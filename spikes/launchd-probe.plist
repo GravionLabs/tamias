@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- THROWAWAY SPIKE (#16) - not product code. Temporary launchd agent that runs
+     claude-usage.ps1 once to see whether the Keychain read prompts under launchd.
+     Replace __REPO__ (absolute worktree path) and __OUT__ (absolute output dir), then:
+       sed -e "s#__REPO__#$PWD#g" -e "s#__OUT__#$TMPDIR#g" spikes/launchd-probe.plist \
+         > ~/Library/LaunchAgents/com.gravionlabs.tamias.probe.plist
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gravionlabs.tamias.probe.plist
+       # wait <= 60 s for __OUT__/tamias-probe.out, then:
+       launchctl bootout gui/$(id -u)/com.gravionlabs.tamias.probe
+       rm ~/Library/LaunchAgents/com.gravionlabs.tamias.probe.plist -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.gravionlabs.tamias.probe</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/pwsh</string>
+        <string>-NoProfile</string>
+        <string>-NonInteractive</string>
+        <string>-File</string>
+        <string>__REPO__/spikes/claude-usage.ps1</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>__OUT__/tamias-probe.out</string>
+    <key>StandardErrorPath</key>
+    <string>__OUT__/tamias-probe.err</string>
+</dict>
+</plist>
