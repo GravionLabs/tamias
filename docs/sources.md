@@ -31,7 +31,7 @@ Read from the installed Claude Code bundle, version **2.1.316** (macOS arm64 nat
 
 macOS observations (2026-11-02, Max subscription):
 
-- The token carries the scopes `user:inference user:profile user:sessions:claude_code user:mcp_servers user:file_upload user:plugins`; `user:profile` is what the endpoint needs.
+- The token carries the scopes `user:inference user:profile user:sessions:claude_code user:mcp_servers user:file_upload user:plugins`. Which scope the endpoint needs is an inference, not tested: by the Claude Code bundle (`rate_limits_available` is false without the profile scope) presumably `user:profile`; no call was made with a token lacking it.
 - `anthropic-beta` is **not required** today: the same call without it (`-OmitBetaHeader`) also
   returned 200. tamias sends it anyway, like Claude Code.
 
