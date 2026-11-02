@@ -1,6 +1,6 @@
 # ADR 0002: Documentation site: VitePress on GitHub Pages, with `docs/` as the only source
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-02
 - Builds on: [ADR 0001](0001-usage-collector-architecture.md), the documentation sites of [elysion](https://github.com/GravionLabs/elysion) (its ADR 0022) and [helix](https://github.com/GravionLabs/helix)
 
