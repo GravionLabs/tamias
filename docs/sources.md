@@ -24,12 +24,12 @@ Read from the installed Claude Code bundle, version **2.1.316** (macOS arm64 nat
 | | macOS | Linux | Windows |
 |---|---|---|---|
 | Credential source | login Keychain, generic password, service `Claude Code-credentials`, read via `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w` | `~/.claude/.credentials.json` (or `$CLAUDE_CONFIG_DIR/.credentials.json`) | `%USERPROFILE%\.claude\.credentials.json` (or `%CLAUDE_CONFIG_DIR%`) |
-| Credential shape | JSON `claudeAiOauth{accessToken, refreshToken, expiresAt (epoch ms), refreshTokenExpiresAt, scopes[], subscriptionType, subscriptionTypeSource, rateLimitTier}` | expected the same (pending) | expected the same (pending) |
-| Request | `GET https://api.anthropic.com/api/oauth/usage`, `Authorization: Bearer`, `anthropic-beta: oauth-2025-04-20` | same (pending) | same (pending) |
-| Result | 200, see fixture | **pending — owner runs on Linux** | **pending — owner runs on Windows** |
+| Credential shape | JSON `claudeAiOauth{accessToken, refreshToken, expiresAt (epoch ms), refreshTokenExpiresAt, scopes[], subscriptionType, subscriptionTypeSource, rateLimitTier}` | expected the same (deferred to #20) | expected the same (deferred to #20) |
+| Request | `GET https://api.anthropic.com/api/oauth/usage`, `Authorization: Bearer`, `anthropic-beta: oauth-2025-04-20` | same (deferred to #20) | same (deferred to #20) |
+| Result | 200, see fixture | **deferred to #20** | **deferred to #20** |
 | Command | `pwsh -NoProfile -File spikes/claude-usage.ps1` | `pwsh -NoProfile -File spikes/claude-usage.ps1` and `... -InvalidToken` | `pwsh -NoProfile -File spikes\claude-usage.ps1` and `... -InvalidToken` |
 
-macOS observations (2026-11-02, Max subscription):
+macOS observations (2026-11-02, the tested subscription):
 
 - The token carries the scopes `user:inference user:profile user:sessions:claude_code user:mcp_servers user:file_upload user:plugins`. Which scope the endpoint needs is an inference, not tested: by the Claude Code bundle (`rate_limits_available` is false without the profile scope) presumably `user:profile`; no call was made with a token lacking it.
 - `anthropic-beta` is **not required** today: the same call without it (`-OmitBetaHeader`) also
@@ -41,7 +41,7 @@ From `crates/core/tests/fixtures/claude/usage-ok.json`:
 
 | Field | Type / unit | Meaning |
 |---|---|---|
-| `five_hour.utilization` | number, percent 0-100 (e.g. `45.0`) | five-hour window used |
+| `five_hour.utilization` | number, percent 0-100 (e.g. `42.0`) | five-hour window used |
 | `five_hour.resets_at` | ISO-8601 string with offset and microseconds (`2026-11-02T08:40:00.155067+01:00`) | end of the five-hour window |
 | `seven_day.utilization` | number, percent 0-100 | seven-day window used (binding limit) |
 | `seven_day.resets_at` | ISO-8601 string | end of the seven-day window |
@@ -99,7 +99,7 @@ Each window is present only while the API reports it and its `resets_at` has not
 statusLine input also carries `rate_limits_available` (false for API key, Bedrock, Vertex or missing
 profile scope; `rate_limits` is then null).
 
-**Real capture: pending — owner captures.** No `statusline.json` fixture is committed yet. Steps
+**Real capture: deferred to #20.** No `statusline.json` fixture is committed yet. Steps for #20
 (temporary, revert afterwards):
 
 1. Add to `~/.claude/settings.json`:
@@ -117,6 +117,6 @@ profile scope; `rate_limits` is then null).
 | Platform | Verdict |
 |---|---|
 | macOS | **Use.** OAuth usage endpoint via `/usr/bin/security`, works under launchd without a prompt. |
-| Linux | pending — owner runs on Linux (`pwsh -NoProfile -File spikes/claude-usage.ps1`, then `-InvalidToken`) |
-| Windows | pending — owner runs on Windows (`pwsh -NoProfile -File spikes\claude-usage.ps1`, then `-InvalidToken`) |
-| Status line fallback | schema confirmed from the 2.1.316 bundle; real capture pending — owner captures |
+| Linux | deferred to #20 (`pwsh -NoProfile -File spikes/claude-usage.ps1`, then `-InvalidToken`) |
+| Windows | deferred to #20 (`pwsh -NoProfile -File spikes\claude-usage.ps1`, then `-InvalidToken`) |
+| Status line fallback | schema confirmed from the 2.1.316 bundle; real capture deferred to #20 |

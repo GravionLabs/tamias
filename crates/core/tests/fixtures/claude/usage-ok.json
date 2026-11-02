@@ -1,6 +1,6 @@
 {
   "five_hour": {
-    "utilization": 45.0,
+    "utilization": 42.0,
     "resets_at": "2026-11-02T07:40:00.155067+00:00",
     "limit_dollars": null,
     "used_dollars": null,
@@ -8,7 +8,7 @@
     "locked_reason": null
   },
   "seven_day": {
-    "utilization": 81.0,
+    "utilization": 17.0,
     "resets_at": "2026-11-02T21:00:00.155085+00:00",
     "limit_dollars": null,
     "used_dollars": null,
@@ -41,10 +41,10 @@
   "pace": null,
   "extra_usage": {
     "is_enabled": true,
-    "monthly_limit": 15000,
+    "monthly_limit": 10000,
     "used_credits": 0.0,
     "utilization": null,
-    "currency": "EUR",
+    "currency": "USD",
     "decimal_places": 2,
     "disabled_reason": null,
     "user_disabled": false,
@@ -57,7 +57,7 @@
     {
       "kind": "session",
       "group": "session",
-      "percent": 45,
+      "percent": 42,
       "severity": "normal",
       "resets_at": "2026-11-02T07:40:00.155067+00:00",
       "scope": null,
@@ -66,8 +66,8 @@
     {
       "kind": "weekly_all",
       "group": "weekly",
-      "percent": 81,
-      "severity": "warning",
+      "percent": 17,
+      "severity": "normal",
       "resets_at": "2026-11-02T21:00:00.155085+00:00",
       "scope": null,
       "is_active": true
@@ -75,7 +75,7 @@
     {
       "kind": "weekly_scoped",
       "group": "weekly",
-      "percent": 9,
+      "percent": 6,
       "severity": "normal",
       "resets_at": "2026-11-02T21:00:00.155208+00:00",
       "scope": {
@@ -91,12 +91,12 @@
   "spend": {
     "used": {
       "amount_minor": 0,
-      "currency": "EUR",
+      "currency": "USD",
       "exponent": 2
     },
     "limit": {
-      "amount_minor": 15000,
-      "currency": "EUR",
+      "amount_minor": 10000,
+      "currency": "USD",
       "exponent": 2
     },
     "percent": 0,
@@ -105,8 +105,8 @@
     "disabled_reason": null,
     "cap": {
       "money": {
-        "amount_minor": 15000,
-        "currency": "EUR",
+        "amount_minor": 10000,
+        "currency": "USD",
         "exponent": 2
       },
       "credits": null
@@ -125,17 +125,17 @@
       {
         "key": "claude_code",
         "display_name": "Claude Code",
-        "percent": 97
+        "percent": 70
       },
       {
         "key": "chat",
         "display_name": "Chats",
-        "percent": 0
+        "percent": 20
       },
       {
         "key": "cowork",
         "display_name": "Cowork",
-        "percent": 3
+        "percent": 10
       },
       {
         "key": "other",
@@ -147,7 +147,7 @@
   "weekly_scoped_shares": [
     {
       "limit_index": 2,
-      "used_percent_of_weekly": 5,
+      "used_percent_of_weekly": 3,
       "allowance_percent_of_weekly": 50
     }
   ]
