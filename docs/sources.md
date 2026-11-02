@@ -64,7 +64,8 @@ Notes for the parser:
 |---|---|
 | Invalid token | HTTP 401, `{"type":"error","error":{"type":"authentication_error","message":"OAuth access token is invalid."},"request_id":"req_..."}` (fixture `usage-unauthorized.json`, `request_id` replaced) |
 | Expired token | not observed (the token was valid). `expiresAt` is in the credential, so tamias checks it before the call; by the bundle, Claude Code treats an expired token as 401 and refreshes. |
-| Missing Keychain item / file | probe throws `Keychain item ... not readable` / `Credentials file not found`; tamias reports `stale` |
+| Missing Keychain item | run on macOS 2026-11-02 with a scratch copy of the probe whose service name was replaced by the non-existent `tamias-spike-missing` (real Keychain item untouched): `security` exited 44, the probe threw `Keychain item 'tamias-spike-missing' not readable (security exit 44).` and exited 1, before any HTTP call. tamias should then report `stale` (intended, not tested) |
+| Missing credentials file (Linux/Windows) | not tested (from probe code): the probe throws `Credentials file not found: <path>`; tamias should report `stale` |
 | No subscription / API key login | expected: no `claudeAiOauth` entry; not tested |
 
 **Refresh:** tamias must **not** refresh the token itself. A refresh rotates the refresh token, and
