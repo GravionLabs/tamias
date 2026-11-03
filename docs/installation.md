@@ -2,7 +2,78 @@
 
 ## Download
 
-The download section is added with the release archives (issue [#10](https://github.com/GravionLabs/tamias/issues/10)).
+Every release on the [GitHub releases page](https://github.com/GravionLabs/tamias/releases) has one archive per platform and a `SHA256SUMS` file with the checksum of every archive. The archive is named `tamias-<version>-<target>` and holds one directory with `tamias` (Windows: `tamias.exe`), `LICENSE` and `README.md`.
+
+| Platform | Archive |
+| --- | --- |
+| Linux, x86_64 | `tamias-<version>-x86_64-unknown-linux-musl.tar.gz` |
+| Linux, arm64 | `tamias-<version>-aarch64-unknown-linux-musl.tar.gz` |
+| macOS, Apple silicon | `tamias-<version>-aarch64-apple-darwin.tar.gz` |
+| macOS, Intel | `tamias-<version>-x86_64-apple-darwin.tar.gz` |
+| Windows, x86_64 | `tamias-<version>-x86_64-pc-windows-msvc.zip` |
+
+The Linux binaries are statically linked and need no installed libraries. The binaries are not signed, so macOS and Windows warn on the first start (see the platform sections).
+
+Download the archive of your platform and `SHA256SUMS` into the same empty directory. Replace `<version>` below with the version you downloaded.
+
+### Linux
+
+```sh
+sha256sum --ignore-missing -c SHA256SUMS
+tar -xzf tamias-<version>-x86_64-unknown-linux-musl.tar.gz
+install -m 755 tamias-<version>-x86_64-unknown-linux-musl/tamias ~/.local/bin/tamias
+```
+
+`~/.local/bin` must be on your `PATH`. The check prints `OK` for the archive you downloaded. Linux does not warn on the first start.
+
+### macOS
+
+```sh
+shasum -a 256 --ignore-missing -c SHA256SUMS
+tar -xzf tamias-<version>-aarch64-apple-darwin.tar.gz
+mkdir -p ~/.local/bin
+cp tamias-<version>-aarch64-apple-darwin/tamias ~/.local/bin/tamias
+```
+
+Put `~/.local/bin` on your `PATH` (for zsh: `export PATH="$HOME/.local/bin:$PATH"` in `~/.zshrc`). If your `shasum` has no `--ignore-missing`, compare `shasum -a 256 <archive>` with the line in `SHA256SUMS` by eye.
+
+Gatekeeper blocks a downloaded, unsigned binary on the first start. Remove the quarantine flag once:
+
+```sh
+xattr -d com.apple.quarantine ~/.local/bin/tamias
+```
+
+Alternatively start `tamias` once, then open System Settings, Privacy & Security, and choose "Allow Anyway" for tamias.
+
+### Windows
+
+In PowerShell, in the download directory:
+
+```powershell
+$archive = "tamias-<version>-x86_64-pc-windows-msvc.zip"
+(Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+Select-String -Path SHA256SUMS -Pattern $archive
+```
+
+The two hashes must be identical. Then unpack and put the directory on your `PATH`:
+
+```powershell
+Expand-Archive $archive -DestinationPath "$env:LOCALAPPDATA\tamias"
+$dir = "$env:LOCALAPPDATA\tamias\tamias-<version>-x86_64-pc-windows-msvc"
+[Environment]::SetEnvironmentVariable("Path", "$([Environment]::GetEnvironmentVariable('Path', 'User'));$dir", "User")
+```
+
+Open a new terminal for the changed `PATH` to apply. Windows SmartScreen may warn about an unrecognized app on the first start: choose "More info", then "Run anyway".
+
+### First start
+
+```sh
+tamias --version
+tamias collect    # poll Claude and Copilot once and store the snapshots
+tamias today      # today's usage against the daily budget
+```
+
+To poll every 5 minutes without running `collect` by hand, see [Scheduled collection](#scheduled-collection).
 
 ## Scheduled collection
 
