@@ -181,7 +181,8 @@ impl Runner for SystemRunner {
 /// # Errors
 ///
 /// [`Error::Io`] when it cannot start, [`Error::Command`] on a non-zero exit.
-#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
+// Only the launchd scheduler uses it; Linux inspects the exit status of `systemctl` itself.
+#[cfg(any(target_os = "macos", test))]
 pub fn run_checked(runner: &dyn Runner, program: &str, args: &[&str]) -> Result<Output> {
     let command = std::iter::once(program)
         .chain(args.iter().copied())
