@@ -1,0 +1,3 @@
+# site/ is the only Node project of tamias: its own workspace root, so pnpm reads these settings from here.
+allowBuilds:
+  esbuild: true
