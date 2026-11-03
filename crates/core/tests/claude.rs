@@ -193,6 +193,7 @@ fn status_401_is_unauthorized_and_tells_to_run_claude_code() {
     ));
     let err = client(&url).fetch(valid_token(), now()).unwrap_err();
     assert!(matches!(err, Error::Unauthorized), "{err:?}");
+    assert_eq!(err.class(), "unauthorized");
     assert!(err.to_string().contains("run Claude Code once"));
     assert_no_token(&err);
 }
@@ -205,6 +206,7 @@ fn other_status_is_http_error() {
         matches!(err, Error::Http(ref m) if m.contains("500")),
         "{err:?}"
     );
+    assert_eq!(err.class(), "http 500");
     assert_no_token(&err);
 }
 
@@ -222,6 +224,7 @@ fn connection_refused_is_http_error() {
     drop(listener);
     let err = client(&url).fetch(valid_token(), now()).unwrap_err();
     assert!(matches!(err, Error::Http(_)), "{err:?}");
+    assert_eq!(err.class(), "network");
     assert_no_token(&err);
 }
 
@@ -237,6 +240,7 @@ fn silent_server_times_out_with_typed_error_and_no_snapshot() {
     let started = std::time::Instant::now();
     let result = UsageClient::with_url(url, Duration::from_millis(300)).fetch(valid_token(), now());
     assert!(matches!(result, Err(Error::Timeout(_))), "{result:?}");
+    assert_eq!(result.unwrap_err().class(), "timeout");
     assert!(started.elapsed() < Duration::from_secs(4));
 }
 
@@ -428,4 +432,32 @@ fn macos_default_source_is_the_keychain_via_usr_bin_security() {
 fn non_macos_default_source_is_the_credentials_file() {
     let shown = format!("{:?}", tamias_core::credentials::os_default().unwrap());
     assert!(shown.contains(".credentials.json"), "{shown}");
+}
+
+// --- Error::class ----------------------------------------------------------------------------
+
+#[test]
+fn error_class_is_short_and_never_carries_the_message() {
+    let cases = [
+        (
+            Error::NoCredentials("/home/u/.claude/.credentials.json".to_owned()),
+            "no credentials",
+        ),
+        (Error::Expired { expires_at: now() }, "expired"),
+        (Error::Unauthorized, "unauthorized"),
+        (Error::Timeout("security".to_owned()), "timeout"),
+        (
+            Error::Http("unexpected HTTP status 503".to_owned()),
+            "http 503",
+        ),
+        (
+            Error::Http("unexpected HTTP status abc".to_owned()),
+            "network",
+        ),
+        (Error::Http("io: connection reset".to_owned()), "network"),
+        (Error::Schema(format!("body {TOKEN}")), "schema"),
+    ];
+    for (err, class) in cases {
+        assert_eq!(err.class(), class, "{err:?}");
+    }
 }

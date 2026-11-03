@@ -54,6 +54,30 @@ pub enum Error {
     Schema(String),
 }
 
+/// Start of the [`Error::Http`] message for an unexpected HTTP status.
+const STATUS_PREFIX: &str = "unexpected HTTP status ";
+
+impl Error {
+    /// Short, stable error class for the source status: `no credentials`, `expired`,
+    /// `unauthorized`, `timeout`, `http <status>`, `network` or `schema`.
+    ///
+    /// Never contains response bodies, paths or credential data.
+    #[must_use]
+    pub fn class(&self) -> String {
+        match self {
+            Error::NoCredentials(_) => "no credentials".to_owned(),
+            Error::Expired { .. } => "expired".to_owned(),
+            Error::Unauthorized => "unauthorized".to_owned(),
+            Error::Timeout(_) => "timeout".to_owned(),
+            Error::Http(message) => message
+                .strip_prefix(STATUS_PREFIX)
+                .and_then(|code| code.parse::<u16>().ok())
+                .map_or_else(|| "network".to_owned(), |code| format!("http {code}")),
+            Error::Schema(_) => "schema".to_owned(),
+        }
+    }
+}
+
 /// Result of the Claude provider.
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -174,7 +198,7 @@ impl UsageClient {
             return Err(Error::Unauthorized);
         }
         if status != 200 {
-            return Err(Error::Http(format!("unexpected HTTP status {status}")));
+            return Err(Error::Http(format!("{STATUS_PREFIX}{status}")));
         }
         let body = response.body_mut().read_to_vec().map_err(map_ureq_error)?;
         parse_usage(&body, now)
