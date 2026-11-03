@@ -327,10 +327,7 @@ pub fn execute(
         Action::Status => {
             let state = scheduler.status()?;
             let store = open_store()?;
-            let mut statuses = Vec::new();
-            for provider in [Provider::Claude, Provider::Copilot] {
-                statuses.push((provider, store.status(provider)?));
-            }
+            let statuses = vec![(Provider::Claude, store.status(Provider::Claude)?)];
             Ok(render_status(
                 &state,
                 &statuses,
@@ -373,6 +370,7 @@ pub fn render_status(
     for (provider, status) in statuses {
         let _ = writeln!(out, "{provider}: {}", last_run(status.as_ref(), tz));
     }
+    out.push_str("copilot: not polled yet (coming with #5)\n");
     let _ = writeln!(out, "log: {}", log_path.display());
     out
 }

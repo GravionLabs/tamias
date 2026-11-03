@@ -13,7 +13,7 @@ use super::{SERVICE, SystemdTimer, TIMER, service_unit, timer_unit, units_dir};
 use crate::service::{Output, Runner, Scheduler};
 
 const EXPECTED_SERVICE: &str = "[Unit]
-Description=tamias collector (polls Claude and Copilot usage once)
+Description=tamias collector (polls Claude usage once)
 
 [Service]
 Type=oneshot

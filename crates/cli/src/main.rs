@@ -4,6 +4,7 @@ mod claude;
 mod collect;
 mod collect_log;
 mod config;
+mod exit;
 mod service;
 mod short;
 mod today;
@@ -19,11 +20,7 @@ use tamias_core::paths;
 use tamias_core::store::Store;
 use tracing::Level;
 
-/// Exit code when the command could not run (invalid config, data directory, store).
-const EXIT_ERROR: u8 = 1;
-/// Exit code when at least one set-up provider is not fresh: its poll failed (`collect`) or it
-/// is stale (`today`).
-const EXIT_STALE: u8 = 3;
+use crate::exit::{EXIT_ERROR, EXIT_STALE};
 
 /// Exit codes shared by `collect` and `today`, shown in their `--help`.
 const EXIT_CODES: &str = "\
@@ -107,18 +104,19 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    if matches!(cli.command, Command::Collect) {
+        return Ok(match collect::run_logged(cli.config.as_deref())? {
+            collect::Outcome::Ok => ExitCode::SUCCESS,
+            collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
+        });
+    }
     let config = config::load(cli.config.as_deref())?;
     let data_dir = paths::data_dir()?;
     let database = data_dir.join(paths::DATABASE_FILE);
     tracing::debug!("database {}", database.display());
     let log = collect_log::CollectLog::in_data_dir(&data_dir);
     match cli.command {
-        Command::Collect => Ok(
-            match collect::run(&config, &mut Store::open(&database)?, &log)? {
-                collect::Outcome::Ok => ExitCode::SUCCESS,
-                collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
-            },
-        ),
+        Command::Collect => unreachable!("handled before the config is loaded"),
         Command::Today(ref args) => {
             // Whole seconds: `generated_at` of the JSON is RFC 3339 without a fraction.
             let now = Timestamp::from_second(Timestamp::now().as_second())?;

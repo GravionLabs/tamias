@@ -14,29 +14,26 @@ mod collect;
 mod collect_log;
 #[path = "../config.rs"]
 mod config;
+#[path = "../exit.rs"]
+mod exit;
 
 use std::process::ExitCode;
 
-use tamias_core::paths;
-use tamias_core::store::Store;
+use exit::{EXIT_ERROR, EXIT_STALE};
 
 /// Same exit codes as `tamias collect`: 0 ok, 1 could not run, 3 a poll failed.
 fn main() -> ExitCode {
     match run() {
         Ok(collect::Outcome::Ok) => ExitCode::SUCCESS,
-        Ok(collect::Outcome::ProviderFailed) => ExitCode::from(3),
+        Ok(collect::Outcome::ProviderFailed) => ExitCode::from(EXIT_STALE),
         Err(e) => {
             // Without a console this goes nowhere; kept for `tamiasw` run from a terminal.
             eprintln!("error: {e}");
-            ExitCode::from(1)
+            ExitCode::from(EXIT_ERROR)
         }
     }
 }
 
 fn run() -> Result<collect::Outcome, Box<dyn std::error::Error>> {
-    let config = config::load(None)?;
-    let data_dir = paths::data_dir()?;
-    let log = collect_log::CollectLog::in_data_dir(&data_dir);
-    let mut store = Store::open(data_dir.join(paths::DATABASE_FILE))?;
-    Ok(collect::run(&config, &mut store, &log)?)
+    collect::run_logged(None)
 }

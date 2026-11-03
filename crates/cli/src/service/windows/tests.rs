@@ -14,7 +14,7 @@ use crate::service::{Output, Runner, Scheduler};
 const EXPECTED_XML: &str = r#"<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>tamias collector: polls Claude and Copilot usage every 5 minutes</Description>
+    <Description>tamias collector: polls Claude usage every 5 minutes</Description>
   </RegistrationInfo>
   <Triggers>
     <TimeTrigger>

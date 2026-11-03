@@ -18,7 +18,7 @@ hero:
 
 features:
   - title: One collector
-    details: Polls Claude and Copilot every 5 minutes as a user-level scheduled job on Linux, Windows and macOS, and stores snapshots in SQLite.
+    details: Polls Claude every 5 minutes (Copilot is coming with #5) as a user-level scheduled job on Linux, Windows and macOS, and stores snapshots in SQLite.
   - title: A dynamic daily budget
     details: What is left until the next reset, divided by the days left. Today is green below 80 %, yellow from 80 to 100 %, red above, grey when the data is stale.
   - title: Thin consumers

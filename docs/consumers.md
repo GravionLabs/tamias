@@ -69,14 +69,14 @@ C 62% · CP 41%
 
 ## Exit codes
 
-| Code | Meaning |
-| --- | --- |
-| 0 | every set-up provider is ok (unavailable providers do not count) |
-| 1 | tamias could not run (invalid config, unreadable store) |
-| 2 | invalid command line |
-| 3 | at least one set-up provider is stale |
+| Code | `tamias collect` (and `tamiasw`) | `tamias today` |
+| --- | --- | --- |
+| 0 | every enabled provider was read (or none is available) | every set-up provider is ok (unavailable providers do not count) |
+| 1 | tamias could not run (invalid config, unreadable store) | tamias could not run (invalid config, unreadable store) |
+| 2 | invalid command line | invalid command line |
+| 3 | at least one provider failed to poll; the error is recorded in the store and the collect log | at least one set-up provider is stale |
 
-With 3 the output is still printed in full, so a consumer can show the stale state itself instead of failing. Only 1 and 2 print nothing on stdout.
+`tamiasw` is `collect` without a console window and uses the same codes. With 3 from `today` the output is still printed in full, so a consumer can show the stale state itself instead of failing. Only 1 and 2 print nothing on stdout.
 
 ## Compatibility rule
 
