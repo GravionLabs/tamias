@@ -2,3 +2,5 @@
 site/node_modules
 site/.vitepress/dist
 site/.vitepress/cache
+# Default output of git-cliff-action in the release job; versioning/gh-release stages with `git add -A`.
+/git-cliff/
