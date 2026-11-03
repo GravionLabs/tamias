@@ -262,6 +262,7 @@ pub fn platform() -> Result<Box<dyn Scheduler>> {
 ///
 /// [`Error::Other`] without a temp directory.
 #[cfg(target_os = "windows")]
+#[allow(clippy::unnecessary_wraps)] // same signature as the other platforms
 pub fn platform() -> Result<Box<dyn Scheduler>> {
     Ok(Box::new(windows::TaskScheduler::new(
         std::env::temp_dir(),
