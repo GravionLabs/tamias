@@ -1,7 +1,9 @@
 //! Core of tamias: usage providers, the snapshot store and the daily budget calculation.
 
 pub mod budget;
+pub mod credentials;
 pub mod paths;
+pub mod provider;
 pub mod snapshot;
 pub mod store;
 
