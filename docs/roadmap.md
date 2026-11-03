@@ -17,7 +17,7 @@ Goal: one collector runs every 5 minutes on Linux, Windows and macOS, and `tamia
 | [#7](https://github.com/GravionLabs/tamias/issues/7) Claude Code status line | `tamias ingest-statusline`: fallback source and compact line |
 | [#8](https://github.com/GravionLabs/tamias/issues/8) Stable consumer interface | `today --json` schema v1, `--short`, exit codes, `tamias-core` as a crate |
 | [#3](https://github.com/GravionLabs/tamias/issues/3) Documentation site | VitePress on GitHub Pages from `docs/` |
-| [#10](https://github.com/GravionLabs/tamias/issues/10) Releases on GitHub | CLI archives with checksums for three platforms |
+| [#10](https://github.com/GravionLabs/tamias/issues/10) Releases on GitHub | CLI archives with checksums for five targets (Linux x86_64 and arm64, macOS Intel and Apple silicon, Windows x86_64) |
 
 Order: the spikes and the workspace ([#11](https://github.com/GravionLabs/tamias/issues/11)) first, then store, budget and Claude provider in parallel, then the CLI. Service, status line, Copilot and the consumer interface build on it; the documentation site can be done at any time.
 
