@@ -32,6 +32,7 @@ export function adrItems(docsDir: string): SidebarItem[] {
 /** The other pages, in the order they are best read. Installation and consumers join when their pages exist. */
 export const PAGES: readonly SidebarItem[] = [
   { text: 'Overview', link: '/' },
+  { text: 'Installation', link: '/installation' },
   { text: 'Consumers', link: '/consumers' },
   { text: 'Usage sources', link: '/sources' },
   { text: 'Roadmap', link: '/roadmap' },
