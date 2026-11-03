@@ -4,6 +4,7 @@ pub mod budget;
 pub mod credentials;
 pub mod paths;
 pub mod provider;
+pub mod report;
 pub mod snapshot;
 pub mod store;
 
