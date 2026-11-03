@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(gh auth status)",
+      "Bash(gh api:*)",
+      "Bash(gh issue:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh label:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo doc:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo check:*)",
+      "Bash(docker run:*)",
+      "Bash(pwsh ~/.claude/skills/deliver/scripts/Remove-PbiWorktrees.ps1:*)",
+      "Bash(pwsh ~/.claude/skills/lessons/scripts/Get-Lessons.ps1:*)",
+      "Bash(pwsh ~/.claude/skills/github-milestone/scripts/Get-Milestones.ps1:*)",
+      "Bash(printenv HERDR_ENV)",
+      "Bash(printenv HERDR_PANE_ID)",
+      "Bash(herdr pane report-metadata:*)",
+      "Edit",
+      "Write"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(gh pr merge --admin:*)"
+    ]
+  }
+}
