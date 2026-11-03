@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use assert_cmd::Command;
 use jiff::{SignedDuration, Timestamp};
+#[cfg(not(target_os = "linux"))]
 use predicates::prelude::*;
 use tempfile::TempDir;
 
@@ -96,9 +97,9 @@ fn a_skipped_provider_is_logged_as_ok() {
     assert!(log.ends_with(" claude ok skipped (disabled)\n"), "{log}");
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 #[test]
-fn service_outside_macos_cannot_run_and_exits_1() {
+fn service_on_unsupported_platforms_cannot_run_and_exits_1() {
     let env = Env::new();
     for action in ["install", "uninstall", "status"] {
         env.tamias()

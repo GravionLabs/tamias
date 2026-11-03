@@ -1,9 +1,13 @@
 //! `tamias service`: register `tamias collect` with the OS scheduler.
 //!
-//! [`Scheduler`] is implemented per OS (`cfg(target_os)`): a launchd agent on macOS. Linux
-//! (#29) and Windows (#30) report "not supported yet". External commands such as `launchctl`
+//! [`Scheduler`] is implemented per OS (`cfg(target_os)`): a launchd agent on macOS, a systemd
+//! user timer on Linux. Windows (#30) reports "not supported yet". External commands such as `launchctl`
 //! go through a [`Runner`], which tests replace with a fake.
 
+// The Linux module is pure file and command logic, so it compiles (and its tests run) on every
+// OS; only Linux selects it in `platform()`.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub mod linux;
 #[cfg(target_os = "macos")]
 pub mod macos;
 
@@ -70,19 +74,19 @@ pub trait Scheduler {
 #[derive(Debug)]
 pub enum Error {
     /// No scheduler for this OS yet.
-    #[cfg_attr(target_os = "macos", allow(dead_code))]
+    #[cfg_attr(any(target_os = "macos", target_os = "linux"), allow(dead_code))]
     Unsupported(&'static str),
     /// A file operation failed.
     Io { context: String, source: io::Error },
     /// An external command exited with an error.
-    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    #[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
     Command {
         command: String,
         status: String,
         stderr: String,
     },
     /// Other problem (for example a path that is not valid UTF-8).
-    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    #[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
     Other(String),
 }
 
@@ -134,7 +138,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Output of an external command.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
 pub struct Output {
     /// Exit status 0.
     pub success: bool,
@@ -145,7 +149,7 @@ pub struct Output {
 }
 
 /// Runs external commands.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
 pub trait Runner {
     /// Runs `program` with `args` and waits for it.
     ///
@@ -156,7 +160,7 @@ pub trait Runner {
 }
 
 /// [`Runner`] of the real system.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemRunner;
 
@@ -177,7 +181,8 @@ impl Runner for SystemRunner {
 /// # Errors
 ///
 /// [`Error::Io`] when it cannot start, [`Error::Command`] on a non-zero exit.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+// Only the launchd scheduler uses it; Linux inspects the exit status of `systemctl` itself.
+#[cfg(any(target_os = "macos", test))]
 pub fn run_checked(runner: &dyn Runner, program: &str, args: &[&str]) -> Result<Output> {
     let command = std::iter::once(program)
         .chain(args.iter().copied())
@@ -201,7 +206,7 @@ pub fn run_checked(runner: &dyn Runner, program: &str, args: &[&str]) -> Result<
 ///
 /// # Errors
 ///
-/// [`Error::Unsupported`] on Linux and Windows for now; [`Error::Other`] without a home
+/// [`Error::Unsupported`] on Windows for now; [`Error::Other`] without a home
 /// directory.
 #[cfg(target_os = "macos")]
 pub fn platform() -> Result<Box<dyn Scheduler>> {
@@ -218,8 +223,24 @@ pub fn platform() -> Result<Box<dyn Scheduler>> {
 ///
 /// # Errors
 ///
-/// [`Error::Unsupported`] on Linux and Windows for now.
-#[cfg(not(target_os = "macos"))]
+/// [`Error::Other`] without a home directory.
+#[cfg(target_os = "linux")]
+pub fn platform() -> Result<Box<dyn Scheduler>> {
+    let home = std::env::home_dir().filter(|h| !h.as_os_str().is_empty());
+    let dir = linux::units_dir(std::env::var_os("XDG_CONFIG_HOME"), home.as_deref())
+        .ok_or_else(|| Error::Other("no home directory found for the current user".to_owned()))?;
+    Ok(Box::new(linux::SystemdTimer::new(
+        dir,
+        Box::new(SystemRunner),
+    )))
+}
+
+/// The scheduler of this OS.
+///
+/// # Errors
+///
+/// [`Error::Unsupported`] on Windows for now.
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub fn platform() -> Result<Box<dyn Scheduler>> {
     Err(Error::Unsupported(std::env::consts::OS))
 }

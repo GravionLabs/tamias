@@ -207,11 +207,11 @@ fn unsupported_names_the_platform() {
     );
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 #[test]
-fn platform_is_not_supported_yet_outside_macos() {
+fn platform_is_not_supported_yet_on_windows() {
     let Err(err) = super::platform() else {
-        panic!("platform() must fail outside macOS");
+        panic!("platform() must fail on this OS");
     };
     assert!(err.to_string().contains("not supported yet"), "{err}");
 }
