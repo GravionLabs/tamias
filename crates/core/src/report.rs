@@ -21,11 +21,24 @@ use crate::store::{self, SourceStatus, Store};
 pub const SCHEMA_VERSION: u32 = 1;
 
 /// State of all providers at `generated_at`.
+///
+/// Read the output of `tamias today --json` with [`Report::parse`], which rejects any
+/// `schema_version` other than [`SCHEMA_VERSION`]; plain `serde_json::from_str` does not check it.
+///
+/// The struct is `#[non_exhaustive]`: fields added within schema version 1 do not break
+/// consumers. Build one with [`Report::new`].
+///
+/// `Provider` and `Window` of this module share their names with [`snapshot::Provider`] and
+/// [`snapshot::Window`] (which the fields `provider` and `window` use); import one of the pairs
+/// with an alias, for example `use tamias_core::report::Provider as ProviderReport;`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Report {
     /// Always [`SCHEMA_VERSION`] when written by this build.
     pub schema_version: u32,
+    /// When the report was generated.
     pub generated_at: Timestamp,
+    /// Every provider, the set-up ones and the `unavailable` ones.
     pub providers: Vec<Provider>,
 }
 
@@ -39,6 +52,40 @@ impl Report {
             providers,
         }
     }
+
+    /// Reads the JSON of `tamias today --json`, checking `schema_version` first.
+    ///
+    /// # Errors
+    ///
+    /// [`ParseError::Json`] when `json` is not a report document, [`ParseError::UnsupportedVersion`]
+    /// when its `schema_version` is not [`SCHEMA_VERSION`] (the rest of such a document is not read).
+    pub fn parse(json: &str) -> Result<Self, ParseError> {
+        #[derive(Deserialize)]
+        struct Version {
+            schema_version: u32,
+        }
+        let Version { schema_version } = serde_json::from_str(json)?;
+        if schema_version != SCHEMA_VERSION {
+            return Err(ParseError::UnsupportedVersion {
+                found: schema_version,
+            });
+        }
+        Ok(serde_json::from_str(json)?)
+    }
+}
+
+/// Why [`Report::parse`] failed.
+#[derive(Debug, thiserror::Error)]
+pub enum ParseError {
+    /// Not valid JSON, or not a report document.
+    #[error("not a tamias report: {0}")]
+    Json(#[from] serde_json::Error),
+    /// A `schema_version` this build does not read.
+    #[error("unsupported schema_version {found}, expected {SCHEMA_VERSION}")]
+    UnsupportedVersion {
+        /// The `schema_version` of the document.
+        found: u32,
+    },
 }
 
 /// Health of a provider.
@@ -55,27 +102,36 @@ pub enum Status {
 
 /// State of one provider.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Provider {
+    /// Which provider.
     pub provider: snapshot::Provider,
+    /// Health of the provider.
     pub status: Status,
     /// Last successful collect of a `stale` provider; absent when it never succeeded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stale_since: Option<Timestamp>,
+    /// Windows with data, the binding one first.
     pub windows: Vec<Window>,
 }
 
 /// State of one usage window.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Window {
+    /// Which window.
     pub window: snapshot::Window,
     /// Whether the window has a daily budget.
     pub binding: bool,
+    /// Unit of `used`, `limit`, `today_usage` and `budget`.
     pub unit: Unit,
     /// High-water mark of the current window; 0 once its reset has passed.
     pub used: f64,
+    /// Limit of the window, in its unit.
     pub limit: f64,
     /// End of the most recently observed window (may be past when no newer one was seen).
     pub resets_at: Timestamp,
+    /// Colour of the window: relative to the daily budget for binding windows, `grey` when stale.
     pub colour: Colour,
     /// Usage of the local day (binding windows).
     #[serde(default, skip_serializing_if = "Option::is_none")]

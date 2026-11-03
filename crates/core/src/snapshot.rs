@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Provider {
+    /// Anthropic Claude (subscription limits).
     Claude,
+    /// GitHub Copilot (premium requests).
     Copilot,
 }
 
@@ -32,7 +34,9 @@ pub enum Window {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Unit {
+    /// Percent of the limit (0 to 100).
     Percent,
+    /// Number of requests.
     Requests,
 }
 
@@ -48,17 +52,21 @@ pub enum Source {
 /// One observation of one window.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Snapshot {
+    /// Provider the snapshot is of.
     pub provider: Provider,
+    /// Window the snapshot is of.
     pub window: Window,
     /// Used amount in `unit` (0..=limit for percent; may exceed `limit` for requests).
     pub used: f64,
     /// Limit in `unit` (100 for percent).
     pub limit: f64,
+    /// Unit of the usage.
     pub unit: Unit,
     /// End of the window as reported by the source (not rounded).
     pub resets_at: Timestamp,
     /// When the source was read.
     pub observed_at: Timestamp,
+    /// Where the snapshot came from.
     pub source: Source,
 }
 

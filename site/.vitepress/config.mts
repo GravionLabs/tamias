@@ -48,6 +48,7 @@ export default defineConfig({
   },
   themeConfig: {
     nav: [
+      { text: 'Consumers', link: '/consumers' },
       { text: 'Usage sources', link: '/sources' },
       { text: 'Decisions', link: '/adr/0001-usage-collector-architecture' },
       { text: 'Roadmap', link: '/roadmap' },

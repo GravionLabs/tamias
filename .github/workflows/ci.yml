@@ -39,5 +39,9 @@ jobs:
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Docs of tamias-core
+        run: cargo doc --no-deps -p tamias-core --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
       - name: Test
         run: cargo test --workspace --locked

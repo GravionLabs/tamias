@@ -23,8 +23,11 @@ use crate::snapshot::{Provider, Snapshot, Window};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Colour {
+    /// Below 80 % of the budget.
     Green,
+    /// From 80 % up to and including 100 % of the budget.
     Yellow,
+    /// Above the budget.
     Red,
     /// The provider status is stale; the numbers may be outdated.
     Grey,
@@ -87,6 +90,7 @@ impl Thresholds {
 /// Current instant and provider status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Status {
+    /// Time of the evaluation.
     pub now: Timestamp,
     /// Last successful read of the provider, `None` if it never succeeded.
     pub last_ok_at: Option<Timestamp>,
@@ -101,6 +105,7 @@ pub struct Day {
     pub budget: f64,
     /// `usage / budget`; `None` when the budget is 0.
     pub ratio: Option<f64>,
+    /// Colour of the level.
     pub colour: Colour,
 }
 
@@ -109,9 +114,11 @@ pub struct Day {
 pub struct Level {
     /// High-water mark of the current window; 0 once its `resets_at` has passed.
     pub used: f64,
+    /// Limit of the window, in its unit.
     pub limit: f64,
     /// `used / limit`; `None` when the limit is 0.
     pub ratio: Option<f64>,
+    /// Colour of the day.
     pub colour: Colour,
 }
 

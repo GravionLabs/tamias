@@ -282,3 +282,37 @@ fn read_of_an_empty_store_is_stale_without_windows() {
     assert_eq!(p.status, Status::Stale);
     assert!(p.windows.is_empty());
 }
+
+#[test]
+fn parse_reads_the_schema_example() {
+    let report = Report::parse(DOCUMENT).unwrap();
+    assert_eq!(report.schema_version, 1);
+    assert_eq!(report.providers.len(), 2);
+}
+
+#[test]
+fn parse_ignores_added_fields_within_version_1() {
+    let text = DOCUMENT.replacen("\"binding\"", "\"future\": 1, \"binding\"", 1);
+    assert!(Report::parse(&text).is_ok());
+}
+
+#[test]
+fn parse_rejects_another_schema_version_even_with_another_shape() {
+    let err = Report::parse(r#"{"schema_version": 2, "rows": []}"#).unwrap_err();
+    assert!(matches!(
+        err,
+        super::ParseError::UnsupportedVersion { found: 2 }
+    ));
+}
+
+#[test]
+fn parse_rejects_garbage_and_a_missing_version() {
+    assert!(matches!(
+        Report::parse("nope").unwrap_err(),
+        super::ParseError::Json(_)
+    ));
+    assert!(matches!(
+        Report::parse("{}").unwrap_err(),
+        super::ParseError::Json(_)
+    ));
+}
