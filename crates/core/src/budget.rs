@@ -15,10 +15,13 @@ use jiff::civil::Date;
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp, ToSpan};
 
+use serde::{Deserialize, Serialize};
+
 use crate::snapshot::{Provider, Snapshot, Window};
 
 /// Traffic-light colour of a day or a window.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Colour {
     Green,
     Yellow,
