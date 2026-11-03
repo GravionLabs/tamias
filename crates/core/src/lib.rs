@@ -2,6 +2,7 @@
 
 pub mod paths;
 pub mod snapshot;
+pub mod store;
 
 /// Version of `tamias-core`, the workspace version.
 #[must_use]
