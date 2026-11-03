@@ -1,5 +1,7 @@
 //! Core of tamias: usage providers, the snapshot store and the daily budget calculation.
 
+pub mod snapshot;
+
 /// Version of `tamias-core`, the workspace version.
 #[must_use]
 pub fn version() -> &'static str {
