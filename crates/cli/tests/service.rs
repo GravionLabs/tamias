@@ -70,11 +70,11 @@ fn closed_url() -> String {
 }
 
 #[test]
-fn a_failed_collect_appends_an_error_line_without_the_token() {
+fn a_failed_poll_exits_3_and_appends_an_error_line_without_the_token() {
     let env = Env::new();
     env.write_credentials();
-    env.tamias().arg("collect").assert().code(1);
-    env.tamias().arg("collect").assert().code(1);
+    env.tamias().arg("collect").assert().code(3);
+    env.tamias().arg("collect").assert().code(3);
 
     let log = fs::read_to_string(env.log_path()).unwrap();
     let lines: Vec<&str> = log.lines().collect();
@@ -98,13 +98,13 @@ fn a_skipped_provider_is_logged_as_ok() {
 
 #[cfg(not(target_os = "macos"))]
 #[test]
-fn service_is_not_supported_yet_outside_macos() {
+fn service_outside_macos_cannot_run_and_exits_1() {
     let env = Env::new();
     for action in ["install", "uninstall", "status"] {
         env.tamias()
             .args(["service", action])
             .assert()
-            .code(2)
+            .code(1)
             .stderr(predicate::str::contains(
                 "not supported yet on this platform",
             ));
@@ -116,7 +116,7 @@ fn service_is_not_supported_yet_outside_macos() {
 fn service_status_shows_the_last_run_and_the_log_path() {
     let env = Env::new();
     env.write_credentials();
-    env.tamias().arg("collect").assert().code(1);
+    env.tamias().arg("collect").assert().code(3);
     env.tamias()
         .args(["service", "status"])
         .assert()
