@@ -48,15 +48,37 @@ From `crates/core/tests/fixtures/claude/usage-ok.json`:
 
 Notes for the parser:
 
-- `resets_at` jitters in the sub-second part between calls (`.155067` vs. `.174235` for the same
-  window); round to whole seconds (or minutes) before comparing for a window jump.
+- `resets_at` jitters by up to about one second between calls, across the full second
+  (`21:00:00.48` in one call, `20:59:59.52` in another for the same window); round to the **nearest
+  minute** before comparing for a window jump. Whole seconds are not enough. After a reset the value
+  can come without fractional seconds (`2026-11-09T21:00:00+00:00`).
 - The seven-day window is **anchored, not rolling**: `seven_day_breakdown.window_started_at`
-  (`2026-10-26T22:00`) is exactly seven days before `seven_day.resets_at` (`2026-11-02T22:00`), and
-  `resets_at` stayed the same across calls. This answers the ADR 0001 open question for this account.
+  (`2026-10-26T21:00Z`) is exactly seven days before `seven_day.resets_at` (`2026-11-02T21:00Z`), and
+  `resets_at` stayed the same across calls; one observed reset confirms it (see "Window behaviour").
+- `seven_day_breakdown` is `null` right after a reset; do not rely on it.
 - Many other keys are present and `null` (`seven_day_opus`, `seven_day_sonnet`, codenamed keys such as
   `tangelo`, `cedar_ember`); ignore unknown keys. `limits[]` repeats the windows as integer `percent`
   with a `severity` (`normal`, `warning`); `extra_usage` / `spend` describe paid overage credits.
   None of these are needed for the first version.
+
+### Window behaviour
+
+Observed reset of the seven-day window (#18), macOS, two runs of `spikes/claude-usage.ps1` from a
+temporary LaunchAgent around `seven_day.resets_at`, 2026-11-02 (times UTC):
+
+| | 21:55 local (20:55Z), before | 22:05 local (21:05Z), after |
+|---|---|---|
+| `seven_day.utilization` | 93.0 | 0.0 |
+| `seven_day.resets_at` | `2026-11-02T20:59:59.524353Z` | `2026-11-09T21:00:00Z` |
+| `five_hour.utilization` | 23.0 | 23.0 |
+| `five_hour.resets_at` | `2026-11-02T22:39:59.524335Z` | `2026-11-02T22:40:00.195041Z` |
+| `seven_day_breakdown` | present | `null` |
+
+- **Seven-day window: anchored.** At the reset instant `utilization` drops to 0 and `resets_at`
+  moves by exactly seven days (rounded to the minute); before it, `resets_at` stays constant.
+- **Five-hour window: independent.** The seven-day reset leaves it unchanged (same `utilization`,
+  same `resets_at` within the jitter).
+- `limits[]` follows the same values (`weekly_all` 93 → 0, `weekly_scoped` → 0, `session` unchanged).
 
 ### Failure modes
 
