@@ -2,7 +2,9 @@
 
 mod claude;
 mod collect;
+mod collect_log;
 mod config;
+mod service;
 mod short;
 mod today;
 
@@ -54,6 +56,9 @@ enum Command {
     /// Show today's usage against today's budget.
     #[command(after_help = EXIT_CODES)]
     Today(TodayArgs),
+    /// Run the collector in the background (install, uninstall, status).
+    #[command(subcommand)]
+    Service(service::Action),
 }
 
 #[derive(Debug, Args)]
@@ -103,18 +108,22 @@ fn main() -> ExitCode {
 
 fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
     let config = config::load(cli.config.as_deref())?;
-    let database = paths::database_path()?;
+    let data_dir = paths::data_dir()?;
+    let database = data_dir.join(paths::DATABASE_FILE);
     tracing::debug!("database {}", database.display());
-    let mut store = Store::open(&database)?;
+    let log = collect_log::CollectLog::in_data_dir(&data_dir);
     match cli.command {
-        Command::Collect => Ok(match collect::run(&config, &mut store)? {
-            collect::Outcome::Ok => ExitCode::SUCCESS,
-            collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
-        }),
+        Command::Collect => Ok(
+            match collect::run(&config, &mut Store::open(&database)?, &log)? {
+                collect::Outcome::Ok => ExitCode::SUCCESS,
+                collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
+            },
+        ),
         Command::Today(ref args) => {
             // Whole seconds: `generated_at` of the JSON is RFC 3339 without a fraction.
             let now = Timestamp::from_second(Timestamp::now().as_second())?;
             let tz = TimeZone::system();
+            let store = Store::open(&database)?;
             let today = today::read(&config, &store, now, &tz)?;
             let stdout = std::io::stdout();
             let colour = args.color.enabled(stdout.is_terminal(), no_color());
@@ -131,6 +140,13 @@ fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             } else {
                 ExitCode::SUCCESS
             })
+        }
+        Command::Service(action) => {
+            let scheduler = service::platform()?;
+            let open_store = || Ok(Store::open(&database)?);
+            let text = service::execute(action, scheduler.as_ref(), open_store, &log.path())?;
+            std::io::stdout().lock().write_all(text.as_bytes())?;
+            Ok(ExitCode::SUCCESS)
         }
     }
 }
