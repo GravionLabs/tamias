@@ -7,7 +7,10 @@ use std::path::PathBuf;
 
 use assert_cmd::Command;
 use jiff::{SignedDuration, Timestamp};
-#[cfg(not(target_os = "linux"))]
+#[cfg(any(
+    target_os = "macos",
+    not(any(target_os = "linux", target_os = "windows"))
+))]
 use predicates::prelude::*;
 use tempfile::TempDir;
 
@@ -97,7 +100,26 @@ fn a_skipped_provider_is_logged_as_ok() {
     assert!(log.ends_with(" claude ok skipped (disabled)\n"), "{log}");
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+#[test]
+fn tamiasw_runs_collect_with_the_same_exit_code_and_log() {
+    let env = Env::new();
+    env.write_credentials();
+    let mut cmd = Command::cargo_bin("tamiasw").expect("binary tamiasw is built");
+    cmd.env("TAMIAS_DATA_DIR", env.path("data"))
+        .env(
+            "TAMIAS_CLAUDE_CREDENTIALS_FILE",
+            env.path("credentials.json"),
+        )
+        .env("TAMIAS_CLAUDE_USAGE_URL", closed_url())
+        .env("HOME", env.path("home"))
+        .env_remove("CLAUDE_CONFIG_DIR")
+        .assert()
+        .code(3);
+    let log = fs::read_to_string(env.log_path()).unwrap();
+    assert!(log.contains(" claude error "), "{log}");
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 #[test]
 fn service_on_unsupported_platforms_cannot_run_and_exits_1() {
     let env = Env::new();
