@@ -3,21 +3,33 @@
 mod claude;
 mod collect;
 mod config;
+mod short;
 mod today;
 
 use std::io::{IsTerminal, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{ArgAction, Parser, Subcommand};
+use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
+use jiff::Timestamp;
+use jiff::tz::TimeZone;
 use tamias_core::paths;
 use tamias_core::store::Store;
 use tracing::Level;
 
-/// Exit code when a provider failed (the error is recorded).
-const EXIT_PROVIDER_FAILED: u8 = 1;
-/// Exit code when the command could not run (config, data directory, store).
-const EXIT_FATAL: u8 = 2;
+/// Exit code when the command could not run (invalid config, data directory, store).
+const EXIT_ERROR: u8 = 1;
+/// Exit code when at least one set-up provider is not fresh: its poll failed (`collect`) or it
+/// is stale (`today`).
+const EXIT_STALE: u8 = 3;
+
+/// Exit codes shared by `collect` and `today`, shown in their `--help`.
+const EXIT_CODES: &str = "\
+Exit codes:
+  0  every set-up provider is ok (unavailable providers do not count)
+  1  error: tamias could not run (invalid config, unreadable store)
+  2  invalid command line
+  3  at least one set-up provider is not fresh (collect: its poll failed; today: it is stale)";
 
 /// Shows how much of your Claude and Copilot usage limits you used today
 /// and whether that fits the daily budget left until the next reset.
@@ -37,9 +49,39 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Poll every available provider once and store the snapshots.
+    #[command(after_help = EXIT_CODES)]
     Collect,
     /// Show today's usage against today's budget.
-    Today,
+    #[command(after_help = EXIT_CODES)]
+    Today(TodayArgs),
+}
+
+#[derive(Debug, Args)]
+struct TodayArgs {
+    /// One compact line for status lines: `C 62% · CP 41%` (binding windows, `?` when stale).
+    #[arg(long)]
+    short: bool,
+    /// When to colour the output; `auto` colours only a terminal without `NO_COLOR`.
+    #[arg(long, value_enum, value_name = "WHEN", default_value_t = ColorChoice::Auto)]
+    color: ColorChoice,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum ColorChoice {
+    Auto,
+    Always,
+    Never,
+}
+
+impl ColorChoice {
+    /// Whether to emit ANSI colours on a stream that is (`terminal`) a TTY.
+    fn enabled(self, terminal: bool, no_color: bool) -> bool {
+        match self {
+            ColorChoice::Always => true,
+            ColorChoice::Never => false,
+            ColorChoice::Auto => terminal && !no_color,
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -49,7 +91,7 @@ fn main() -> ExitCode {
         Ok(code) => code,
         Err(e) => {
             eprintln!("error: {e}");
-            ExitCode::from(EXIT_FATAL)
+            ExitCode::from(EXIT_ERROR)
         }
     }
 }
@@ -62,14 +104,25 @@ fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
     match cli.command {
         Command::Collect => Ok(match collect::run(&config, &mut store)? {
             collect::Outcome::Ok => ExitCode::SUCCESS,
-            collect::Outcome::ProviderFailed => ExitCode::from(EXIT_PROVIDER_FAILED),
+            collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
         }),
-        Command::Today => {
+        Command::Today(ref args) => {
+            let now = Timestamp::now();
+            let tz = TimeZone::system();
+            let lines = today::lines(&config, &store, now, &tz)?;
             let stdout = std::io::stdout();
-            let colour = stdout.is_terminal() && !no_color();
-            let table = today::run(&config, &store, colour)?;
-            stdout.lock().write_all(table.as_bytes())?;
-            Ok(ExitCode::SUCCESS)
+            let colour = args.color.enabled(stdout.is_terminal(), no_color());
+            let out = if args.short {
+                short::render(&lines, colour) + "\n"
+            } else {
+                today::render(&lines, now, &tz, colour)
+            };
+            stdout.lock().write_all(out.as_bytes())?;
+            Ok(if today::any_stale(&lines) {
+                ExitCode::from(EXIT_STALE)
+            } else {
+                ExitCode::SUCCESS
+            })
         }
     }
 }
@@ -92,4 +145,24 @@ fn init_logging(verbose: u8) {
         .without_time()
         .with_ansi(std::io::stderr().is_terminal() && !no_color())
         .init();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ColorChoice;
+
+    #[test]
+    fn auto_colours_only_a_terminal_without_no_color() {
+        assert!(ColorChoice::Auto.enabled(true, false));
+        assert!(!ColorChoice::Auto.enabled(true, true));
+        assert!(!ColorChoice::Auto.enabled(false, false));
+    }
+
+    #[test]
+    fn always_and_never_ignore_the_terminal_and_no_color() {
+        for (terminal, no_color) in [(true, true), (false, false), (false, true)] {
+            assert!(ColorChoice::Always.enabled(terminal, no_color));
+            assert!(!ColorChoice::Never.enabled(terminal, no_color));
+        }
+    }
 }
