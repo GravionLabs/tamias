@@ -1,0 +1,27 @@
+# Pushes to a release branch, handled by the reusable workflow release-branch.yml of GravionLabs/ci: keeps the release PR
+# release/next -> main open and current, labels the issues merged into the branch `merged`, sets the project Status
+# `In release` on the project items of those issues. The Needs sync is off (no project-url): the tamias issues are in no
+# project yet; set project-url (e.g. https://github.com/users/GravionLabs/projects/17) once they are.
+# Release PR token: the GitHub App GravionLabs CI (CI_APP_ID + CI_APP_PRIVATE_KEY) when set, else GH_PAT (classic PAT,
+# scope `repo`); a PR created with the GITHUB_TOKEN triggers no required checks.
+# PROJECT_TOKEN (optional): classic PAT with scope `project`, falls back to GH_PAT.
+name: Release branch
+
+on:
+  push:
+    branches: ["release/**"]
+
+permissions: {}
+
+jobs:
+  release-branch:
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    uses: GravionLabs/ci/.github/workflows/release-branch.yml@v1
+    secrets:
+      CI_APP_ID: ${{ secrets.CI_APP_ID }}
+      CI_APP_PRIVATE_KEY: ${{ secrets.CI_APP_PRIVATE_KEY }}
+      GH_PAT: ${{ secrets.GH_PAT }}
+      PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
