@@ -5,6 +5,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.1.1] — 2026-11-03
+
+### Bug Fixes
+- **cli**: Log fatal errors of a scheduled collect run (#58) (#64)
+- **cli**: Keep status tests and clippy green (#59)
+- **schema**: Published today-v1 schema allows additional properties (#60) (#66)
+- **release**: Require tamiasw.exe in Windows archives, align docs (#61) (#67)
+
+
+### Documentation
+- **cli**: Exit codes of collect, shared exit constants (#57) (#62)
+- Copilot is announced but not polled yet (#59) (#65)
+- **cli**: State that Copilot is not polled yet (#59)
+- **schema**: Published today-v1 schema allows additional properties (#60) (#66)
+
+
 ## [0.1.0] — 2026-11-03
 
 ### Bug Fixes
@@ -28,6 +44,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **core**: Consumers page, documented tamias-core, checked Report::parse (#27) (#49)
 - Installation, scheduled collection (#31) (#55)
 - Installation, download and first start (#34) (#56)
+- Update CHANGELOG.md for v0.1.0 [skip ci]
 
 
 ### Features
