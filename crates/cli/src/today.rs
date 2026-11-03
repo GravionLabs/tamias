@@ -39,40 +39,57 @@ pub struct Line {
     pub window: Option<Window>,
     pub unit: Unit,
     pub used: Option<f64>,
+    /// Limit of the window (100 for percent windows, the quota for request windows).
+    pub limit: Option<f64>,
     pub usage: Option<f64>,
     pub budget: Option<f64>,
     pub resets_at: Option<Timestamp>,
     pub state: State,
 }
 
-/// Reads the store and renders the table.
+/// Reads the store and derives the lines of every provider at `now`.
 ///
 /// # Errors
 ///
 /// Store errors.
-pub fn run(config: &Config, store: &Store, colour: bool) -> Result<String, store::Error> {
-    let now = Timestamp::now();
-    let tz = TimeZone::system();
+pub fn lines(
+    config: &Config,
+    store: &Store,
+    now: Timestamp,
+    tz: &TimeZone,
+) -> Result<Vec<Line>, store::Error> {
     let provider = Provider::Claude;
-    let lines = if let Some(why) = claude::availability(config.claude) {
-        vec![unavailable(provider, why)]
-    } else {
-        let start = now
-            .to_zoned(tz.clone())
-            .start_of_day()
-            .map_or(now, |z| z.timestamp());
-        let from = start.checked_sub(LOOKBACK).unwrap_or(start);
-        let to = now
-            .checked_add(SignedDuration::from_hours(48))
-            .unwrap_or(now);
-        let mut snapshots = Vec::new();
-        for window in [Window::SevenDay, Window::FiveHour] {
-            snapshots.extend(store.snapshots(provider, window, from, to)?);
-        }
-        let status = store.status(provider)?;
-        claude_lines(&snapshots, status.as_ref(), now, &tz, &config.thresholds)
-    };
-    Ok(render(&lines, now, &tz, colour))
+    if let Some(why) = claude::availability(config.claude) {
+        return Ok(vec![unavailable(provider, why)]);
+    }
+    let start = now
+        .to_zoned(tz.clone())
+        .start_of_day()
+        .map_or(now, |z| z.timestamp());
+    let from = start.checked_sub(LOOKBACK).unwrap_or(start);
+    let to = now
+        .checked_add(SignedDuration::from_hours(48))
+        .unwrap_or(now);
+    let mut snapshots = Vec::new();
+    for window in [Window::SevenDay, Window::FiveHour] {
+        snapshots.extend(store.snapshots(provider, window, from, to)?);
+    }
+    let status = store.status(provider)?;
+    Ok(claude_lines(
+        &snapshots,
+        status.as_ref(),
+        now,
+        tz,
+        &config.thresholds,
+    ))
+}
+
+/// Whether at least one set-up provider is stale (exit code 3 of `today`).
+#[must_use]
+pub fn any_stale(lines: &[Line]) -> bool {
+    lines
+        .iter()
+        .any(|line| matches!(line.state, State::Stale { .. }))
 }
 
 /// Line of an `unavailable` provider.
@@ -83,6 +100,7 @@ pub fn unavailable(provider: Provider, why: Unavailable) -> Line {
         window: None,
         unit: Unit::Percent,
         used: None,
+        limit: None,
         usage: None,
         budget: None,
         resets_at: None,
@@ -121,6 +139,7 @@ pub fn claude_lines(
             window: Some(window),
             unit: Unit::Percent,
             used: level.map(|l| l.used),
+            limit: level.map(|l| l.limit),
             usage: day.map(|d| d.usage),
             budget: day.map(|d| d.budget),
             resets_at: next_reset(snapshots, provider, window, now),
@@ -234,10 +253,7 @@ fn amount(value: f64, unit: Unit, decimals: usize) -> String {
 /// Status text and its ANSI colour code.
 fn status_cell(state: &State, now: Timestamp, tz: &TimeZone) -> (String, Option<&'static str>) {
     match state {
-        State::Colour(Colour::Green) => ("green".to_owned(), Some("32")),
-        State::Colour(Colour::Yellow) => ("yellow".to_owned(), Some("33")),
-        State::Colour(Colour::Red) => ("red".to_owned(), Some("31")),
-        State::Colour(Colour::Grey) => ("grey".to_owned(), Some("90")),
+        State::Colour(colour) => (colour_name(*colour).to_owned(), Some(ansi(*colour))),
         State::Stale { since, error } => {
             let mut text = match since {
                 Some(at) => format!("stale since {}", local_time(*at, now, tz)),
@@ -246,10 +262,33 @@ fn status_cell(state: &State, now: Timestamp, tz: &TimeZone) -> (String, Option<
             if let Some(error) = error {
                 let _ = write!(text, " ({error})");
             }
-            (text, Some("90"))
+            (text, Some(ansi(Colour::Grey)))
         }
-        State::Unavailable(why) => (format!("unavailable ({})", why.reason()), Some("90")),
+        State::Unavailable(why) => (
+            format!("unavailable ({})", why.reason()),
+            Some(ansi(Colour::Grey)),
+        ),
         State::NoData => ("no data".to_owned(), None),
+    }
+}
+
+/// ANSI SGR code of `colour`.
+#[must_use]
+pub fn ansi(colour: Colour) -> &'static str {
+    match colour {
+        Colour::Green => "32",
+        Colour::Yellow => "33",
+        Colour::Red => "31",
+        Colour::Grey => "90",
+    }
+}
+
+fn colour_name(colour: Colour) -> &'static str {
+    match colour {
+        Colour::Green => "green",
+        Colour::Yellow => "yellow",
+        Colour::Red => "red",
+        Colour::Grey => "grey",
     }
 }
 

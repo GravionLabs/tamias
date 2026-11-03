@@ -118,8 +118,13 @@ fn usage_ok() -> String {
 }
 
 fn stdout_of(cmd: &mut Command) -> String {
+    stdout_with_code(cmd, 0)
+}
+
+/// Stdout of `cmd`, asserting its exit code.
+fn stdout_with_code(cmd: &mut Command, code: i32) -> String {
     let output = cmd.output().unwrap();
-    assert!(output.status.success(), "{output:?}");
+    assert_eq!(output.status.code(), Some(code), "{output:?}");
     String::from_utf8(output.stdout).unwrap()
 }
 
@@ -165,7 +170,7 @@ fn collect_then_today_shows_both_claude_windows() {
 }
 
 #[test]
-fn failing_endpoint_exits_1_and_today_shows_stale_with_the_error_class() {
+fn failing_endpoint_exits_3_and_today_shows_stale_with_the_error_class() {
     let env = Env::new();
     env.write_credentials();
     let (url, _requests) = serve(vec![response(
@@ -176,13 +181,13 @@ fn failing_endpoint_exits_1_and_today_shows_stale_with_the_error_class() {
     env.tamias(&url)
         .arg("collect")
         .assert()
-        .code(1)
+        .code(3)
         .stderr(predicate::str::contains("500").and(no_token()));
 
     env.tamias(&closed_url())
         .arg("today")
         .assert()
-        .success()
+        .code(3)
         .stdout(
             predicate::str::contains("stale, never collected (http 500)")
                 .and(predicate::str::contains("secret-looking").not()),
@@ -198,10 +203,10 @@ fn failure_after_a_success_is_stale_since_the_success() {
     env.tamias(&closed_url())
         .arg("collect")
         .assert()
-        .code(1)
+        .code(3)
         .stderr(no_token());
 
-    let table = stdout_of(env.tamias(&closed_url()).arg("today"));
+    let table = stdout_with_code(env.tamias(&closed_url()).arg("today"), 3);
     let seven_day = table.lines().nth(1).unwrap();
     assert!(seven_day.starts_with("claude    seven_day  34%"), "{table}");
     assert!(seven_day.contains("stale since "), "{table}");
@@ -234,12 +239,12 @@ fn missing_credentials_with_true_are_an_error_and_stale() {
     env.tamias(&url)
         .arg("collect")
         .assert()
-        .code(1)
+        .code(3)
         .stderr(predicate::str::contains("no Claude credentials"));
     env.tamias(&url)
         .arg("today")
         .assert()
-        .success()
+        .code(3)
         .stdout(predicate::str::contains(
             "stale, never collected (no credentials)",
         ));
@@ -273,7 +278,7 @@ fn invalid_config_is_a_clear_error() {
         env.tamias(&closed_url())
             .arg(command)
             .assert()
-            .code(2)
+            .code(1)
             .stdout("")
             .stderr(
                 predicate::str::starts_with(format!("error: invalid config {}", config.display()))
@@ -289,7 +294,7 @@ fn invalid_value_names_the_key() {
     env.tamias(&closed_url())
         .arg("today")
         .assert()
-        .code(2)
+        .code(1)
         .stderr(predicate::str::contains(
             "providers.claude = \"maybe\" must be \"auto\", true or false",
         ));
@@ -302,7 +307,7 @@ fn missing_explicit_config_is_an_error() {
     env.tamias(&closed_url())
         .arg("today")
         .assert()
-        .code(2)
+        .code(1)
         .stderr(
             predicate::str::contains("config.toml").and(predicate::str::contains("cannot read")),
         );
@@ -333,8 +338,135 @@ fn non_loopback_usage_url_is_ignored() {
     env.tamias("http://example.com/api/oauth/usage")
         .arg("collect")
         .assert()
-        .code(1)
+        .code(3)
         .stderr(predicate::str::contains(
             "ignoring TAMIAS_CLAUDE_USAGE_URL: only http loopback URLs are allowed",
         ));
+}
+
+/// Collects one successful poll (seven-day 34 %, five-hour 12 %) into `env`.
+fn seed_ok(env: &Env) {
+    env.write_credentials();
+    let (url, _requests) = serve(vec![usage_ok()]);
+    env.tamias(&url).arg("collect").assert().success();
+}
+
+#[test]
+fn short_shows_the_binding_window_and_exits_0() {
+    let env = Env::new();
+    seed_ok(&env);
+    env.tamias(&closed_url())
+        .args(["today", "--short"])
+        .assert()
+        .code(0)
+        .stdout("C 34%\n");
+}
+
+#[test]
+fn short_colour_always_colours_the_segment() {
+    let env = Env::new();
+    seed_ok(&env);
+    env.tamias(&closed_url())
+        .args(["today", "--short", "--color", "always"])
+        .assert()
+        .code(0)
+        .stdout("\x1b[32mC 34%\x1b[0m\n");
+}
+
+#[test]
+fn short_with_no_color_has_no_escape_codes() {
+    let env = Env::new();
+    seed_ok(&env);
+    env.tamias(&closed_url())
+        .env("NO_COLOR", "1")
+        .args(["today", "--short", "--color", "auto"])
+        .assert()
+        .code(0)
+        .stdout("C 34%\n");
+    env.tamias(&closed_url())
+        .env("NO_COLOR", "1")
+        .args(["today", "--short", "--color", "never"])
+        .assert()
+        .code(0)
+        .stdout("C 34%\n");
+}
+
+#[test]
+fn short_stale_provider_is_a_question_mark_and_exits_3() {
+    let env = Env::new();
+    seed_ok(&env);
+    env.tamias(&closed_url()).arg("collect").assert().code(3);
+    env.tamias(&closed_url())
+        .args(["today", "--short"])
+        .assert()
+        .code(3)
+        .stdout("C ?\n");
+    env.tamias(&closed_url())
+        .args(["today", "--short", "--color", "always"])
+        .assert()
+        .code(3)
+        .stdout("\x1b[90mC ?\x1b[0m\n");
+}
+
+#[test]
+fn short_with_nothing_set_up_is_an_empty_line_and_exits_0() {
+    let env = Env::new();
+    env.write_config("[providers]\nclaude = \"auto\"\n");
+    env.tamias(&closed_url())
+        .args(["today", "--short"])
+        .assert()
+        .code(0)
+        .stdout("\n");
+    env.write_config("[providers]\nclaude = false\n");
+    env.tamias(&closed_url())
+        .args(["today", "--short", "--color", "always"])
+        .assert()
+        .code(0)
+        .stdout("\n");
+}
+
+#[test]
+fn unreadable_store_exits_1_in_every_mode() {
+    let env = Env::new();
+    std::fs::create_dir_all(env.path("data")).unwrap();
+    std::fs::write(
+        env.path("data").join("tamias.db"),
+        "this is not a sqlite database, padded to more than one header length",
+    )
+    .unwrap();
+    for args in [&["today"][..], &["today", "--short"][..], &["collect"][..]] {
+        env.tamias(&closed_url())
+            .args(args)
+            .assert()
+            .code(1)
+            .stdout("")
+            .stderr(predicate::str::starts_with("error: "));
+    }
+}
+
+#[test]
+fn invalid_color_value_is_a_usage_error() {
+    let env = Env::new();
+    env.tamias(&closed_url())
+        .args(["today", "--color", "sometimes"])
+        .assert()
+        .code(2);
+}
+
+#[test]
+fn help_documents_the_exit_codes() {
+    let env = Env::new();
+    for command in ["today", "collect"] {
+        env.tamias(&closed_url())
+            .args([command, "--help"])
+            .assert()
+            .success()
+            .stdout(
+                predicate::str::contains("Exit codes:")
+                    .and(predicate::str::contains("  1  error"))
+                    .and(predicate::str::contains(
+                        "  3  at least one set-up provider",
+                    )),
+            );
+    }
 }
