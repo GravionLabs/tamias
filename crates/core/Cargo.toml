@@ -18,4 +18,5 @@ rusqlite = { version = "0.41.1", features = ["bundled"] }
 thiserror = "2.0.21"
 
 [dev-dependencies]
+jiff = { version = "0.2.39", features = ["tzdb-bundle-always"] }
 tempfile = "3.27.0"
