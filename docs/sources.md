@@ -142,3 +142,69 @@ profile scope; `rate_limits` is then null).
 | Linux | deferred to #20 (`pwsh -NoProfile -File spikes/claude-usage.ps1`, then `-InvalidToken`) |
 | Windows | deferred to #20 (`pwsh -NoProfile -File spikes\claude-usage.ps1`, then `-InvalidToken`) |
 | Status line fallback | schema confirmed from the 2.1.316 bundle; real capture deferred to #20 |
+
+## Copilot
+
+Probe: `spikes/copilot-usage.ps1` (#17). Fixtures: `crates/core/tests/fixtures/copilot/` (`user-ok.json`,
+`user-unauthorized.json`, `billing-not-found.json`; login, id and tracking id replaced).
+
+### Results per platform
+
+| | macOS | Linux | Windows |
+|---|---|---|---|
+| OS / gh | Darwin 27.0.0 arm64 (macOS), gh 2.103.3, pwsh 7.5.4, 2026-11-03 | **pending** | **pending** |
+| Personal seat | run, see below | **pending** | **pending** |
+| Enterprise-managed seat | **pending** (no such seat available on the test machine) | **pending** | **pending** |
+| Fine-grained PAT | **pending** (none available) | **pending** | **pending** |
+| Command | `pwsh -NoProfile -File spikes/copilot-usage.ps1` (also `-InvalidToken`, `-Day 3`, `-Token <pat>`) | same | same |
+
+Pending rows go into a follow-up PBI; nothing in them was run or assumed.
+
+### `GET https://api.github.com/copilot_internal/user`
+
+- **Auth:** `Authorization: Bearer <token>` with the output of `gh auth token`. Worked with both a classic PAT
+  (`ghp_`, via `GH_TOKEN`) and the gh OAuth token (`gho_`, keyring, scopes `admin:public_key, gist, project,
+  read:org, repo, workflow`): the gh token suffices, no Copilot-specific scope was needed.
+- **Headers:** `Accept: application/vnd.github+json` and a `User-Agent` were sent. No `Editor-Version`
+  or other Copilot headers were needed (not tested without `Accept`). Not rate-limit-relevant: counted
+  against the normal 5000/h core limit.
+- **Fields used** (`user-ok.json`):
+
+| Field | Meaning |
+|---|---|
+| `copilot_plan`, `access_type_sku` | plan (`individual`, `free_limited_copilot` on the tested seat) |
+| `quota_snapshots.premium_interactions.entitlement` | monthly quota (premium requests) |
+| `quota_snapshots.premium_interactions.remaining` / `quota_remaining` | left this month (`quota_remaining` is a float) |
+| `quota_snapshots.premium_interactions.percent_remaining` | 0-100 |
+| `quota_snapshots.premium_interactions.unlimited` | true for unlimited plans |
+| `quota_snapshots.premium_interactions.has_quota` | false when the plan has no premium quota |
+| `quota_snapshots.premium_interactions.overage_permitted` / `overage_count` | paid overage |
+| `quota_reset_date` (`2026-12-01`), `quota_reset_date_utc` (`2026-12-01T00:00:00Z`) | reset, the 1st of next month |
+| `enterprise_list[]`, `organization_login_list[]` | empty here; expected to be filled for managed seats (not tested) |
+
+- **Not usable:** `quota_snapshots.*.quota_reset_at` is `0`; use `quota_reset_date_utc`. `chat` and
+  `completions` snapshots exist too (200 and 2000 on the free plan). `token_based_billing: true` and
+  `credits_used` appear; their meaning for paid plans is not verified. Ignore unknown keys.
+- **Tested seat limit:** the owner's tested seat is a personal **free** plan, so `premium_interactions` reads
+  `entitlement 0, has_quota false`. The paid-plan shape (non-zero entitlement, remaining counting down,
+  `unlimited: true`) was **not observed**; field names are taken from this response and the same
+  object type. The first paid or managed seat run must confirm them.
+- **Failure modes:** invalid token: HTTP 401 `{"message":"Bad credentials",...}` (`user-unauthorized.json`).
+  Other cases (account without Copilot, 403 for managed seats, 404) not observed.
+- **Verdict (macOS, personal free seat):** **Use as primary**; works with the gh token, undocumented, so
+  parse tolerantly. Quota semantics for paid/managed seats **pending**.
+
+### `GET /users/{username}/settings/billing/premium_request/usage?year=&month=[&day=]`
+
+- **Auth tried:** classic PAT (scopes incl. `repo`, `read:org`, no `user`) and gh OAuth token, headers
+  `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, `year=2026&month=11` and
+  with `day=3`. `{username}` came from `GET /user`.
+- **Result:** HTTP 404 `{"message":"Not Found",...}` for both tokens (`billing-not-found.json`), also with `day`.
+  GitHub returns 404 instead of 403 when the token lacks access, so this does not tell apart "no billed
+  usage", "missing permission" and "not available for free seat". Fine-grained PAT (documented permission
+  "Plan" read) was **not tried**; the `X-Accepted-GitHub-Permissions` header was empty.
+- **Fields used:** none; no successful response was seen.
+- **Verdict:** **not usable on the owner's seat as tested.** The billing fallback is unconfirmed: it
+  returned nothing for a free personal seat with a classic PAT and a gh token, and nothing was run
+  for a paid personally billed or enterprise-managed seat (pending). Do not build on it for v1;
+  `copilot_internal/user` is the only source, and `stale` carries the risk (ADR 0001).
