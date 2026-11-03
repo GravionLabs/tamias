@@ -2,7 +2,9 @@
 
 mod claude;
 mod collect;
+mod collect_log;
 mod config;
+mod service;
 mod short;
 mod today;
 
@@ -54,6 +56,9 @@ enum Command {
     /// Show today's usage against today's budget.
     #[command(after_help = EXIT_CODES)]
     Today(TodayArgs),
+    /// Run the collector in the background (install, uninstall, status).
+    #[command(subcommand)]
+    Service(service::Action),
 }
 
 #[derive(Debug, Args)]
@@ -98,11 +103,13 @@ fn main() -> ExitCode {
 
 fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
     let config = config::load(cli.config.as_deref())?;
-    let database = paths::database_path()?;
+    let data_dir = paths::data_dir()?;
+    let database = data_dir.join(paths::DATABASE_FILE);
     tracing::debug!("database {}", database.display());
     let mut store = Store::open(&database)?;
+    let log = collect_log::CollectLog::in_data_dir(&data_dir);
     match cli.command {
-        Command::Collect => Ok(match collect::run(&config, &mut store)? {
+        Command::Collect => Ok(match collect::run(&config, &mut store, &log)? {
             collect::Outcome::Ok => ExitCode::SUCCESS,
             collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
         }),
@@ -123,6 +130,12 @@ fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             } else {
                 ExitCode::SUCCESS
             })
+        }
+        Command::Service(action) => {
+            let scheduler = service::platform()?;
+            let text = service::execute(action, scheduler.as_ref(), &store, &log.path())?;
+            std::io::stdout().lock().write_all(text.as_bytes())?;
+            Ok(ExitCode::SUCCESS)
         }
     }
 }
