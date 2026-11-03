@@ -236,6 +236,52 @@ fn seeded_copilot_monthly_window_is_valid() {
 }
 
 #[test]
+fn stale_json_exits_3_and_is_valid_json_without_ansi_even_with_color_always() {
+    let env = Env::new(true);
+    let mut store = env.store();
+    seed_claude(&mut store);
+    store
+        .record_error(Provider::Claude, Timestamp::now(), "network")
+        .unwrap();
+
+    let output = env
+        .tamias()
+        .args(["today", "--json", "--color", "always"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(3), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.contains('\x1b'), "no ANSI codes: {stdout:?}");
+    let doc: Value = serde_json::from_str(&stdout).unwrap();
+    assert_valid(&doc);
+    assert_eq!(doc["providers"][0]["status"], "stale");
+}
+
+#[test]
+fn json_and_short_show_the_same_used_percent() {
+    let env = Env::new(true);
+    seed_claude(&mut env.store());
+
+    let doc = env.json();
+    let used = doc["providers"][0]["windows"][0]["used"].as_f64().unwrap();
+    env.tamias()
+        .args(["today", "--short", "--color", "never"])
+        .assert()
+        .code(0)
+        .stdout(format!("C {used:.0}%\n"));
+}
+
+#[test]
+fn json_and_short_together_are_a_usage_error() {
+    let env = Env::new(true);
+    env.tamias()
+        .args(["today", "--json", "--short"])
+        .assert()
+        .code(2)
+        .stdout("");
+}
+
+#[test]
 fn logs_go_to_stderr_and_stdout_is_only_json() {
     let env = Env::new(true);
     seed_claude(&mut env.store());
