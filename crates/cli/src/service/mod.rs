@@ -238,13 +238,15 @@ pub fn current_exe() -> Result<PathBuf> {
 
 /// Runs `action` against `scheduler`; returns the text for stdout.
 ///
+/// `open_store` is called only by `status`: install and uninstall work without a database.
+///
 /// # Errors
 ///
-/// Errors of the scheduler or the store.
+/// Errors of the scheduler, of `open_store` or of the store.
 pub fn execute(
     action: Action,
     scheduler: &dyn Scheduler,
-    store: &Store,
+    open_store: impl FnOnce() -> std::result::Result<Store, Box<dyn std::error::Error>>,
     log_path: &Path,
 ) -> std::result::Result<String, Box<dyn std::error::Error>> {
     match action {
@@ -268,6 +270,7 @@ pub fn execute(
         }
         Action::Status => {
             let state = scheduler.status()?;
+            let store = open_store()?;
             let mut statuses = Vec::new();
             for provider in [Provider::Claude, Provider::Copilot] {
                 statuses.push((provider, store.status(provider)?));

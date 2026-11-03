@@ -210,7 +210,9 @@ fn unsupported_names_the_platform() {
 #[cfg(not(target_os = "macos"))]
 #[test]
 fn platform_is_not_supported_yet_outside_macos() {
-    let err = super::platform().unwrap_err();
+    let Err(err) = super::platform() else {
+        panic!("platform() must fail outside macOS");
+    };
     assert!(err.to_string().contains("not supported yet"), "{err}");
 }
 
@@ -248,14 +250,18 @@ fn store() -> (tempfile::TempDir, Store) {
     (dir, store)
 }
 
+/// Store opener that fails like a database that cannot be opened.
+fn broken_store() -> std::result::Result<Store, Box<dyn std::error::Error>> {
+    Err("cannot open the database".into())
+}
+
 #[test]
 fn install_registers_the_canonical_current_exe() {
-    let (_dir, store) = store();
     let scheduler = FakeScheduler::default();
     let text = execute(
         Action::Install,
         &scheduler,
-        &store,
+        broken_store,
         Path::new("/d/collect.log"),
     )
     .unwrap();
@@ -267,18 +273,16 @@ fn install_registers_the_canonical_current_exe() {
 
 #[test]
 fn uninstall_when_not_installed_succeeds_with_a_note() {
-    let (_dir, store) = store();
     let scheduler = FakeScheduler::default();
-    let text = execute(Action::Uninstall, &scheduler, &store, Path::new("l")).unwrap();
+    let text = execute(Action::Uninstall, &scheduler, broken_store, Path::new("l")).unwrap();
     assert_eq!(text, "not installed, nothing to remove\n");
 }
 
 #[test]
 fn uninstall_after_install_says_the_data_is_kept() {
-    let (_dir, store) = store();
     let scheduler = FakeScheduler::default();
-    execute(Action::Install, &scheduler, &store, Path::new("l")).unwrap();
-    let text = execute(Action::Uninstall, &scheduler, &store, Path::new("l")).unwrap();
+    execute(Action::Install, &scheduler, broken_store, Path::new("l")).unwrap();
+    let text = execute(Action::Uninstall, &scheduler, broken_store, Path::new("l")).unwrap();
     assert_eq!(text, "uninstalled; the data and the log are kept\n");
     assert_eq!(*scheduler.uninstalls.borrow(), 1);
 }
@@ -292,11 +296,23 @@ fn status_reads_the_last_run_from_the_store() {
     let text = execute(
         Action::Status,
         &FakeScheduler::default(),
-        &store,
+        || Ok(store),
         Path::new("l"),
     )
     .unwrap();
     assert!(text.contains("claude: last run 2026-11-03"), "{text}");
     assert!(text.contains("error (rate limited)"), "{text}");
     assert!(text.contains("copilot: no run yet"), "{text}");
+}
+
+#[test]
+fn status_reports_a_store_that_cannot_be_opened() {
+    let err = execute(
+        Action::Status,
+        &FakeScheduler::default(),
+        broken_store,
+        Path::new("l"),
+    )
+    .unwrap_err();
+    assert_eq!(err.to_string(), "cannot open the database");
 }

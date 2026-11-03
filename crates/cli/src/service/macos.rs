@@ -6,6 +6,7 @@
 //! to `/dev/null`: the collector writes its own log.
 
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
@@ -18,6 +19,8 @@ pub const LABEL: &str = "com.gravionlabs.tamias.collect";
 pub const INTERVAL_SECONDS: u32 = 300;
 
 const LAUNCHCTL: &str = "launchctl";
+/// Mode of the plist: launchd ignores agents that others can write.
+const PLIST_MODE: u32 = 0o644;
 /// Waits for launchd to finish a `bootout` before the next `bootstrap`.
 const BOOTOUT_POLLS: u32 = 20;
 const BOOTOUT_POLL_INTERVAL: Duration = Duration::from_millis(100);
@@ -126,7 +129,9 @@ impl Scheduler for LaunchAgent {
         fs::create_dir_all(&self.agents_dir)
             .map_err(|e| Error::io(format!("cannot create {}", self.agents_dir.display()), e))?;
         let temp = self.temp_path();
-        if let Err(e) = fs::write(&temp, plist(exe)) {
+        let written = fs::write(&temp, plist(exe))
+            .and_then(|()| fs::set_permissions(&temp, fs::Permissions::from_mode(PLIST_MODE)));
+        if let Err(e) = written {
             let _ = fs::remove_file(&temp);
             return Err(Error::io(format!("cannot write {}", temp.display()), e));
         }

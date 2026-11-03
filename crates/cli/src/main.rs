@@ -106,16 +106,18 @@ fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
     let data_dir = paths::data_dir()?;
     let database = data_dir.join(paths::DATABASE_FILE);
     tracing::debug!("database {}", database.display());
-    let mut store = Store::open(&database)?;
     let log = collect_log::CollectLog::in_data_dir(&data_dir);
     match cli.command {
-        Command::Collect => Ok(match collect::run(&config, &mut store, &log)? {
-            collect::Outcome::Ok => ExitCode::SUCCESS,
-            collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
-        }),
+        Command::Collect => Ok(
+            match collect::run(&config, &mut Store::open(&database)?, &log)? {
+                collect::Outcome::Ok => ExitCode::SUCCESS,
+                collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
+            },
+        ),
         Command::Today(ref args) => {
             let now = Timestamp::now();
             let tz = TimeZone::system();
+            let store = Store::open(&database)?;
             let lines = today::lines(&config, &store, now, &tz)?;
             let stdout = std::io::stdout();
             let colour = args.color.enabled(stdout.is_terminal(), no_color());
@@ -133,7 +135,8 @@ fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
         }
         Command::Service(action) => {
             let scheduler = service::platform()?;
-            let text = service::execute(action, scheduler.as_ref(), &store, &log.path())?;
+            let open_store = || Ok(Store::open(&database)?);
+            let text = service::execute(action, scheduler.as_ref(), open_store, &log.path())?;
             std::io::stdout().lock().write_all(text.as_bytes())?;
             Ok(ExitCode::SUCCESS)
         }

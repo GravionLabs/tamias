@@ -201,6 +201,24 @@ fn install_writes_the_plist_and_bootstraps_it() {
 }
 
 #[test]
+fn install_writes_the_plist_with_mode_644_even_over_a_stale_temp_file() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new();
+    fs::create_dir_all(f.agents_dir()).unwrap();
+    let stale = f.agents_dir().join(format!(".{LABEL}.plist.tmp"));
+    fs::write(&stale, "stale").unwrap();
+    fs::set_permissions(&stale, fs::Permissions::from_mode(0o600)).unwrap();
+
+    f.agent.install(Path::new("/opt/tamias/tamias")).unwrap();
+
+    let mode = fs::metadata(f.agent.plist_path())
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o644);
+}
+
+#[test]
 fn install_is_idempotent_and_the_last_exe_wins() {
     let f = Fixture::new();
     for exe in [
