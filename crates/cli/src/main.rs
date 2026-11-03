@@ -59,9 +59,14 @@ enum Command {
 #[derive(Debug, Args)]
 struct TodayArgs {
     /// One compact line for status lines: `C 62% · CP 41%` (binding windows, `?` when stale).
-    #[arg(long)]
+    #[arg(long, conflicts_with = "json")]
     short: bool,
-    /// When to colour the output; `auto` colours only a terminal without `NO_COLOR`.
+    /// Print one JSON document (schema docs/schema/today-v1.schema.json) instead of the table;
+    /// never coloured.
+    #[arg(long)]
+    json: bool,
+    /// When to colour the output; `auto` colours only a terminal without `NO_COLOR`
+    /// (ignored with `--json`).
     #[arg(long, value_enum, value_name = "WHEN", default_value_t = ColorChoice::Auto)]
     color: ColorChoice,
 }
@@ -107,18 +112,21 @@ fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
         }),
         Command::Today(ref args) => {
-            let now = Timestamp::now();
+            // Whole seconds: `generated_at` of the JSON is RFC 3339 without a fraction.
+            let now = Timestamp::from_second(Timestamp::now().as_second())?;
             let tz = TimeZone::system();
-            let lines = today::lines(&config, &store, now, &tz)?;
+            let today = today::read(&config, &store, now, &tz)?;
             let stdout = std::io::stdout();
             let colour = args.color.enabled(stdout.is_terminal(), no_color());
-            let out = if args.short {
-                short::render(&lines, colour) + "\n"
+            let out = if args.json {
+                today::json(&today.report)?
+            } else if args.short {
+                short::render(&today.lines, colour) + "\n"
             } else {
-                today::render(&lines, now, &tz, colour)
+                today::render(&today.lines, now, &tz, colour)
             };
             stdout.lock().write_all(out.as_bytes())?;
-            Ok(if today::any_stale(&lines) {
+            Ok(if today.any_stale() {
                 ExitCode::from(EXIT_STALE)
             } else {
                 ExitCode::SUCCESS
