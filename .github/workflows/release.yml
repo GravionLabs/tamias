@@ -1,0 +1,65 @@
+# Release on main, built from the versioning actions of GravionLabs/ci (model: GravionLabs/poimen).
+#
+# push to main (the merge commit of the release PR release/next -> main):
+#   ci.yml (fmt, clippy, test on three OS) -> determine-version (GitVersion.yml) -> gh-release: the version command
+#   writes the version into the Cargo workspace, git-cliff writes CHANGELOG.md, both are committed to main in one
+#   [skip ci] commit, which is tagged v<version>; then the GitHub Release is created and the issues delivered by the
+#   release PR are closed. Binary archives (#33) are not part of this workflow yet.
+#
+# .github/scripts/set-version.sh sets [workspace.package] version and the tamias-core version in
+# [workspace.dependencies] and updates Cargo.lock, so a build of the tag reports the released version (tamias --version).
+#
+# GH_PAT: classic PAT with scope `repo` of a repository admin. When the `main` ruleset requires a pull request and the
+# `ci` check with admins as bypass actors, the release commit is pushed with GH_PAT; the GITHUB_TOKEN cannot bypass it.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release
+  # A release in progress is never canceled.
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Release
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # release commit, tag, GitHub Release
+      issues: write # close-issues
+      pull-requests: read # close-issues reads the release PR
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # required by GitVersion
+
+      - name: Determine version
+        id: version
+        uses: GravionLabs/ci/versioning/determine-version@v1
+        with:
+          gitversion-config-file: GitVersion.yml
+
+      # gh-release checks out main again (with GH_PAT), runs the version command, commits its changes together with
+      # CHANGELOG.md and tags that commit (a tag created before it would leave git-cliff's --unreleased notes empty),
+      # creates the release and closes the issues.
+      - name: Create GitHub Release
+        uses: GravionLabs/ci/versioning/gh-release@v1
+        with:
+          version: ${{ steps.version.outputs.semver }}
+          version-command: bash .github/scripts/set-version.sh
+          changelog-file: CHANGELOG.md
+          cliff-config: cliff.toml
+          update-changelog: "true"
+          close-issues: "true"
+          token: ${{ secrets.GH_PAT }}

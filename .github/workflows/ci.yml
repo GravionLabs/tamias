@@ -1,17 +1,21 @@
 name: CI
 
+# Pushes to main run these checks through release.yml (workflow_call), so they run once per release.
 on:
+  workflow_dispatch:
+  workflow_call:
   pull_request:
     branches: [main, "release/**"]
   push:
-    branches: [main, "release/**"]
+    branches: ["release/**"]
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # never cancel the checks of a release run (workflow_call from release.yml on main)
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   CARGO_TERM_COLOR: always
