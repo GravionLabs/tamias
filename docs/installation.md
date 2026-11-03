@@ -2,7 +2,7 @@
 
 ## Download
 
-Every release on the [GitHub releases page](https://github.com/GravionLabs/tamias/releases) has one archive per platform and a `SHA256SUMS` file with the checksum of every archive. The archive is named `tamias-<version>-<target>` and holds one directory with `tamias` (Windows: `tamias.exe`), `LICENSE` and `README.md`.
+Every release on the [GitHub releases page](https://github.com/GravionLabs/tamias/releases) has one archive per platform and a `SHA256SUMS` file with the checksum of every archive. The archive is named `tamias-<version>-<target>` and holds one directory with `tamias` (Windows: `tamias.exe`), `LICENSE` and `README.md`. The Windows archive also holds `tamiasw.exe`, which `tamias service install` needs next to `tamias.exe`.
 
 | Platform | Archive |
 | --- | --- |

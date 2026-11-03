@@ -5,7 +5,7 @@
 #   <bin-dir>  directory with the built binaries (target/<target>/release)
 #   <out-dir>  directory the archive is written to (created if missing), relative to the repository root
 # The archive holds one top-level directory tamias-<version>-<target>/ with tamias (tamias.exe), on Windows also
-# tamiasw.exe when it was built (#30), and LICENSE and README.md of the repository root (the current directory).
+# tamiasw.exe (required, #30; the script fails without it), and LICENSE and README.md of the repository root (the current directory).
 # Prints the path of the archive relative to the repository root (<out-dir>/<archive>), never an absolute one: on
 # Windows (Git Bash) that would be an MSYS path (/d/a/...) which actions/upload-artifact cannot resolve.
 # Run by .github/workflows/release-binaries.yml from the repository root.
@@ -30,6 +30,11 @@ case "$target" in
 esac
 
 [ -f "$bin_dir/tamias$exe" ] || { echo "$bin_dir/tamias$exe not found" >&2; exit 1; }
+# The windowless GUI bin of #30: `service install` refuses on Windows without it.
+if [ -n "$exe" ] && [ ! -f "$bin_dir/tamiasw$exe" ]; then
+  echo "$bin_dir/tamiasw$exe not found (required in Windows archives)" >&2
+  exit 1
+fi
 
 name="tamias-$version-$target"
 file="$name.$format"
@@ -40,8 +45,7 @@ trap 'rm -rf "$stage"' EXIT
 mkdir "$stage/$name"
 
 cp "$bin_dir/tamias$exe" "$stage/$name/"
-# The windowless GUI bin of #30; optional until it exists.
-if [ -n "$exe" ] && [ -f "$bin_dir/tamiasw$exe" ]; then
+if [ -n "$exe" ]; then
   cp "$bin_dir/tamiasw$exe" "$stage/$name/"
 fi
 cp LICENSE README.md "$stage/$name/"
