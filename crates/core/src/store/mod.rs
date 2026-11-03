@@ -34,13 +34,20 @@ pub enum Error {
     /// A migration script failed; the database stays at its previous version.
     #[error("migration {version} failed: {source}")]
     Migration {
+        /// Version of the migration that failed.
         version: usize,
         #[source]
+        /// The database error.
         source: rusqlite::Error,
     },
     /// The database was written by a newer tamias.
     #[error("database schema version {found} is newer than the supported version {supported}")]
-    SchemaTooNew { found: i64, supported: usize },
+    SchemaTooNew {
+        /// Schema version of the database.
+        found: i64,
+        /// Newest schema version this build supports.
+        supported: usize,
+    },
     /// The database cannot use WAL mode (for example on a network file system).
     #[error("cannot switch the database to WAL mode (journal mode is {0})")]
     NoWal(String),
@@ -50,7 +57,9 @@ pub enum Error {
     /// A stored value could not be read back.
     #[error("invalid value in column {column}: {message}")]
     InvalidValue {
+        /// Column that could not be read.
         column: &'static str,
+        /// What was wrong with the value.
         message: String,
     },
 }
@@ -75,9 +84,13 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 /// Health of one provider as seen by the collector.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceStatus {
+    /// Provider the status is of.
     pub provider: Provider,
+    /// Last successful collect.
     pub last_ok_at: Option<Timestamp>,
+    /// Last failed collect.
     pub last_error_at: Option<Timestamp>,
+    /// Message of the last failure, when one was recorded.
     pub last_error: Option<String>,
 }
 
