@@ -4,7 +4,6 @@
   "title": "tamias today --json, schema version 1",
   "description": "State of all providers as printed by `tamias today --json`. Within version 1 fields are only added as optional; a rename or removal bumps schema_version.",
   "type": "object",
-  "additionalProperties": false,
   "required": ["schema_version", "generated_at", "providers"],
   "properties": {
     "schema_version": { "const": 1 },
@@ -27,7 +26,6 @@
     "amount": { "type": "number", "minimum": 0 },
     "provider": {
       "type": "object",
-      "additionalProperties": false,
       "required": ["provider", "status", "windows"],
       "properties": {
         "provider": { "enum": ["claude", "copilot"] },
@@ -81,7 +79,6 @@
     },
     "window": {
       "type": "object",
-      "additionalProperties": false,
       "required": ["window", "binding", "unit", "used", "limit", "resets_at", "colour"],
       "properties": {
         "window": {

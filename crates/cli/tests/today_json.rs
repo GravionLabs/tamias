@@ -20,9 +20,32 @@ fn read_json(path: &str) -> Value {
     serde_json::from_str(&std::fs::read_to_string(repo_file(path)).unwrap()).unwrap()
 }
 
-fn validator() -> jsonschema::Validator {
+/// The published schema as is: it allows unknown fields (compatibility rule of docs/consumers.md).
+fn published_validator() -> jsonschema::Validator {
     jsonschema::draft202012::new(&read_json("docs/schema/today-v1.schema.json"))
         .expect("the schema is valid draft 2020-12")
+}
+
+/// Sets `additionalProperties: false` on every object schema, so a field the CLI adds without
+/// the schema knowing it fails the tests.
+fn strictify(schema: &mut Value) {
+    match schema {
+        Value::Object(map) => {
+            if map.get("type") == Some(&json!("object")) {
+                map.insert("additionalProperties".into(), json!(false));
+            }
+            map.values_mut().for_each(strictify);
+        }
+        Value::Array(items) => items.iter_mut().for_each(strictify),
+        _ => {}
+    }
+}
+
+/// The strict copy used for the CLI output and the negative cases.
+fn validator() -> jsonschema::Validator {
+    let mut schema = read_json("docs/schema/today-v1.schema.json");
+    strictify(&mut schema);
+    jsonschema::draft202012::new(&schema).expect("the strict schema is valid draft 2020-12")
 }
 
 fn assert_valid(document: &Value) {
@@ -382,4 +405,16 @@ fn wrong_values_fail_the_schema() {
     assert_invalid(&example_with(|d| {
         d["providers"][0]["unknown"] = json!(true);
     }));
+}
+
+#[test]
+fn published_schema_allows_unknown_fields() {
+    let mut document = read_json("docs/schema/today-v1.example.json");
+    document["added_later"] = json!(1);
+    document["providers"][0]["unknown"] = json!(true);
+    document["providers"][1]["windows"][0]["extra"] = json!("x");
+    let validator = published_validator();
+    assert!(validator.is_valid(&document), "{document:#}");
+    // the strict copy still rejects them
+    assert_invalid(&document);
 }
