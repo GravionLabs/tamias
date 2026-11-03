@@ -12,6 +12,11 @@ authors.workspace = true
 name = "tamias"
 path = "src/main.rs"
 
+# Windowless twin of `tamias collect` for the Windows Task Scheduler; built everywhere, used on Windows.
+[[bin]]
+name = "tamiasw"
+path = "src/bin/tamiasw.rs"
+
 [dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
 http = "1.5.0"
