@@ -1,6 +1,6 @@
 # ADR 0001: Usage collector architecture
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-02
 
 ## Context
@@ -29,7 +29,7 @@ Several consumers want the same numbers: poimen (Tauri GUI over herdr), herdr pl
   - Linux: systemd `--user` timer with `Persistent=true`,
   - Windows: Task Scheduler task in the user's context, repeating every 5 minutes, "run as soon as possible after a missed start".
 - **OS-specific code behind traits**, selected with `cfg(target_os)`: credential source (macOS Keychain item `Claude Code-credentials`; `~/.claude/.credentials.json` on Linux and Windows; `gh auth token` for Copilot), scheduler installer, data directory (`~/Library/Application Support/tamias`, `$XDG_DATA_HOME/tamias`, `%APPDATA%\tamias`).
-- **Per-day usage is derived** from consecutive snapshots: the sum of deltas within a local calendar day; a jump of `resets_at` starts a new window and its delta is not counted. The binding Claude limit is the seven-day window; the five-hour window is shown as additional information. Copilot's limit is the monthly quota, reset on the 1st.
+- **Per-day usage is derived** from consecutive snapshots as a high-water mark: within a window (identified by `resets_at`, rounded to the nearest minute because the source jitters by about a second) only the running maximum of `used` counts, and today's usage is the rise of that maximum within the local calendar day; a jump of `resets_at` starts a new window. A lower value after a higher one (sources mixed, rounding) never counts as usage. On the day of a reset, today's budget is the old window's budget plus the new window's daily budget prorated by the rest of the day. The binding Claude limit is the seven-day window; the five-hour window is shown as additional information. Copilot's limit is the monthly quota, reset on the 1st.
 - **Day boundary: local calendar day** (local time of the machine).
 - **Daily budget is dynamic:** `remaining / remaining days until reset` (remaining days include today), computed at the start of the local day.
 - **Colours** by today's usage relative to today's budget: green below 80 %, yellow 80–100 %, red above 100 %, grey for stale or failing data. The thresholds are configurable.
@@ -40,7 +40,7 @@ Several consumers want the same numbers: poimen (Tauri GUI over herdr), herdr pl
 - **Reliability through statelessness.** Each collector run starts clean; a failed run is followed by an independent one, and the OS schedulers catch up after sleep. No crash recovery, wake detection or memory growth to handle.
 - **No push.** Consumers see a new value at most 5 minutes late; the Tauri app watches the SQLite file. A later `tamias daemon` (long-running user process with adaptive polling and local IPC) can be added on the same `tamias-core` if live updates become necessary.
 - **Undocumented endpoints.** Both primary sources can change without notice. For an enterprise-managed Copilot seat there is no official fallback, so the `stale` state carries that risk; provider code is isolated so a fix touches one module.
-- **Derived daily values depend on snapshot density.** Gaps (machine off) attribute the usage to the day of the next snapshot. If the Claude seven-day window turns out to be rolling rather than reset at a fixed time, deltas can be negative without a reset; the derivation then needs a different model.
+- **Derived daily values depend on snapshot density.** Gaps (machine off) attribute the usage to the day of the next snapshot. The model relies on the Claude seven-day window being anchored (see Follow-up); should it ever become rolling, the derivation needs a different model and a new ADR.
 - **Credentials are read, never stored.** tamias reads the tokens of Claude Code and `gh` at each run and does not copy them into its own store.
 - **Three platforms to test.** The scheduler installers and credential sources need a CI matrix (Linux, Windows, macOS) and a manual check on each.
 
@@ -56,4 +56,9 @@ Several consumers want the same numbers: poimen (Tauri GUI over herdr), herdr pl
 
 ## Follow-up
 
-- Spike, on all three platforms: the OAuth usage endpoint with the token from the Keychain or credentials file; `copilot_internal/user` with `gh auth token`; whether the Claude seven-day window resets at a fixed time or rolls; whether the `statusLine` `rate_limits` fields are present in the current Claude Code version.
+Spike results, recorded in [`docs/sources.md`](../sources.md):
+
+- **OAuth usage endpoint:** `GET /api/oauth/usage` verified on macOS, also from a launchd agent without a Keychain dialog (via `/usr/bin/security`). tamias never refreshes the token; an expired token makes Claude `stale` until Claude Code refreshes it. Linux and Windows: [#20](https://github.com/GravionLabs/tamias/issues/20).
+- **Seven-day window:** anchored, not rolling: `window_started_at` is exactly seven days before `resets_at`, and `resets_at` stays constant until the reset. An observed reset confirmed it ([#18](https://github.com/GravionLabs/tamias/issues/18)): utilization dropped to 0 and `resets_at` moved by exactly seven days; the five-hour window is independent of it.
+- **Status line `rate_limits`:** schema confirmed from the Claude Code 2.1.316 bundle; a real capture follows in [#20](https://github.com/GravionLabs/tamias/issues/20).
+- **Copilot sources:** [#17](https://github.com/GravionLabs/tamias/issues/17).

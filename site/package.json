@@ -1,0 +1,20 @@
+{
+  "name": "@tamias/site",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "description": "The documentation site: docs/ as a website (VitePress), published on GitHub Pages.",
+  "type": "module",
+  "packageManager": "pnpm@12.9.1",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "vitepress": "^1.6.4",
+    "vitest": "^5"
+  }
+}
