@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use assert_cmd::Command;
 use jiff::{SignedDuration, Timestamp};
+#[cfg(not(target_os = "linux"))]
 use predicates::prelude::*;
 use tempfile::TempDir;
 
