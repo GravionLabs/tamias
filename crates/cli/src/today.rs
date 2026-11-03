@@ -2,21 +2,21 @@
 //!
 //! The binding window (Claude `seven_day`) shows used %, today's usage, today's budget and the
 //! colour; the informational window (Claude `five_hour`) shows used % and the reset time only.
+//! [`read`] gathers the store once into a [`Today`]: `--json` prints its [`Report`], the table
+//! and `--short` render its [`Line`]s, which are derived from that report, so all three show
+//! the same numbers.
 
 use std::fmt::Write as _;
 
+use jiff::Timestamp;
 use jiff::tz::TimeZone;
-use jiff::{SignedDuration, Timestamp};
-use tamias_core::budget::{self, Colour, Status, Thresholds};
-use tamias_core::snapshot::{Provider, Snapshot, Unit, Window};
+use tamias_core::budget::{Colour, Thresholds};
+use tamias_core::report::{self, Report};
+use tamias_core::snapshot::{Provider, Unit, Window};
 use tamias_core::store::{self, SourceStatus, Store};
 
 use crate::claude::{self, Unavailable};
 use crate::config::Config;
-
-/// Snapshots older than this before the start of today are not needed: the binding window is
-/// at most seven days long, the margin covers a late reset.
-const LOOKBACK: SignedDuration = SignedDuration::from_hours(8 * 24);
 
 /// State shown in the last column.
 #[derive(Debug, Clone, PartialEq)]
@@ -47,49 +47,124 @@ pub struct Line {
     pub state: State,
 }
 
-/// Reads the store and derives the lines of every provider at `now`.
+/// Everything `today` shows, gathered once at one `now`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Today {
+    /// The document of `--json`.
+    pub report: Report,
+    /// The rows of the table and the segments of `--short`, derived from `report`.
+    pub lines: Vec<Line>,
+}
+
+impl Today {
+    /// Whether at least one set-up provider is stale (exit code 3 of `today`, every mode).
+    #[must_use]
+    pub fn any_stale(&self) -> bool {
+        any_stale(&self.report)
+    }
+}
+
+/// Reads the store once and derives the report and the lines of every provider at `now`.
 ///
 /// # Errors
 ///
 /// Store errors.
-pub fn lines(
+pub fn read(
     config: &Config,
     store: &Store,
     now: Timestamp,
     tz: &TimeZone,
-) -> Result<Vec<Line>, store::Error> {
-    let provider = Provider::Claude;
-    if let Some(why) = claude::availability(config.claude) {
-        return Ok(vec![unavailable(provider, why)]);
+) -> Result<Today, store::Error> {
+    let mut providers = Vec::new();
+    let mut lines = Vec::new();
+    for entry in gather(config, store, now, tz)? {
+        match entry {
+            Entry::Unavailable(provider, why) => {
+                providers.push(report::unavailable(provider));
+                lines.push(unavailable(provider, why));
+            }
+            Entry::Read(report, status) => {
+                lines.extend(provider_lines(
+                    &report,
+                    status.as_ref(),
+                    now,
+                    &config.thresholds,
+                ));
+                providers.push(report);
+            }
+        }
     }
-    let start = now
-        .to_zoned(tz.clone())
-        .start_of_day()
-        .map_or(now, |z| z.timestamp());
-    let from = start.checked_sub(LOOKBACK).unwrap_or(start);
-    let to = now
-        .checked_add(SignedDuration::from_hours(48))
-        .unwrap_or(now);
-    let mut snapshots = Vec::new();
-    for window in [Window::SevenDay, Window::FiveHour] {
-        snapshots.extend(store.snapshots(provider, window, from, to)?);
-    }
-    let status = store.status(provider)?;
-    Ok(claude_lines(
-        &snapshots,
-        status.as_ref(),
-        now,
-        tz,
-        &config.thresholds,
-    ))
+    Ok(Today {
+        report: Report::new(now, providers),
+        lines,
+    })
 }
 
-/// Whether at least one set-up provider is stale (exit code 3 of `today`).
+/// Whether at least one provider of `report` is stale, as decided by [`report::stale`].
 #[must_use]
-pub fn any_stale(lines: &[Line]) -> bool {
-    lines
+pub fn any_stale(report: &Report) -> bool {
+    report
+        .providers
         .iter()
-        .any(|line| matches!(line.state, State::Stale { .. }))
+        .any(|p| p.status == report::Status::Stale)
+}
+
+/// `report` as pretty JSON (schema `docs/schema/today-v1.schema.json`), ending with a newline.
+/// Never coloured.
+///
+/// # Errors
+///
+/// Serialization errors.
+pub fn json(report: &Report) -> serde_json::Result<String> {
+    let mut out = serde_json::to_string_pretty(report)?;
+    out.push('\n');
+    Ok(out)
+}
+
+/// One provider as read for `today`: the table and the JSON are both built from it.
+enum Entry {
+    Unavailable(Provider, Unavailable),
+    Read(report::Provider, Option<SourceStatus>),
+}
+
+/// Claude (unless unavailable), then Copilot when the store has anything of it.
+fn gather(
+    config: &Config,
+    store: &Store,
+    now: Timestamp,
+    tz: &TimeZone,
+) -> Result<Vec<Entry>, store::Error> {
+    let mut entries = Vec::new();
+    if let Some(why) = claude::availability(config.claude) {
+        entries.push(Entry::Unavailable(Provider::Claude, why));
+    } else {
+        entries.push(read_provider(
+            store,
+            Provider::Claude,
+            now,
+            tz,
+            &config.thresholds,
+        )?);
+    }
+    // No Copilot provider yet (#5): shown only when seeded into the store.
+    let copilot = read_provider(store, Provider::Copilot, now, tz, &config.thresholds)?;
+    if let Entry::Read(report, status) = &copilot
+        && (status.is_some() || !report.windows.is_empty())
+    {
+        entries.push(copilot);
+    }
+    Ok(entries)
+}
+
+fn read_provider(
+    store: &Store,
+    provider: Provider,
+    now: Timestamp,
+    tz: &TimeZone,
+    thresholds: &Thresholds,
+) -> Result<Entry, store::Error> {
+    let report = report::read(store, provider, now, tz, thresholds)?;
+    Ok(Entry::Read(report, store.status(provider)?))
 }
 
 /// Line of an `unavailable` provider.
@@ -109,80 +184,53 @@ pub fn unavailable(provider: Provider, why: Unavailable) -> Line {
 }
 
 /// Lines of Claude: `seven_day` with today's budget, `five_hour` with used % only.
+#[cfg(test)]
 #[must_use]
 pub fn claude_lines(
-    snapshots: &[Snapshot],
+    snapshots: &[tamias_core::snapshot::Snapshot],
     status: Option<&SourceStatus>,
     now: Timestamp,
     tz: &TimeZone,
     thresholds: &Thresholds,
 ) -> Vec<Line> {
-    let provider = Provider::Claude;
-    let last_ok_at = status.and_then(|s| s.last_ok_at);
-    let budget_status = Status { now, last_ok_at };
-    let stale_line = stale_state(status, now, thresholds);
-
-    let mut lines = Vec::new();
-    for window in [Window::SevenDay, Window::FiveHour] {
-        let level = budget::level(snapshots, provider, window, budget_status, thresholds);
-        let day = (window == Window::SevenDay)
-            .then(|| budget::today(snapshots, provider, window, tz, budget_status, thresholds))
-            .flatten();
-        let colour = day.map(|d| d.colour).or(level.map(|l| l.colour));
-        let state = match (&stale_line, colour) {
-            (Some(stale), _) => stale.clone(),
-            (None, Some(colour)) => State::Colour(colour),
-            (None, None) => State::NoData,
-        };
-        lines.push(Line {
-            provider,
-            window: Some(window),
-            unit: Unit::Percent,
-            used: level.map(|l| l.used),
-            limit: level.map(|l| l.limit),
-            usage: day.map(|d| d.usage),
-            budget: day.map(|d| d.budget),
-            resets_at: next_reset(snapshots, provider, window, now),
-            state,
-        });
-    }
-    lines
+    let report = report::provider(Provider::Claude, snapshots, status, now, tz, thresholds);
+    provider_lines(&report, status, now, thresholds)
 }
 
-/// `Some` when the provider is stale: its last run failed, or its last success is older than
-/// `stale_after` (or there was none).
-fn stale_state(
+/// One line per window of the provider of `report`, from the same numbers as the JSON.
+fn provider_lines(
+    report: &report::Provider,
     status: Option<&SourceStatus>,
     now: Timestamp,
     thresholds: &Thresholds,
-) -> Option<State> {
-    let since = status.and_then(|s| s.last_ok_at);
-    let failed = status.and_then(|s| {
-        let at = s.last_error_at?;
-        since
-            .is_none_or(|ok| at > ok)
-            .then(|| s.last_error.clone().unwrap_or_default())
+) -> Vec<Line> {
+    // The same check that made `report.status` stale, for the error text of the table.
+    let stale_state = report::stale(status, now, thresholds).map(|s| State::Stale {
+        since: s.since,
+        error: s.error,
     });
-    let old = since.is_none_or(|ok| now.duration_since(ok) > thresholds.stale_after);
-    (failed.is_some() || old).then_some(State::Stale {
-        since,
-        error: failed.filter(|e| !e.is_empty()),
-    })
-}
-
-/// `resets_at` of the most recently observed snapshot of `window`, if still ahead.
-fn next_reset(
-    snapshots: &[Snapshot],
-    provider: Provider,
-    window: Window,
-    now: Timestamp,
-) -> Option<Timestamp> {
-    snapshots
+    report::windows(report.provider)
         .iter()
-        .filter(|s| s.provider == provider && s.window == window)
-        .max_by_key(|s| s.observed_at)
-        .map(|s| s.resets_at)
-        .filter(|&at| at > now)
+        .map(|&window| {
+            let data = report.windows.iter().find(|w| w.window == window);
+            let state = match (&stale_state, data) {
+                (Some(stale), _) => stale.clone(),
+                (None, Some(w)) => State::Colour(w.colour),
+                (None, None) => State::NoData,
+            };
+            Line {
+                provider: report.provider,
+                window: Some(window),
+                unit: data.map_or_else(|| report::unit(window), |w| w.unit),
+                used: data.map(|w| w.used),
+                limit: data.map(|w| w.limit),
+                usage: data.and_then(|w| w.today_usage),
+                budget: data.and_then(|w| w.budget),
+                resets_at: data.map(|w| w.resets_at).filter(|&at| at > now),
+                state,
+            }
+        })
+        .collect()
 }
 
 const HEADER: [&str; 7] = [

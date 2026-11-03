@@ -6,16 +6,19 @@ use std::fmt;
 use std::str::FromStr;
 
 use jiff::Timestamp;
+use serde::{Deserialize, Serialize};
 
 /// Usage provider.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Provider {
     Claude,
     Copilot,
 }
 
 /// Usage window of a provider.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Window {
     /// Claude five-hour window (informational).
     FiveHour,
@@ -26,7 +29,8 @@ pub enum Window {
 }
 
 /// Unit of `used` and `limit`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Unit {
     Percent,
     Requests,

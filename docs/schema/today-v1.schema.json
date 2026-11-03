@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/GravionLabs/tamias/blob/main/docs/schema/today-v1.schema.json",
+  "title": "tamias today --json, schema version 1",
+  "description": "State of all providers as printed by `tamias today --json`. Within version 1 fields are only added as optional; a rename or removal bumps schema_version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at", "providers"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "generated_at": { "$ref": "#/$defs/timestamp" },
+    "providers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/provider" }
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "description": "RFC 3339 instant in UTC.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+    },
+    "colour": {
+      "description": "green: below yellow_at of today's budget; yellow: up to red_at; red: above; grey: the provider is stale.",
+      "enum": ["green", "yellow", "red", "grey"]
+    },
+    "amount": { "type": "number", "minimum": 0 },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "status", "windows"],
+      "properties": {
+        "provider": { "enum": ["claude", "copilot"] },
+        "status": {
+          "description": "ok: collected recently; stale: the last collect failed or is older than stale_after; unavailable: disabled or not set up.",
+          "enum": ["ok", "stale", "unavailable"]
+        },
+        "stale_since": {
+          "description": "Last successful collect of a stale provider; absent when it never succeeded.",
+          "$ref": "#/$defs/timestamp"
+        },
+        "windows": {
+          "description": "Windows with data, the binding one first.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/window" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "stale" } } },
+          "then": {
+            "properties": {
+              "windows": { "items": { "properties": { "colour": { "const": "grey" } } } }
+            }
+          },
+          "else": { "not": { "required": ["stale_since"] } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "unavailable" } } },
+          "then": { "properties": { "windows": { "maxItems": 0 } } }
+        },
+        {
+          "if": { "properties": { "provider": { "const": "claude" } } },
+          "then": {
+            "properties": {
+              "windows": {
+                "items": { "properties": { "window": { "enum": ["seven_day", "five_hour"] } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "provider": { "const": "copilot" } } },
+          "then": {
+            "properties": {
+              "windows": { "items": { "properties": { "window": { "const": "monthly" } } } }
+            }
+          }
+        }
+      ]
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window", "binding", "unit", "used", "limit", "resets_at", "colour"],
+      "properties": {
+        "window": {
+          "description": "Claude: seven_day (binding) and five_hour (informational). Copilot: monthly (binding).",
+          "enum": ["five_hour", "seven_day", "monthly"]
+        },
+        "binding": {
+          "description": "Whether the window has a daily budget.",
+          "type": "boolean"
+        },
+        "unit": { "enum": ["percent", "requests"] },
+        "used": {
+          "description": "High-water mark of the current window in unit; 0 once its reset has passed. May exceed limit for requests.",
+          "$ref": "#/$defs/amount"
+        },
+        "limit": {
+          "description": "Limit in unit (100 for percent).",
+          "$ref": "#/$defs/amount"
+        },
+        "resets_at": {
+          "description": "End of the most recently observed window; in the past when no newer window was seen yet.",
+          "$ref": "#/$defs/timestamp"
+        },
+        "colour": { "$ref": "#/$defs/colour" },
+        "today_usage": {
+          "description": "Usage of the local day in unit (binding windows only).",
+          "$ref": "#/$defs/amount"
+        },
+        "budget": {
+          "description": "Budget of the local day in unit (binding windows only).",
+          "$ref": "#/$defs/amount"
+        },
+        "ratio": {
+          "description": "today_usage / budget (binding windows only; absent when the budget is 0).",
+          "$ref": "#/$defs/amount"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "window": { "const": "five_hour" } } },
+          "then": {
+            "properties": { "binding": { "const": false }, "unit": { "const": "percent" } },
+            "not": {
+              "anyOf": [
+                { "required": ["today_usage"] },
+                { "required": ["budget"] },
+                { "required": ["ratio"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": { "properties": { "window": { "const": "seven_day" } } },
+          "then": { "properties": { "binding": { "const": true }, "unit": { "const": "percent" } } }
+        },
+        {
+          "if": { "properties": { "window": { "const": "monthly" } } },
+          "then": { "properties": { "binding": { "const": true }, "unit": { "const": "requests" } } }
+        },
+        {
+          "if": { "properties": { "unit": { "const": "percent" } } },
+          "then": { "properties": { "limit": { "const": 100 } } }
+        },
+        {
+          "if": { "required": ["ratio"] },
+          "then": { "required": ["today_usage", "budget"] }
+        }
+      ]
+    }
+  }
+}
