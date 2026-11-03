@@ -152,3 +152,40 @@ fn service_status_shows_the_last_run_and_the_log_path() {
         )))
         .stdout(predicate::str::contains("TEST-TOKEN").not());
 }
+
+#[test]
+fn a_fatal_error_of_collect_is_logged_and_shown_by_service_status() {
+    let env = Env::new();
+    fs::write(env.path("config.toml"), "bogus_key = 1\n").unwrap();
+    env.tamias().arg("collect").assert().code(1);
+    let log = fs::read_to_string(env.log_path()).unwrap();
+    assert!(log.contains(" claude error fatal: "), "{log}");
+    assert!(log.contains("bogus_key"), "{log}");
+    assert_eq!(log.lines().count(), 1, "{log}");
+    #[cfg(target_os = "macos")]
+    {
+        fs::write(env.path("config.toml"), "").unwrap();
+        env.tamias()
+            .args(["service", "status"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("claude: last run "))
+            .stdout(predicate::str::contains("error (fatal: "));
+    }
+}
+
+#[test]
+fn a_fatal_error_of_tamiasw_is_logged() {
+    let env = Env::new();
+    // A directory where the database file belongs: the store cannot be opened.
+    fs::create_dir_all(env.path("data").join("tamias.db")).unwrap();
+    Command::cargo_bin("tamiasw")
+        .expect("binary tamiasw is built")
+        .env("TAMIAS_DATA_DIR", env.path("data"))
+        .env("HOME", env.path("home"))
+        .env_remove("CLAUDE_CONFIG_DIR")
+        .assert()
+        .code(1);
+    let log = fs::read_to_string(env.log_path()).unwrap();
+    assert!(log.contains(" claude error fatal: "), "{log}");
+}
