@@ -71,10 +71,21 @@ pub fn availability(enabled: Enabled) -> Option<Unavailable> {
     match enabled {
         Enabled::Off => Some(Unavailable::Disabled),
         Enabled::On => None,
-        Enabled::Auto => match source().and_then(|s| s.claude_token()) {
-            Ok(_) => None,
-            Err(e) => unavailable_for(enabled, &e),
-        },
+        Enabled::Auto => {
+            let probe = source().and_then(|s| s.claude_token());
+            tracing::debug!(
+                "claude auto: credential probe {}",
+                if probe.is_ok() {
+                    "found a credential"
+                } else {
+                    "found no usable credential"
+                }
+            );
+            match probe {
+                Ok(_) => None,
+                Err(e) => unavailable_for(enabled, &e),
+            }
+        }
     }
 }
 
@@ -102,18 +113,18 @@ fn client() -> UsageClient {
     }
 }
 
-/// Whether `url` is `http://` to `127.0.0.1`, `localhost` or `[::1]`.
+/// Whether `url` is `http://` to exactly `127.0.0.1`, `localhost` or `[::1]` (any port, no
+/// userinfo).
 fn is_loopback(url: &str) -> bool {
-    let Some(rest) = url.strip_prefix("http://") else {
+    let Ok(uri) = url.parse::<http::Uri>() else {
         return false;
     };
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
-    let host = if let Some(v6) = authority.strip_prefix('[') {
-        v6.split(']').next().map(|h| format!("[{h}]"))
-    } else {
-        authority.split(':').next().map(str::to_owned)
+    let Some(authority) = uri.authority() else {
+        return false;
     };
-    matches!(host.as_deref(), Some("127.0.0.1" | "localhost" | "[::1]"))
+    uri.scheme() == Some(&http::uri::Scheme::HTTP)
+        && !authority.as_str().contains('@')
+        && matches!(authority.host(), "127.0.0.1" | "localhost" | "[::1]")
 }
 
 #[cfg(test)]
@@ -137,6 +148,14 @@ mod tests {
         assert!(!is_loopback("http://127.0.0.1.example.com/"));
         assert!(!is_loopback("http://localhost@example.com/"));
         assert!(!is_loopback("http://user@127.0.0.1/"));
+        assert!(!is_loopback("http://127.0.0.1:80@example.com/"));
+        assert!(!is_loopback("http://localhost:x@evil.host/"));
+        assert!(!is_loopback("http://[::1]@evil.host/"));
+        assert!(!is_loopback("http://127.0.0.1.evil.host/"));
+        assert!(!is_loopback("http://localhost.evil.host/"));
+        assert!(!is_loopback("http://127.0.0.1%40evil.host/"));
+        assert!(!is_loopback("http://evil.host%40127.0.0.1/"));
+        assert!(!is_loopback("http://localhost%40evil.host:80/"));
         assert!(!is_loopback(""));
     }
 

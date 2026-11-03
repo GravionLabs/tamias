@@ -900,6 +900,7 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "clap",
+ "http",
  "jiff",
  "predicates",
  "serde",
