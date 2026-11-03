@@ -48,13 +48,10 @@ fn status_of_an_installed_agent_with_runs() {
     };
     let text = render_status(
         &state,
-        &[
-            (
-                Provider::Claude,
-                status(Some("2026-11-03T10:05:00Z"), None, None),
-            ),
-            (Provider::Copilot, None),
-        ],
+        &[(
+            Provider::Claude,
+            status(Some("2026-11-03T10:05:00Z"), None, None),
+        )],
         Path::new("/d/logs/collect.log"),
         &TimeZone::UTC,
     );
@@ -65,7 +62,7 @@ fn status_of_an_installed_agent_with_runs() {
              definition: /h/agent.plist\n\
              exe: {}\n\
              claude: last run 2026-11-03 10:05 ok\n\
-             copilot: no run yet\n\
+             copilot: not polled yet (coming with #5)\n\
              log: /d/logs/collect.log\n",
             exe.display()
         )
@@ -302,7 +299,10 @@ fn status_reads_the_last_run_from_the_store() {
     .unwrap();
     assert!(text.contains("claude: last run 2026-11-03"), "{text}");
     assert!(text.contains("error (rate limited)"), "{text}");
-    assert!(text.contains("copilot: no run yet"), "{text}");
+    assert!(
+        text.contains("copilot: not polled yet (coming with #5)"),
+        "{text}"
+    );
 }
 
 #[test]

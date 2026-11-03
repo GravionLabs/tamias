@@ -69,7 +69,7 @@ Open a new terminal for the changed `PATH` to apply. Windows SmartScreen may war
 
 ```sh
 tamias --version
-tamias collect    # poll Claude and Copilot once and store the snapshots
+tamias collect    # poll Claude once and store (Copilot follows with [#5](https://github.com/GravionLabs/tamias/issues/5)) the snapshots
 tamias today      # today's usage against the daily budget
 ```
 
@@ -77,7 +77,7 @@ To poll every 5 minutes without running `collect` by hand, see [Scheduled collec
 
 ## Scheduled collection
 
-tamias reads Claude and Copilot usage by polling every 5 minutes. `tamias service` registers that poll with the scheduler of your operating system. It runs in your user account on all three platforms: no administrator rights, no `sudo`, no stored password.
+tamias reads Claude usage by polling every 5 minutes. `tamias service` registers that poll with the scheduler of your operating system. It runs in your user account on all three platforms: no administrator rights, no `sudo`, no stored password.
 
 ```text
 tamias service install     # register the collector (run again to replace it)
@@ -107,11 +107,11 @@ Every scheduled run appends one line per provider to `logs/collect.log` in the d
 
 ### Check the last run
 
-`tamias service status` prints the registration, the executable, the last run of each provider (from the store) and the log path. For the history, read the end of the log:
+`tamias service status` prints the registration, the executable, the last run of Claude (Copilot is not polled yet; it is marked as coming with #5) (from the store) and the log path. For the history, read the end of the log:
 
 ```text
 2026-11-03T10:15:42Z claude ok stored 2 snapshots
-2026-11-03T10:15:42Z copilot error unauthorized
+2026-11-03T10:20:42Z claude error unauthorized
 ```
 
 An `error` line names a class of failure, for example an expired login; fix it and the next run recovers. A source that keeps failing shows as `stale` in `tamias today`.

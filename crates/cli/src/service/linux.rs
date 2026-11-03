@@ -237,7 +237,7 @@ impl Scheduler for SystemdTimer {
 pub fn service_unit(exe: &str) -> String {
     format!(
         "[Unit]\n\
-         Description=tamias collector (polls Claude and Copilot usage once)\n\
+         Description=tamias collector (polls Claude usage once)\n\
          \n\
          [Service]\n\
          Type=oneshot\n\
