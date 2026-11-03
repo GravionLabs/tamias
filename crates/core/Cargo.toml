@@ -12,4 +12,6 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
+directories = "6.0.0"
 jiff = "0.2.39"
+thiserror = "2.0.21"
