@@ -327,10 +327,7 @@ pub fn execute(
         Action::Status => {
             let state = scheduler.status()?;
             let store = open_store()?;
-            let mut statuses = Vec::new();
-            for provider in [Provider::Claude] {
-                statuses.push((provider, store.status(provider)?));
-            }
+            let statuses = vec![(Provider::Claude, store.status(Provider::Claude)?)];
             Ok(render_status(
                 &state,
                 &statuses,

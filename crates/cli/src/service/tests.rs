@@ -109,7 +109,7 @@ fn status_when_not_installed_shows_the_log_path() {
     );
     assert_eq!(
         text,
-        "service: not installed (run `tamias service install`)\nlog: /d/collect.log\n"
+        "service: not installed (run `tamias service install`)\ncopilot: not polled yet (coming with #5)\nlog: /d/collect.log\n"
     );
 }
 
