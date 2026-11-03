@@ -14,9 +14,12 @@ mod collect;
 mod collect_log;
 #[path = "../config.rs"]
 mod config;
+#[path = "../exit.rs"]
+mod exit;
 
 use std::process::ExitCode;
 
+use exit::{EXIT_ERROR, EXIT_STALE};
 use tamias_core::paths;
 use tamias_core::store::Store;
 
@@ -24,11 +27,11 @@ use tamias_core::store::Store;
 fn main() -> ExitCode {
     match run() {
         Ok(collect::Outcome::Ok) => ExitCode::SUCCESS,
-        Ok(collect::Outcome::ProviderFailed) => ExitCode::from(3),
+        Ok(collect::Outcome::ProviderFailed) => ExitCode::from(EXIT_STALE),
         Err(e) => {
             // Without a console this goes nowhere; kept for `tamiasw` run from a terminal.
             eprintln!("error: {e}");
-            ExitCode::from(1)
+            ExitCode::from(EXIT_ERROR)
         }
     }
 }

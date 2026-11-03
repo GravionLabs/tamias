@@ -4,6 +4,7 @@ mod claude;
 mod collect;
 mod collect_log;
 mod config;
+mod exit;
 mod service;
 mod short;
 mod today;
@@ -19,11 +20,7 @@ use tamias_core::paths;
 use tamias_core::store::Store;
 use tracing::Level;
 
-/// Exit code when the command could not run (invalid config, data directory, store).
-const EXIT_ERROR: u8 = 1;
-/// Exit code when at least one set-up provider is not fresh: its poll failed (`collect`) or it
-/// is stale (`today`).
-const EXIT_STALE: u8 = 3;
+use crate::exit::{EXIT_ERROR, EXIT_STALE};
 
 /// Exit codes shared by `collect` and `today`, shown in their `--help`.
 const EXIT_CODES: &str = "\
