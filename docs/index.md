@@ -31,7 +31,7 @@ tamias (Greek ταμίας, treasurer) shows, per provider, how much of the usag
 
 tamias is in development. Read on:
 
-- [Installation](./installation.md): scheduled collection on macOS, Linux and Windows.
+- [Installation](./installation.md): download, first start and scheduled collection on macOS, Linux and Windows.
 - [Consumers](./consumers.md): how to read tamias from scripts, plugins and Rust.
 - [Usage sources](./sources.md): where the numbers come from and how stable each source is.
 - [Roadmap](./roadmap.md): the milestones and their Features.
