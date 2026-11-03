@@ -95,7 +95,7 @@ tamias service uninstall   # remove the registration (exits 0 with a note when t
 
 ### The collect log
 
-Every scheduled run appends one line per provider to `logs/collect.log` in the data directory: time, provider, `ok` or `error`, a short message. It never contains a token. Above 1 MiB the file is rotated to `collect.log.1` (one generation is kept). The scheduler's own stdout and stderr are discarded; this file is the log.
+Every scheduled run appends one line per provider to `logs/collect.log` in the data directory: time, provider, `ok` or `error`, a short message. A fatal error (invalid config, unreadable data directory or store) is one line too, `error fatal: <reason>`, and `tamias service status` shows it as the last result when the store can be opened. It never contains a token. Above 1 MiB the file is rotated to `collect.log.1` (one generation is kept). The scheduler's own stdout and stderr are discarded; this file is the log.
 
 | Platform | Data directory | Collect log |
 |----------|----------------|-------------|

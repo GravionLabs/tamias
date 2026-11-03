@@ -104,18 +104,19 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    if matches!(cli.command, Command::Collect) {
+        return Ok(match collect::run_logged(cli.config.as_deref())? {
+            collect::Outcome::Ok => ExitCode::SUCCESS,
+            collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
+        });
+    }
     let config = config::load(cli.config.as_deref())?;
     let data_dir = paths::data_dir()?;
     let database = data_dir.join(paths::DATABASE_FILE);
     tracing::debug!("database {}", database.display());
     let log = collect_log::CollectLog::in_data_dir(&data_dir);
     match cli.command {
-        Command::Collect => Ok(
-            match collect::run(&config, &mut Store::open(&database)?, &log)? {
-                collect::Outcome::Ok => ExitCode::SUCCESS,
-                collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
-            },
-        ),
+        Command::Collect => unreachable!("handled before the config is loaded"),
         Command::Today(ref args) => {
             // Whole seconds: `generated_at` of the JSON is RFC 3339 without a fraction.
             let now = Timestamp::from_second(Timestamp::now().as_second())?;
