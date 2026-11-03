@@ -4,7 +4,8 @@
 #   ci.yml (fmt, clippy, test on three OS) -> determine-version (GitVersion.yml) -> gh-release: the version command
 #   writes the version into the Cargo workspace, git-cliff writes CHANGELOG.md, both are committed to main in one
 #   [skip ci] commit, which is tagged v<version>; then the GitHub Release is created and the issues delivered by the
-#   release PR are closed. Binary archives (#33) are not part of this workflow yet.
+#   release PR are closed -> release-binaries.yml builds the tagged commit for five targets and attaches the archives
+#   and SHA256SUMS to that release (#33).
 #
 # .github/scripts/set-version.sh sets [workspace.package] version and the tamias-core version in
 # [workspace.dependencies] and updates Cargo.lock, so a build of the tag reports the released version (tamias --version).
@@ -35,6 +36,8 @@ jobs:
     name: Release
     needs: test
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.semver }}
     permissions:
       contents: write # release commit, tag, GitHub Release
       issues: write # close-issues
@@ -63,3 +66,12 @@ jobs:
           update-changelog: "true"
           close-issues: "true"
           token: ${{ secrets.GH_PAT }}
+
+  binaries:
+    name: Binaries
+    needs: release
+    permissions:
+      contents: write # gh release upload of the archives
+    uses: ./.github/workflows/release-binaries.yml
+    with:
+      tag: v${{ needs.release.outputs.version }}
