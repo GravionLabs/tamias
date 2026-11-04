@@ -37,11 +37,59 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Format
         run: cargo fmt --all --check
+      # tamias-app needs the Tauri system libraries and the built frontend; the app job checks it.
       - name: Clippy
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        run: cargo clippy --workspace --exclude tamias-app --all-targets --locked -- -D warnings
       - name: Docs of tamias-core
         run: cargo doc --no-deps -p tamias-core --locked
         env:
           RUSTDOCFLAGS: -D warnings
       - name: Test
-        run: cargo test --workspace --locked
+        run: cargo test --workspace --exclude tamias-app --locked
+
+  app:
+    name: app (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The system libraries of Tauri on Linux (https://v2.tauri.app/start/prerequisites/#linux);
+      # Ubuntu 24.04 ships the app indicator as libayatana-appindicator.
+      - name: Install the Tauri Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+      # rust-toolchain.toml pins the toolchain; rustup installs it on first use.
+      - name: Install toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: app
+      # app/ is its own pnpm root; the pnpm version comes from its packageManager field.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: app/.nvmrc
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm check
+      - run: pnpm format:check
+      - run: pnpm test
+      # The Tauri macros read the built frontend (frontendDist in tauri.conf.json).
+      - name: Build the frontend
+        run: pnpm build
+      - name: Clippy
+        run: cargo clippy -p tamias-app --all-targets --locked -- -D warnings
+      - name: Test
+        run: cargo test -p tamias-app --locked

@@ -1,0 +1,33 @@
+[package]
+name = "tamias-app"
+description = "Desktop app of tamias: today's usage against the daily budget per provider"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+# The `_lib` suffix keeps the library name apart from the binary name (cargo#8519, an issue on Windows).
+name = "tamias_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.2", features = [] }
+
+[dependencies]
+jiff = "0.2.39"
+tamias-core.workspace = true
+tauri = { version = "2.12.5", features = [] }
+thiserror = "2.0.21"
+
+[dev-dependencies]
+jsonschema = { version = "0.60.2", default-features = false }
+rusqlite = { version = "0.41.1", features = ["bundled"] }
+serde_json = "1.0.154"
+tempfile = "3.27.0"
+
+[lints]
+workspace = true

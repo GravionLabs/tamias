@@ -1,0 +1,91 @@
+:host {
+  display: block;
+  padding: 24px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.muted {
+  color: var(--h-text-muted-color);
+}
+
+.providers {
+  display: grid;
+  gap: 16px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.note {
+  margin: 0 0 8px;
+  color: var(--h-text-muted-color);
+}
+
+.windows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.windows li {
+  display: grid;
+  grid-template-columns: auto 9rem 1fr 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.colour-green {
+  background: var(--h-green-500);
+}
+
+.colour-yellow {
+  background: var(--h-yellow-500);
+}
+
+.colour-red {
+  background: var(--h-red-500);
+}
+
+.colour-grey {
+  background: var(--h-surface-400);
+}
+
+.name {
+  font-weight: 600;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
