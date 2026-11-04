@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
-use tamias_app_lib::today;
+use tamias_app_lib::{CommandError, today};
 use tamias_core::config::{self, Config};
 use tamias_core::paths::DATABASE_FILE;
 use tamias_core::report::{Report, Status};
@@ -278,4 +278,38 @@ fn report_is_schema_v1_json() {
     assert_eq!(json["providers"][0]["provider"], "claude");
     assert_eq!(json["providers"][1]["status"], "unavailable");
     assert_eq!(Report::parse(&json.to_string()).unwrap(), report);
+}
+
+#[test]
+fn a_busy_store_is_a_busy_command_error() {
+    let busy = Error::Sqlite(rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
+        None,
+    ));
+
+    let err = CommandError::from(today::Error::Store(busy));
+
+    assert!(err.busy);
+    assert_eq!(serde_json::to_value(&err).unwrap()["busy"], true);
+}
+
+#[test]
+fn other_store_errors_are_not_busy() {
+    let (_dir, database) = data_dir();
+    seed_claude(&database);
+    rusqlite::Connection::open(&database)
+        .unwrap()
+        .pragma_update(None, "user_version", 99)
+        .unwrap();
+    let err = today::read(&database, &Config::default(), now(), &TimeZone::UTC).unwrap_err();
+
+    let err = CommandError::from(today::Error::Store(err));
+
+    assert_eq!(
+        serde_json::to_value(&err).unwrap(),
+        serde_json::json!({
+            "message": "database schema version 99 is newer than the supported version 1",
+            "busy": false,
+        })
+    );
 }

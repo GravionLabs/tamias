@@ -1,10 +1,17 @@
 import { Injectable } from "@angular/core";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { Report } from "./report";
 
-/** The commands of the Tauri backend; components inject this, tests provide a double. */
+/** Stops a listener registered with `Ipc.listen`. */
+export type Unlisten = () => void;
+
+/** The commands and events of the Tauri backend; components inject this, tests provide a double. */
 export abstract class Ipc {
   abstract invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
+
+  /** Calls `handler` for every `event` the backend emits until the returned function is called. */
+  abstract listen(event: string, handler: () => void): Promise<Unlisten>;
 
   /** Today's report of every provider (the document of `tamias today --json`). */
   today(): Promise<Report> {
@@ -12,10 +19,41 @@ export abstract class Ipc {
   }
 }
 
-/** The only caller of Tauri's `invoke`. */
+/** The only caller of Tauri's `invoke` and `listen`. */
 @Injectable()
 export class TauriIpc extends Ipc {
   override invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
     return invoke<T>(command, args);
   }
+
+  override listen(event: string, handler: () => void): Promise<Unlisten> {
+    return listen(event, () => handler());
+  }
+}
+
+/** The error a command of the backend rejects with (`CommandError` in `app/src-tauri/src/lib.rs`). */
+export interface CommandError {
+  message: string;
+  /** The store was locked longer than its busy timeout; the next refresh retries. */
+  busy: boolean;
+}
+
+function isCommandError(error: unknown): error is CommandError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    typeof (error as CommandError).message === "string" &&
+    typeof (error as CommandError).busy === "boolean"
+  );
+}
+
+/** Whether a rejection is a busy store: not an error state, the next refresh retries. */
+export function isBusy(error: unknown): boolean {
+  return isCommandError(error) && error.busy;
+}
+
+/** The text of a rejection: a command error, an `Error` or anything else. */
+export function errorText(error: unknown): string {
+  if (isCommandError(error) || error instanceof Error) return error.message;
+  return String(error);
 }

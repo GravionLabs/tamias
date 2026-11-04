@@ -35,6 +35,14 @@ pub enum Error {
     Store(#[from] store::Error),
 }
 
+impl Error {
+    /// Whether the store was locked longer than its busy timeout; the next refresh retries.
+    #[must_use]
+    pub fn is_busy(&self) -> bool {
+        matches!(self, Self::Store(error) if error.is_busy())
+    }
+}
+
 /// The report now, in the system time zone, from the database at [`paths::database_path`]
 /// (`TAMIAS_DATA_DIR` respected) with the default `config.toml` (`TAMIAS_CONFIG_DIR` respected).
 ///

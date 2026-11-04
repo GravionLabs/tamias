@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { TestBed, getTestBed } from "@angular/core/testing";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { Ipc } from "../core/ipc";
+import { Ipc, type Unlisten } from "../core/ipc";
+import { STORE_CHANGED } from "../core/store-events";
 import type { ProviderReport, Report } from "../core/report";
 import { Overview } from "./overview";
 
@@ -12,15 +13,32 @@ beforeAll(() => {
 });
 afterEach(() => TestBed.resetTestingModule());
 
-/** An `Ipc` whose `today` answers `answer` (a thrown error rejects it). */
+/**
+ * An `Ipc` whose `today` answers `answer` (a thrown error rejects it); `emit` fires the events the
+ * view listens to.
+ */
 class StubIpc extends Ipc {
-  constructor(private readonly answer: () => unknown) {
+  todayCalls = 0;
+  private readonly handlers = new Map<string, Set<() => void>>();
+
+  constructor(public answer: () => unknown) {
     super();
   }
 
   override async invoke<T>(command: string): Promise<T> {
     if (command !== "today") throw new Error(`unexpected command ${command}`);
+    this.todayCalls++;
     return this.answer() as T;
+  }
+
+  override async listen(event: string, handler: () => void): Promise<Unlisten> {
+    const handlers = this.handlers.get(event) ?? new Set();
+    this.handlers.set(event, handlers.add(handler));
+    return () => handlers.delete(handler);
+  }
+
+  emit(event: string): void {
+    for (const handler of this.handlers.get(event) ?? []) handler();
   }
 }
 
@@ -76,8 +94,9 @@ const COPILOT_STALE: ProviderReport = {
   ],
 };
 
-async function render(answer: () => unknown): Promise<HTMLElement> {
-  TestBed.configureTestingModule({ providers: [{ provide: Ipc, useValue: new StubIpc(answer) }] });
+async function mount(answer: () => unknown) {
+  const ipc = new StubIpc(answer);
+  TestBed.configureTestingModule({ providers: [{ provide: Ipc, useValue: ipc }] });
   TestBed.overrideComponent(Overview, {
     set: {
       templateUrl: undefined,
@@ -86,9 +105,17 @@ async function render(answer: () => unknown): Promise<HTMLElement> {
     },
   });
   const fixture = TestBed.createComponent(Overview);
-  await fixture.whenStable();
-  fixture.detectChanges();
-  return fixture.nativeElement as HTMLElement;
+  /** Waits for the pending loads and renders. */
+  const settle = async () => {
+    await fixture.whenStable();
+    fixture.detectChanges();
+  };
+  await settle();
+  return { ipc, el: fixture.nativeElement as HTMLElement, settle };
+}
+
+async function render(answer: () => unknown): Promise<HTMLElement> {
+  return (await mount(answer)).el;
 }
 
 function card(el: HTMLElement, provider: string): HTMLElement {
@@ -162,5 +189,74 @@ describe("Overview", () => {
   it("shows the loading state until the backend answers", async () => {
     const el = await render(() => new Promise(() => {}));
     expect(el.querySelector("[role=status]")?.textContent).toContain("Reading today's usage");
+  });
+
+  it("reloads once on a store-changed event", async () => {
+    const { ipc, el, settle } = await mount(() => report(CLAUDE_OK));
+    expect(ipc.todayCalls).toBe(1);
+
+    ipc.answer = () =>
+      report({ ...CLAUDE_OK, status: "stale", stale_since: CLAUDE_OK.windows[0].resets_at });
+    ipc.emit(STORE_CHANGED);
+    await settle();
+
+    expect(ipc.todayCalls).toBe(2);
+    expect(card(el, "claude").getAttribute("data-status")).toBe("stale");
+  });
+
+  it("does not reload without an event", async () => {
+    const { ipc, settle } = await mount(() => report(CLAUDE_OK));
+    await settle();
+    expect(ipc.todayCalls).toBe(1);
+  });
+
+  it("keeps the last report when the store is busy on a reload", async () => {
+    const { ipc, el, settle } = await mount(() => report(CLAUDE_OK));
+
+    ipc.answer = () =>
+      Promise.reject({ message: "database error: database is locked", busy: true });
+    ipc.emit(STORE_CHANGED);
+    await settle();
+
+    expect(ipc.todayCalls).toBe(2);
+    expect(el.querySelector("[data-testid=error]")).toBeNull();
+    expect(card(el, "claude").getAttribute("data-status")).toBe("ok");
+  });
+
+  it("stays loading when the store is busy at the start, and shows the report on the next event", async () => {
+    const { ipc, el, settle } = await mount(() =>
+      Promise.reject({ message: "database error: database is locked", busy: true }),
+    );
+    expect(el.querySelector("[data-testid=error]")).toBeNull();
+    expect(el.querySelector("[role=status]")?.textContent).toContain("Reading today's usage");
+
+    ipc.answer = () => report(CLAUDE_OK);
+    ipc.emit(STORE_CHANGED);
+    await settle();
+
+    expect(card(el, "claude").getAttribute("data-status")).toBe("ok");
+  });
+
+  it("shows the message of a command error that is not busy", async () => {
+    const el = await render(() =>
+      Promise.reject({ message: "database schema version 9 is newer", busy: false }),
+    );
+    expect(el.querySelector("[data-testid=error]")?.textContent).toContain("schema version 9");
+  });
+
+  it("shows only the latest load when an earlier one answers late", async () => {
+    let answerFirst: (value: Report) => void = () => undefined;
+    const { ipc, el, settle } = await mount(
+      () => new Promise<Report>((resolve) => (answerFirst = resolve)),
+    );
+
+    ipc.answer = () => report(COPILOT_STALE);
+    ipc.emit(STORE_CHANGED);
+    await settle();
+    answerFirst(report(CLAUDE_OK));
+    await settle();
+
+    expect(el.querySelector("hx-card[data-provider=claude]")).toBeNull();
+    expect(card(el, "copilot").getAttribute("data-status")).toBe("stale");
   });
 });
