@@ -17,7 +17,9 @@
 //! - [`ServiceLock`] keeps install and uninstall from running concurrently.
 
 use std::io::{self, Read};
-use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
