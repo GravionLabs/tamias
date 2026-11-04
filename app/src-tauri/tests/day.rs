@@ -126,3 +126,17 @@ fn day_serialises_for_the_frontend() {
     );
     assert_eq!(json["providers"][1]["status"], "unavailable");
 }
+
+#[test]
+fn a_datetime_is_not_a_date() {
+    let dir = tempfile::tempdir().unwrap();
+    let error = read(&dir.path().join(DATABASE_FILE), "2026-11-04T10:00").unwrap_err();
+    assert!(matches!(error, Error::InvalidDate(_)));
+}
+
+#[test]
+fn a_future_day_has_no_points_and_no_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = read(&dir.path().join(DATABASE_FILE), "2099-01-01").unwrap();
+    assert!(report.providers.iter().all(|p| p.points.is_empty()));
+}

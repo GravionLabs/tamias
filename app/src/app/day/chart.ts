@@ -81,8 +81,11 @@ export function buildChart(
     path += ` H${round(x(until))}`;
   }
 
+  // Ticks sit at the real instants of local 00:00, 06:00, 12:00 and 18:00, the last one at the end
+  // of the day (so on a 23 or 25 hour day the spacing is uneven but each label is right).
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
   const xTicks = [0, 6, 12, 18, 24].map((h) => ({
-    at: round(LEFT + (h / 24) * (right - LEFT)),
+    at: round(x(h === 24 ? end : new Date(year, month - 1, day, h).getTime())),
     label: `${String(h).padStart(2, "0")}:00`,
   }));
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => ({

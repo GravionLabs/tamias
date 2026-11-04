@@ -128,9 +128,10 @@ pub fn read(
     now: Timestamp,
     tz: &TimeZone,
 ) -> Result<DayReport, Error> {
-    let date: Date = date
-        .parse()
-        .map_err(|_| Error::InvalidDate(date.to_owned()))?;
+    let date: Date = Some(date)
+        .filter(|d| d.len() == 10)
+        .and_then(|d| d.parse().ok())
+        .ok_or_else(|| Error::InvalidDate(date.to_owned()))?;
     let overview = today::read(database, config, now, tz)?;
     let store = if database.is_file() {
         Some(Store::open_read_only(database)?)

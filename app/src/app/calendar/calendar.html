@@ -42,6 +42,7 @@
           <a
             class="day open"
             data-testid="open-day"
+            [attr.aria-label]="'Open ' + cell.date"
             [routerLink]="['/day', cell.date]"
             [queryParams]="{ month: cell.date.slice(0, 7) }"
             >{{ cell.day }}</a

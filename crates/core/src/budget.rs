@@ -199,7 +199,9 @@ pub struct Point {
 ///
 /// The first point is 0 at local midnight, then one point per distinct observation instant of
 /// the day, oldest first. The values never decrease (a lower value after a higher one adds
-/// nothing, a reset continues the sum) and the last one equals `day(...).usage`. Snapshots of
+/// nothing, a reset continues the sum) and the last one equals `day(...).usage` whenever [`day`] is `Some`. Where `day` is `None` (no
+/// window open at the start of the day, observed before its end) the points are still returned
+/// and are not backed by a `day` value. Snapshots of
 /// the day alone take part, so a caller caps the range it reads at the present: nothing after
 /// `now` is usage yet. A day without a snapshot, or out of range, gives no points.
 #[must_use]
