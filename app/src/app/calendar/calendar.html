@@ -1,0 +1,61 @@
+<header class="head">
+  <h1 data-testid="title">{{ title() }}</h1>
+  <nav class="nav" aria-label="Month">
+    <button hx-button variant="outlined" data-testid="prev" (click)="previous()">Previous</button>
+    <button
+      hx-button
+      variant="outlined"
+      data-testid="today"
+      [disabled]="isCurrentMonth()"
+      (click)="goToday()"
+    >
+      Today
+    </button>
+    <button hx-button variant="outlined" data-testid="next" (click)="next()">Next</button>
+  </nav>
+  <a class="muted" routerLink="/today">Today overview</a>
+</header>
+
+@if (error(); as message) {
+  <hx-message severity="error" data-testid="error">Cannot read the month: {{ message }}</hx-message>
+}
+@if (report()) {
+  <div class="grid" role="grid" data-testid="grid">
+    @for (name of weekdays(); track $index) {
+      <div class="weekday" role="columnheader">{{ name }}</div>
+    }
+    @for (blank of blanks(); track $index) {
+      <div class="cell blank" aria-hidden="true"></div>
+    }
+    @for (cell of cells(); track cell.date) {
+      <div
+        class="cell"
+        role="gridcell"
+        data-testid="cell"
+        [attr.data-date]="cell.date"
+        [class.today]="cell.today"
+      >
+        <span class="day">{{ cell.day }}</span>
+        <span class="chips">
+          @for (c of cell.chips; track c.provider) {
+            <span
+              class="chip"
+              [class]="'chip colour-' + c.colour"
+              [attr.data-provider]="c.provider"
+              [attr.data-colour]="c.colour"
+              [attr.title]="c.title"
+              >{{ c.letters }}</span
+            >
+          }
+        </span>
+        @if (cell.stale; as hint) {
+          <span class="stale" data-testid="stale">{{ hint }}</span>
+        }
+      </div>
+    }
+  </div>
+} @else if (!error()) {
+  <p class="loading" role="status">
+    <hx-progress-spinner ariaLabel="Reading the month" /> Reading the month…
+  </p>
+}

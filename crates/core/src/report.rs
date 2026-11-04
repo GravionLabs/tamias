@@ -9,6 +9,7 @@
 //!   Copilot `monthly`) once a day can be derived ([`budget::today`]).
 //! - A stale provider shows every window `grey`.
 
+use jiff::civil::Date;
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 use serde::{Deserialize, Serialize};
@@ -331,6 +332,92 @@ pub fn read(
         tz,
         thresholds,
     ))
+}
+
+/// Usage against the budget of one local day, one entry of [`month`].
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct DayEntry {
+    /// The local calendar day.
+    pub date: Date,
+    /// Usage of the day, in the unit of the binding window.
+    pub usage: f64,
+    /// Budget of the day, in the same unit.
+    pub budget: f64,
+    /// `usage / budget`; absent when the budget is 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ratio: Option<f64>,
+    /// Colour of the day against `thresholds`. Never `grey`: the staleness of the provider is
+    /// not a property of a past day (see [`stale`]).
+    pub colour: Colour,
+}
+
+/// The days of `month` of `year` (local, in `tz`) up to the local day of `now`, each with the
+/// usage and budget of the binding window of `provider` (`seven_day`, `monthly`).
+///
+/// Reads the snapshots from [`lookback`] before the first day to the end of the month or `now`, whichever is first, once and
+/// derives every day with [`budget::day`], so a day has the same values as that call alone.
+/// Days without a result (no window observed) and days after `now` are absent; an invalid
+/// `year`/`month` gives no days.
+///
+/// # Errors
+///
+/// Store errors.
+pub fn month(
+    store: &Store,
+    provider: snapshot::Provider,
+    year: i16,
+    month: i8,
+    tz: &TimeZone,
+    thresholds: &Thresholds,
+    now: Timestamp,
+) -> store::Result<Vec<DayEntry>> {
+    let window = windows(provider)[0];
+    let Ok(first) = Date::new(year, month, 1) else {
+        return Ok(Vec::new());
+    };
+    let today = now.to_zoned(tz.clone()).date();
+    let last = first.last_of_month().min(today);
+    let (Ok(from), Ok(to)) = (
+        first.to_zoned(tz.clone()),
+        first
+            .last_of_month()
+            .tomorrow()
+            .and_then(|d| d.to_zoned(tz.clone())),
+    ) else {
+        return Ok(Vec::new());
+    };
+    let from = from
+        .timestamp()
+        .checked_sub(lookback(window))
+        .unwrap_or_else(|_| from.timestamp());
+    // Nothing observed after `now` takes part, so today is judged as `budget::day` alone would.
+    let to = to.timestamp().min(
+        now.checked_add(SignedDuration::from_nanos(1))
+            .unwrap_or(now),
+    );
+    let snapshots = store.snapshots(provider, window, from, to)?;
+    // Past days are judged as if fresh: a stale provider greys only today, in the caller.
+    let status = budget::Status {
+        now,
+        last_ok_at: Some(now),
+    };
+    let mut days = Vec::new();
+    let mut date = first;
+    while date <= last {
+        if let Some(d) = budget::day(&snapshots, provider, window, date, tz, status, thresholds) {
+            days.push(DayEntry {
+                date,
+                usage: d.usage,
+                budget: d.budget,
+                ratio: d.ratio,
+                colour: d.colour,
+            });
+        }
+        let Ok(next) = date.tomorrow() else { break };
+        date = next;
+    }
+    Ok(days)
 }
 
 #[cfg(test)]

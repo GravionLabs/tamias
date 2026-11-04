@@ -1,7 +1,7 @@
 import { Injectable } from "@angular/core";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { Report } from "./report";
+import type { MonthReport, Report } from "./report";
 
 /** Stops a listener registered with `Ipc.listen`. */
 export type Unlisten = () => void;
@@ -16,6 +16,11 @@ export abstract class Ipc {
   /** Today's report of every provider (the document of `tamias today --json`). */
   today(): Promise<Report> {
     return this.invoke<Report>("today");
+  }
+
+  /** The days of `month` (1-12) of `year` of every provider, with usage against the budget. */
+  month(year: number, month: number): Promise<MonthReport> {
+    return this.invoke<MonthReport>("month", { year, month });
   }
 }
 

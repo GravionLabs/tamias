@@ -1,7 +1,10 @@
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 
-use super::{Provider, Report, SCHEMA_VERSION, Stale, Status, provider, read, stale, unavailable};
+use super::{
+    DayEntry, Provider, Report, SCHEMA_VERSION, Stale, Status, month, provider, read, stale,
+    unavailable,
+};
 use crate::budget::{Colour, Thresholds};
 use crate::snapshot::{self, Snapshot, Source, Unit, Window};
 use crate::store::{SourceStatus, Store};
@@ -315,4 +318,256 @@ fn parse_rejects_garbage_and_a_missing_version() {
         Report::parse("{}").unwrap_err(),
         super::ParseError::Json(_)
     ));
+}
+
+fn month_store(snaps: &[Snapshot]) -> (tempfile::TempDir, Store) {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::open(dir.path().join("tamias.db")).unwrap();
+    store
+        .record_run(
+            snapshot::Provider::Claude,
+            snaps,
+            ts("2026-11-30T12:00:00Z"),
+        )
+        .unwrap();
+    (dir, store)
+}
+
+fn claude_month(now: &str) -> Vec<DayEntry> {
+    // Seven-day windows resetting on Nov 12 and Nov 19 (UTC noon): a reset in the middle.
+    let c = snapshot::Provider::Claude;
+    let s = |used, resets: &str, observed: &str| snap(c, Window::SevenDay, used, resets, observed);
+    let (_dir, store) = month_store(&[
+        s(10.0, "2026-11-12T12:00:00Z", "2026-11-09T01:00:00Z"),
+        s(30.0, "2026-11-12T12:00:00Z", "2026-11-10T20:00:00Z"),
+        s(50.0, "2026-11-12T12:00:00Z", "2026-11-11T20:00:00Z"),
+        s(5.0, "2026-11-19T12:00:00Z", "2026-11-12T20:00:00Z"),
+        s(25.0, "2026-11-19T12:00:00Z", "2026-11-13T20:00:00Z"),
+    ]);
+    month(
+        &store,
+        c,
+        2026,
+        11,
+        &TimeZone::UTC,
+        &Thresholds::default(),
+        ts(now),
+    )
+    .unwrap()
+}
+
+#[test]
+fn month_matches_budget_day_across_a_reset() {
+    let c = snapshot::Provider::Claude;
+    let days = claude_month("2026-11-15T10:00:00Z");
+    let snaps = [
+        snap(
+            c,
+            Window::SevenDay,
+            10.0,
+            "2026-11-12T12:00:00Z",
+            "2026-11-09T01:00:00Z",
+        ),
+        snap(
+            c,
+            Window::SevenDay,
+            30.0,
+            "2026-11-12T12:00:00Z",
+            "2026-11-10T20:00:00Z",
+        ),
+        snap(
+            c,
+            Window::SevenDay,
+            50.0,
+            "2026-11-12T12:00:00Z",
+            "2026-11-11T20:00:00Z",
+        ),
+        snap(
+            c,
+            Window::SevenDay,
+            5.0,
+            "2026-11-19T12:00:00Z",
+            "2026-11-12T20:00:00Z",
+        ),
+        snap(
+            c,
+            Window::SevenDay,
+            25.0,
+            "2026-11-19T12:00:00Z",
+            "2026-11-13T20:00:00Z",
+        ),
+    ];
+    let status = crate::budget::Status {
+        now: ts("2026-11-15T10:00:00Z"),
+        last_ok_at: Some(ts("2026-11-15T10:00:00Z")),
+    };
+    let entry = |d: &str| days.iter().find(|e| e.date.to_string() == d).copied();
+    for d in ["2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13"] {
+        let alone = crate::budget::day(
+            &snaps,
+            c,
+            Window::SevenDay,
+            d.parse().unwrap(),
+            &TimeZone::UTC,
+            status,
+            &Thresholds::default(),
+        )
+        .unwrap();
+        let got = entry(d).unwrap();
+        assert_eq!(
+            (got.usage, got.budget, got.ratio, got.colour),
+            (alone.usage, alone.budget, alone.ratio, alone.colour),
+            "{d}"
+        );
+    }
+    // Literal anchor: Nov 11 rose from 30 to 50.
+    assert!((entry("2026-11-11").unwrap().usage - 20.0).abs() < 1e-9);
+}
+
+#[test]
+fn month_leaves_out_days_without_snapshots() {
+    let days = claude_month("2026-11-15T10:00:00Z");
+    assert!(
+        days.iter()
+            .all(|e| e.date.to_string().as_str() >= "2026-11-09")
+    );
+    assert!(
+        days.iter()
+            .all(|e| e.date.to_string().as_str() != "2026-11-01")
+    );
+    assert!(!days.is_empty());
+}
+
+#[test]
+fn month_leaves_out_days_after_now() {
+    let days = claude_month("2026-11-12T10:00:00Z");
+    assert_eq!(days.last().unwrap().date.to_string(), "2026-11-12");
+}
+
+#[test]
+fn month_of_an_empty_store_or_invalid_month_is_empty() {
+    let (_dir, store) = month_store(&[]);
+    let c = snapshot::Provider::Claude;
+    let t = Thresholds::default();
+    assert!(
+        month(&store, c, 2026, 11, &TimeZone::UTC, &t, ts(NOW))
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        month(&store, c, 2026, 13, &TimeZone::UTC, &t, ts(NOW))
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn month_in_the_future_is_empty() {
+    let (_dir, store) = month_store(&claude());
+    let c = snapshot::Provider::Claude;
+    let t = Thresholds::default();
+    assert!(
+        month(&store, c, 2026, 12, &TimeZone::UTC, &t, ts(NOW))
+            .unwrap()
+            .is_empty()
+    );
+}
+
+fn month_of(snaps: &[Snapshot], year: i16, m: i8, now: &str) -> Vec<String> {
+    let (_dir, store) = month_store(snaps);
+    month(
+        &store,
+        snapshot::Provider::Claude,
+        year,
+        m,
+        &TimeZone::UTC,
+        &Thresholds::default(),
+        ts(now),
+    )
+    .unwrap()
+    .iter()
+    .map(|e| e.date.to_string())
+    .collect()
+}
+
+#[test]
+fn month_leaves_out_a_day_in_the_middle_without_a_result() {
+    let c = snapshot::Provider::Claude;
+    let s = |used, resets: &str, observed: &str| snap(c, Window::SevenDay, used, resets, observed);
+    // Window A is observed Nov 2-5; window B is first observed Nov 15: Nov 6-14 have no result.
+    let days = month_of(
+        &[
+            s(10.0, "2026-11-05T12:00:00Z", "2026-11-02T10:00:00Z"),
+            s(20.0, "2026-11-05T12:00:00Z", "2026-11-04T10:00:00Z"),
+            s(5.0, "2026-11-20T12:00:00Z", "2026-11-15T10:00:00Z"),
+            s(9.0, "2026-11-20T12:00:00Z", "2026-11-16T10:00:00Z"),
+        ],
+        2026,
+        11,
+        "2026-11-18T10:00:00Z",
+    );
+    let expect: Vec<String> = [2, 3, 4, 5, 15, 16, 17, 18]
+        .iter()
+        .map(|d| format!("2026-11-{d:02}"))
+        .collect();
+    assert_eq!(days, expect);
+}
+
+#[test]
+fn month_in_january_looks_back_into_the_previous_year() {
+    let c = snapshot::Provider::Claude;
+    let s = |used, resets: &str, observed: &str| snap(c, Window::SevenDay, used, resets, observed);
+    let days = month_of(
+        &[
+            s(10.0, "2026-01-03T12:00:00Z", "2025-12-28T10:00:00Z"),
+            s(40.0, "2026-01-03T12:00:00Z", "2026-01-02T10:00:00Z"),
+        ],
+        2026,
+        1,
+        "2026-01-03T10:00:00Z",
+    );
+    assert_eq!(days, ["2026-01-01", "2026-01-02", "2026-01-03"]);
+}
+
+#[test]
+fn month_of_a_leap_february_has_29_days_and_none_after_now() {
+    let c = snapshot::Provider::Claude;
+    let snaps = [snap(
+        c,
+        Window::SevenDay,
+        10.0,
+        "2028-03-05T12:00:00Z",
+        "2028-02-01T01:00:00Z",
+    )];
+    let all = month_of(&snaps, 2028, 2, "2028-03-02T10:00:00Z");
+    assert_eq!(all.len(), 29);
+    assert_eq!(all.last().unwrap(), "2028-02-29");
+    let part = month_of(&snaps, 2028, 2, "2028-02-27T10:00:00Z");
+    assert_eq!(part.len(), 27);
+    assert_eq!(part.last().unwrap(), "2028-02-27");
+}
+
+#[test]
+fn month_ignores_snapshots_observed_after_now() {
+    let c = snapshot::Provider::Claude;
+    let s = |used, resets: &str, observed: &str| snap(c, Window::SevenDay, used, resets, observed);
+    let (_dir, store) = month_store(&[
+        s(10.0, "2026-11-19T12:00:00Z", "2026-11-09T01:00:00Z"),
+        s(30.0, "2026-11-19T12:00:00Z", "2026-11-12T08:00:00Z"),
+        s(90.0, "2026-11-19T12:00:00Z", "2026-11-12T20:00:00Z"),
+    ]);
+    let days = month(
+        &store,
+        c,
+        2026,
+        11,
+        &TimeZone::UTC,
+        &Thresholds::default(),
+        ts("2026-11-12T10:00:00Z"),
+    )
+    .unwrap();
+    let today = days.last().unwrap();
+    assert_eq!(today.date.to_string(), "2026-11-12");
+    // 10 at the start of the day (carried), 30 by `now`; the 90 observed later is not seen.
+    assert!((today.usage - 20.0).abs() < 1e-9);
 }

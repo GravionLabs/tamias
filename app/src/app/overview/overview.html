@@ -1,5 +1,6 @@
 <header class="head">
   <h1>Today</h1>
+  <a class="muted" routerLink="/">Calendar</a>
   @if (report(); as r) {
     <span class="muted">as of {{ time(r.generated_at) }}</span>
   }
