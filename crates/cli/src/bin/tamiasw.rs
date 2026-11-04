@@ -16,6 +16,8 @@ mod collect_log;
 mod copilot;
 #[path = "../exit.rs"]
 mod exit;
+#[path = "../unavailable.rs"]
+mod unavailable;
 
 use std::process::ExitCode;
 

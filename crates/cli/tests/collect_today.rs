@@ -213,7 +213,7 @@ fn collect_then_today_shows_both_claude_windows() {
 
     let table = stdout_of(env.tamias(&closed_url()).arg("today"));
     let lines: Vec<&str> = table.lines().collect();
-    assert_eq!(lines.len(), 3, "{table}");
+    assert_eq!(lines.len(), 4, "{table}");
     assert!(lines[0].starts_with("PROVIDER  WINDOW"), "{table}");
     assert!(lines[1].starts_with("claude    seven_day  34%"), "{table}");
     assert!(lines[1].ends_with("green"), "{table}");
@@ -222,6 +222,10 @@ fn collect_then_today_shows_both_claude_windows() {
         "{table}"
     );
     assert!(lines[2].ends_with("green"), "{table}");
+    assert!(
+        lines[3].starts_with("copilot   -") && lines[3].ends_with("unavailable (not set up)"),
+        "no gh: Copilot is unavailable: {table}"
+    );
     assert!(
         !table.contains('\x1b'),
         "no colour when stdout is not a TTY"
@@ -634,6 +638,29 @@ fn free_copilot_seat_is_recorded_unavailable_without_a_snapshot() {
     assert!(
         log[1].ends_with("copilot ok skipped (no premium quota)"),
         "{log:?}"
+    );
+}
+
+#[test]
+fn today_shows_the_stored_reason_of_a_free_copilot_seat() {
+    let env = Env::new();
+    env.write_config("[providers]\nclaude = false\n");
+    env.fake_gh();
+    let copilot_url = copilot_server(&copilot_free());
+    env.tamias(&closed_url())
+        .env("TAMIAS_COPILOT_USER_URL", copilot_url)
+        .arg("collect")
+        .assert()
+        .success();
+
+    let table = stdout_of(env.tamias(&closed_url()).arg("today"));
+
+    let lines: Vec<&str> = table.lines().collect();
+    assert_eq!(lines.len(), 3, "{table}");
+    assert!(lines[1].ends_with("unavailable (disabled)"), "{table}");
+    assert!(
+        lines[2].starts_with("copilot   -") && lines[2].ends_with("unavailable (no premium quota)"),
+        "{table}"
     );
 }
 

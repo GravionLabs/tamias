@@ -12,30 +12,33 @@ use tamias_core::config::{Config, Enabled};
 use tamias_core::provider::copilot::{CopilotProvider, CopilotUser, Error, GhTokenSource, TIMEOUT};
 
 use crate::claude::is_loopback;
+use crate::unavailable::Unavailable;
 
 /// Test-only override of the `gh` executable.
 pub const GH_ENV: &str = "TAMIAS_GH";
 /// Test-only override of the user endpoint (loopback only).
 pub const USER_URL_ENV: &str = "TAMIAS_COPILOT_USER_URL";
 
-/// Why Copilot is `unavailable`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Unavailable {
-    /// Disabled in the config.
-    Disabled,
-    /// `auto` and `gh` is missing or not logged in.
-    NotSetUp,
+/// Availability of Copilot without polling: `Some` when it is disabled, or `auto` and no `gh`
+/// executable can be found (the login is not probed).
+#[must_use]
+pub fn availability(config: &Config) -> Option<Unavailable> {
+    match config.copilot {
+        Enabled::Off => Some(Unavailable::Disabled),
+        Enabled::On => None,
+        Enabled::Auto => gh_source(config)
+            .resolve()
+            .is_none()
+            .then_some(Unavailable::NotSetUp),
+    }
 }
 
-impl Unavailable {
-    /// Short reason for the log.
-    #[must_use]
-    pub fn reason(self) -> &'static str {
-        match self {
-            Unavailable::Disabled => "disabled",
-            Unavailable::NotSetUp => "not set up",
-        }
-    }
+fn gh_source(config: &Config) -> GhTokenSource {
+    let explicit = std::env::var_os(GH_ENV)
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| config.gh_path.clone());
+    GhTokenSource::new(explicit)
 }
 
 /// `Some` when the config alone makes Copilot `unavailable` (disabled).
@@ -58,11 +61,7 @@ pub fn unavailable_for(enabled: Enabled, error: &Error) -> Option<Unavailable> {
 /// the known install locations.
 #[must_use]
 pub fn provider(config: &Config) -> CopilotProvider<GhTokenSource> {
-    let explicit = std::env::var_os(GH_ENV)
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| config.gh_path.clone());
-    CopilotProvider::new(GhTokenSource::new(explicit), client())
+    CopilotProvider::new(gh_source(config), client())
 }
 
 fn client() -> CopilotUser {
@@ -84,7 +83,8 @@ mod tests {
     use tamias_core::config::Enabled;
     use tamias_core::provider::copilot::Error;
 
-    use super::{Unavailable, availability_from_config, unavailable_for};
+    use super::{availability_from_config, unavailable_for};
+    use crate::unavailable::Unavailable;
 
     #[test]
     fn only_off_is_unavailable_from_the_config() {
