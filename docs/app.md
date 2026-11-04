@@ -32,9 +32,9 @@ The bundles are not signed or notarised (v1 ships unsigned, see the roadmap). Ea
 On the first start without data and without a collector, the calendar asks "Collection is not set up — set up now?". "Set up" runs `tamias service install` of the bundled CLI, which registers the collector with your operating system's scheduler:
 
 - macOS and Windows: the scheduler runs the CLI inside the installed app (`tamias.app/Contents/MacOS/tamias`, or `tamiasw.exe` in the install directory on Windows).
-- Linux: the AppImage is mounted at a new path on every start, so the app first copies the CLI to `~/.local/bin/tamias` (replacing an older copy) and the systemd timer runs that copy. Put `~/.local/bin` on your `PATH` if you want to run `tamias` yourself.
+- Linux: the app first copies the CLI to `~/.local/bin/tamias` (replacing an older copy) and the systemd timer runs that copy. This happens on every Linux install, `.deb` included; for the AppImage it is needed because it is mounted at a new path on every start. Put `~/.local/bin` on your `PATH` if you want to run `tamias` yourself.
 
-"Not now" hides the prompt. Settings shows the collection status at any time, with "Set up" and "Remove". A collector you registered with a CLI from the archives keeps working: the app shows it as set up and does not replace it.
+"Not now" hides the prompt only until the app is closed; it returns on the next start. Settings shows the collection status at any time, with "Set up" and "Remove". A collector you registered with a CLI from the archives keeps working: the app shows it as set up and does not replace it.
 
 Every call of the CLI is limited to 10 seconds; a call that fails or does not answer is shown as an error with its message.
 
@@ -42,17 +42,17 @@ Every call of the CLI is limited to 10 seconds; a call that fails or does not an
 
 ## Calendar
 
-The calendar opens on the current month. Previous, Today and Next move between months. Claude (`C`) and Copilot (`CP`) are shown side by side in each day's cell. A chip's colour is the colour of that day against the daily budget:
+The calendar opens on the current month. Previous, Today and Next move between months. Claude (`C`) and Copilot (`CP`) are shown side by side in each day's cell. A chip's colour is the colour of that day against the daily budget. The limits are the defaults of `yellow_at` (0.8) and `red_at` (1.0) in `config.toml`; green is below `yellow_at`, yellow up to and including `red_at`, red above:
 
 | Colour | Meaning |
 | --- | --- |
-| Green | below 80 % of the daily budget |
-| Yellow | from 80 % up to and including 100 % |
-| Red | above 100 % |
+| Green | below 80 % of the daily budget (by default) |
+| Yellow | from 80 % up to and including 100 % (by default) |
+| Red | above 100 % (by default) |
 | Grey | today only: the provider is stale |
 | Neutral | no data for that day, or the provider is not available |
 
-A provider is stale when its last successful read is more than 15 minutes old, or it has never succeeded. On today's cell the grey chip says "stale since 09:00" (the time of the last successful collect), or "stale, never collected". Today's cell is only grey while the provider is stale; the calendar does not show old numbers as current.
+A provider is stale when its last successful read is older than `stale_after` (default 15 minutes, set in `config.toml`; see also [Consumers](./consumers.md)), when it has never succeeded, or when its last run failed after its last success, even if that success is younger than `stale_after`. On today's cell the grey chip says "stale since 09:00" (the time of the last successful collect), or "stale, never collected". Today's cell is only grey while the provider is stale; the calendar does not show old numbers as current.
 
 The calendar refreshes when the collector writes new snapshots, so the app needs no reload. The first data appears with the next collect, within 5 minutes.
 
@@ -64,7 +64,7 @@ The day view shows, per provider, the usage over the local day as a curve agains
 
 ## Tray
 
-The tray icon shows the worst colour of the binding windows of the set-up providers. Its summary is the line of `tamias today --short` (for example `C 62% · CP 41%`), shown as the tooltip (Windows and macOS) and as the first, disabled menu item (Linux shows no tooltips).
+The tray icon shows the worst colour of the binding windows of the set-up providers. Its summary is the line of `tamias today --short` (for example `C 62%`), shown as the tooltip (Windows and macOS) and as the first, disabled menu item (Linux shows no tooltips).
 
 | Icon | When |
 | --- | --- |
@@ -74,7 +74,7 @@ The tray icon shows the worst colour of the binding windows of the set-up provid
 
 Grey wins over red: a stale provider's numbers may be outdated.
 
-- A left click on the icon (Windows and macOS), or "Open tamias" in its menu, shows and focuses the window.
+- A left click on the icon (Windows and macOS only), or "Open tamias" in its menu, shows and focuses the window. On Linux only the menu entry "Open tamias" opens it.
 - Closing the window hides it to the tray; the app keeps running and collection is not affected.
 - "Quit" in the tray menu exits the app. On macOS the dock icon is hidden while the window is hidden.
 
@@ -82,7 +82,7 @@ If the tray icon cannot be created (for example on Linux without an AppIndicator
 
 ## Start at login
 
-Settings has "Start tamias at login". The setting is the state of the operating system's autostart entry, so it is off until you turn it on. The entry starts the app with `--hidden`: only the tray icon appears, and the window opens with "Open tamias" in the tray menu or a left click on the icon.
+Settings has "Start tamias at login". The setting is the state of the operating system's autostart entry, so it is off until you turn it on. The entry starts the app with `--hidden`: only the tray icon appears, and the window opens with "Open tamias" in the tray menu, or on Windows and macOS with a left click on the icon.
 
 Removing the app does not remove the autostart entry; turn it off in Settings first.
 
@@ -94,7 +94,7 @@ The app reads the store that `tamias collect` writes and never polls a source it
 
 This section is for contributors who build the app from the repository. The app lives in `app/` (Angular, with the Tauri shell in `app/src-tauri/`).
 
-`externalBin` in `app/src-tauri/tauri.conf.json` needs the CLI as `app/src-tauri/binaries/tamias-<target-triple>` (on Windows also `tamiasw-<target-triple>.exe`), and the Tauri build script needs it for every `cargo build`, `clippy` and `test` of the app crate. Build it first, in `app/`:
+`externalBin` in `app/src-tauri/tauri.conf.json` needs the CLI as `app/src-tauri/binaries/tamias-<target-triple>[.exe]` (on Windows also `tamiasw-<target-triple>.exe`), and the Tauri build script needs it for every `cargo build`, `clippy` and `test` of the app crate. Build it first, in `app/`:
 
 ```sh
 cd app

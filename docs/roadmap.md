@@ -2,7 +2,7 @@
 
 tamias v1 is planned in the Epic [#1](https://github.com/GravionLabs/tamias/issues/1). This page names the goal of each milestone and its Features; progress, open PBIs and dependencies live on GitHub in the [milestones](https://github.com/GravionLabs/tamias/milestones) and in the native sub-issues, not here.
 
-Work lands on `release/next`; a milestone is released from it once all its issues are closed. The milestones on GitHub are the source of the sections above.
+Work lands on `release/next`; a milestone is released from it once all its issues are closed. The milestones on GitHub are the source of the sections below.
 
 ## 0.1.0 – Usable CLI
 
