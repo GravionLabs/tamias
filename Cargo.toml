@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/core", "crates/cli"]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 rust-version = "1.98"
 license = "MIT"
@@ -11,7 +11,7 @@ repository = "https://github.com/GravionLabs/tamias"
 authors = ["Jérôme Kaufmann"]
 
 [workspace.dependencies]
-tamias-core = { path = "crates/core", version = "0.1.1" }
+tamias-core = { path = "crates/core", version = "0.1.2" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

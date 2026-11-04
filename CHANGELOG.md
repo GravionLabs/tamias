@@ -5,6 +5,21 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.1.2] — 2026-11-04
+
+### Bug Fixes
+- **cli**: Align exit code descriptions of help text and consumers docs (#74)
+- **cli**: A fatal collect error no longer makes Claude stale or stores the config path (#76)
+- **cli**: Write one error line per run when record_error fails (#77)
+- **cli**: Drop Copilot from help text, untangle Copilot wording in docs (#78)
+- Fatal-error tests depend on the developer's config and cover service status only on macOS (#72) (#79)
+
+
+### Documentation
+- ADRs are not published on the GitHub Pages site (#73) (#80)
+- **site**: Do not publish the ADRs on the documentation site
+
+
 ## [0.1.1] — 2026-11-03
 
 ### Bug Fixes
@@ -19,6 +34,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Copilot is announced but not polled yet (#59) (#65)
 - **cli**: State that Copilot is not polled yet (#59)
 - **schema**: Published today-v1 schema allows additional properties (#60) (#66)
+- Update CHANGELOG.md for v0.1.1 [skip ci]
 
 
 ## [0.1.0] — 2026-11-03
