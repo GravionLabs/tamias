@@ -14,6 +14,9 @@
     <button hx-button variant="outlined" data-testid="next" (click)="next()">Next</button>
   </nav>
   <a class="muted" routerLink="/today">Today overview</a>
+  <a class="gear" routerLink="/settings" aria-label="Settings" title="Settings" data-testid="gear"
+    >&#9881;</a
+  >
 </header>
 
 @if (error(); as message) {

@@ -2,6 +2,7 @@
 //! the commands registered in [`run`] through its `Ipc` bridge (`app/src/app/core/ipc.ts`) and
 //! reloads on the [`watch::EVENT`] of the live refresh (`app/src/app/core/store-events.ts`).
 
+pub mod launch;
 pub mod month;
 pub mod today;
 pub mod watch;
@@ -106,8 +107,20 @@ fn stop_live_refresh(app: &tauri::AppHandle) {
 /// When the window cannot be created.
 pub fn run() {
     tauri::Builder::default()
+        // The entry starts the app with `--hidden`; the OS is the source of truth for whether it
+        // exists, there is no own setting.
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![launch::HIDDEN]),
+        ))
         .setup(|app| {
             start_live_refresh(app.handle());
+            // The window is created hidden (tauri.conf.json) and shown unless `--hidden`.
+            if launch::initial_visibility(std::env::args().skip(1))
+                && let Some(window) = app.get_webview_window("main")
+            {
+                window.show()?;
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![today, month])

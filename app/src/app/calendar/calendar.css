@@ -29,6 +29,12 @@ h1 {
   margin-left: auto;
 }
 
+.gear {
+  color: var(--h-text-muted-color);
+  font-size: 1.4rem;
+  text-decoration: none;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));

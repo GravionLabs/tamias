@@ -25,6 +25,18 @@ describe("TauriIpc", () => {
     expect(tauri.calls("today")).toEqual([undefined]);
   });
 
+  it("reads and sets autostart with the commands of the autostart plugin", async () => {
+    tauri.answer("plugin:autostart|is_enabled", () => true);
+    tauri.answer("plugin:autostart|enable", () => undefined);
+    tauri.answer("plugin:autostart|disable", () => undefined);
+    const ipc = new TauriIpc();
+    await expect(ipc.autostartEnabled()).resolves.toBe(true);
+    await ipc.setAutostart(true);
+    await ipc.setAutostart(false);
+    expect(tauri.calls("plugin:autostart|enable")).toHaveLength(1);
+    expect(tauri.calls("plugin:autostart|disable")).toHaveLength(1);
+  });
+
   it("passes commands and arguments through to Tauri", async () => {
     tauri.answer("echo", (args) => args);
     await expect(new TauriIpc().invoke("echo", { day: "2026-11-03" })).resolves.toEqual({
