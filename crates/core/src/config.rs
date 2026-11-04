@@ -15,10 +15,10 @@ use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use crate::budget::Thresholds;
+use crate::paths;
 use jiff::SignedDuration;
 use serde::Deserialize;
-use tamias_core::budget::Thresholds;
-use tamias_core::paths;
 
 /// File name of the config inside the config directory.
 pub const FILE_NAME: &str = "config.toml";
@@ -37,13 +37,17 @@ pub enum Enabled {
 
 /// Effective configuration.
 #[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub struct Config {
+    /// Colour thresholds and the staleness limit.
     pub thresholds: Thresholds,
+    /// Whether the Claude provider is collected.
     pub claude: Enabled,
 }
 
 /// The config could not be read or is invalid.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Error {
     path: PathBuf,
     message: String,

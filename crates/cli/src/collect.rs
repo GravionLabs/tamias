@@ -9,7 +9,7 @@ use tamias_core::store::Store;
 
 use crate::claude;
 use crate::collect_log::{CollectLog, RunResult};
-use crate::config::{self, Config};
+use tamias_core::config::{self, Config};
 
 /// Longest message of a fatal-error line in the log.
 const FATAL_MAX_CHARS: usize = 300;
