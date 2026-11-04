@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TauriIpc } from "./ipc";
+import { TauriIpc, errorText, isBusy } from "./ipc";
 import type { Report } from "./report";
 import { tauri } from "./tauri.mock";
 
 vi.mock("@tauri-apps/api/core", async () => ({
   invoke: (await import("./tauri.mock")).tauri.invoke,
+}));
+vi.mock("@tauri-apps/api/event", async () => ({
+  listen: (await import("./tauri.mock")).tauri.listen,
 }));
 
 const REPORT: Report = {
@@ -34,5 +37,47 @@ describe("TauriIpc", () => {
       throw new Error("database schema version 9 is newer than the supported version 1");
     });
     await expect(new TauriIpc().today()).rejects.toThrow("schema version 9");
+  });
+
+  it("calls the handler for every emitted event until unlistened", async () => {
+    const handler = vi.fn();
+    const unlisten = await new TauriIpc().listen("store-changed", handler);
+
+    tauri.emit("store-changed");
+    tauri.emit("store-changed");
+    tauri.emit("other-event");
+    expect(handler).toHaveBeenCalledTimes(2);
+
+    unlisten();
+    tauri.emit("store-changed");
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes no payload to the handler", async () => {
+    const handler = vi.fn();
+    await new TauriIpc().listen("store-changed", handler);
+    tauri.emit("store-changed", { ignored: true });
+    expect(handler).toHaveBeenCalledWith();
+  });
+});
+
+describe("command errors", () => {
+  it("are busy only when the backend says so", () => {
+    expect(isBusy({ message: "database error: database is locked", busy: true })).toBe(true);
+    expect(isBusy({ message: "invalid config", busy: false })).toBe(false);
+  });
+
+  it("are not busy when the rejection is not a command error", () => {
+    expect(isBusy(new Error("busy"))).toBe(false);
+    expect(isBusy("busy")).toBe(false);
+    expect(isBusy(null)).toBe(false);
+    expect(isBusy({ busy: true })).toBe(false);
+  });
+
+  it("show the message of a command error, an Error or anything else", () => {
+    expect(errorText({ message: "invalid config", busy: false })).toBe("invalid config");
+    expect(errorText(new Error("database is locked"))).toBe("database is locked");
+    expect(errorText("plain")).toBe("plain");
+    expect(errorText(undefined)).toBe("undefined");
   });
 });
