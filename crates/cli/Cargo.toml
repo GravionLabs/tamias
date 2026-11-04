@@ -36,4 +36,5 @@ assert_cmd = "2.2.2"
 jiff = { version = "0.2.39", features = ["tzdb-bundle-always"] }
 jsonschema = { version = "0.60.2", default-features = false }
 predicates = "3.1.4"
+rusqlite = { version = "0.41.1", features = ["bundled"] }
 tempfile = "3.27.0"

@@ -60,8 +60,9 @@ pub fn run(
                 return Ok(Outcome::Ok);
             }
             tracing::error!("{provider}: {e}");
-            log.record(now, provider, RunResult::Error, &e.class());
+            // Store first: if it fails, `run_logged` writes the one error line (fatal).
             store.record_error(provider, now, &e.class())?;
+            log.record(now, provider, RunResult::Error, &e.class());
             Ok(Outcome::ProviderFailed)
         }
     }
