@@ -1,0 +1,77 @@
+<header class="head">
+  <a class="back" routerLink="/" [queryParams]="{ month: month() }" data-testid="back"
+    >&larr; Back to the month</a
+  >
+  <h1 data-testid="title">{{ title() }}</h1>
+</header>
+
+@if (error(); as message) {
+  <hx-message severity="error" data-testid="error">Cannot read the day: {{ message }}</hx-message>
+}
+@if (report()) {
+  <div class="panels">
+    @for (p of panels(); track p.provider) {
+      <section class="panel" data-testid="panel" [attr.data-provider]="p.provider">
+        <h2>{{ p.name }}</h2>
+        @if (p.summary) {
+          <p class="summary" data-testid="summary">
+            <span [class]="'dot colour-' + p.colour"></span> {{ p.summary }}
+          </p>
+        }
+        @if (p.stale; as hint) {
+          <p class="muted" data-testid="stale">{{ hint }}</p>
+        }
+        @if (p.chart; as c) {
+          <svg
+            class="chart"
+            data-testid="chart"
+            [attr.viewBox]="'0 0 ' + width + ' ' + height"
+            role="img"
+            [attr.aria-label]="p.name + ' usage over the day against the budget'"
+          >
+            @for (t of c.yTicks; track t.label) {
+              <line
+                class="grid"
+                [attr.x1]="c.left"
+                [attr.x2]="c.right"
+                [attr.y1]="t.at"
+                [attr.y2]="t.at"
+              />
+              <text class="tick" text-anchor="end" [attr.x]="c.left - 6" [attr.y]="t.at + 4">
+                {{ t.label }}
+              </text>
+            }
+            @for (t of c.xTicks; track t.label) {
+              <text class="tick" text-anchor="middle" [attr.x]="t.at" [attr.y]="c.bottom + 18">
+                {{ t.label }}
+              </text>
+            }
+            <line
+              class="budget"
+              data-testid="budget-line"
+              [attr.x1]="c.left"
+              [attr.x2]="c.right"
+              [attr.y1]="c.budgetY"
+              [attr.y2]="c.budgetY"
+            />
+            <path [class]="'usage colour-' + p.colour" data-testid="usage-line" [attr.d]="c.path" />
+          </svg>
+          <p class="legend">
+            <span class="swatch usage-swatch"></span> Usage
+            <span class="swatch budget-swatch"></span> Budget
+          </p>
+        }
+        @if (p.empty; as reason) {
+          <p class="empty" data-testid="empty">{{ reason }}</p>
+        }
+        @if (p.fiveHour; as level) {
+          <p class="muted" data-testid="five-hour">{{ level }}</p>
+        }
+      </section>
+    }
+  </div>
+} @else if (!error()) {
+  <p class="loading" role="status">
+    <hx-progress-spinner ariaLabel="Reading the day" /> Reading the day…
+  </p>
+}

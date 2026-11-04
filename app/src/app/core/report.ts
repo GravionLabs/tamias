@@ -87,6 +87,44 @@ export interface MonthReport {
   providers: ProviderMonth[];
 }
 
+/** One point of the intraday curve: the usage of the day up to `at`, in the provider's unit. */
+export interface CurvePoint {
+  at: Timestamp;
+  usage: number;
+}
+
+/** Current level of Claude's five-hour window (`FiveHour` in `app/src-tauri/src/day.rs`). */
+export interface FiveHourLevel {
+  used: number;
+  limit: number;
+  colour: Colour;
+}
+
+/** One provider's day of the `day` command (`ProviderDay` in `app/src-tauri/src/day.rs`). */
+export interface ProviderDay {
+  provider: ProviderName;
+  status: Status;
+  /** Last successful collect of a stale provider; absent when it never succeeded. */
+  stale_since?: Timestamp;
+  unit: Unit;
+  /** From 0 at local midnight; empty without data. */
+  points: CurvePoint[];
+  /** `usage`, `budget` and `colour` are absent without data. */
+  usage?: number;
+  budget?: number;
+  colour?: Colour;
+  /** Current level, Claude only. */
+  five_hour?: FiveHourLevel;
+}
+
+/** The answer of the `day` command (`DayReport` in `app/src-tauri/src/day.rs`). */
+export interface DayReport {
+  /** `YYYY-MM-DD`, the local day. */
+  date: string;
+  generated_at: Timestamp;
+  providers: ProviderDay[];
+}
+
 const PROVIDER_LABELS: Record<ProviderName, string> = {
   claude: "Claude",
   copilot: "Copilot",

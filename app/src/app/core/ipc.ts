@@ -1,7 +1,7 @@
 import { Injectable } from "@angular/core";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { MonthReport, Report } from "./report";
+import type { DayReport, MonthReport, Report } from "./report";
 
 /** Stops a listener registered with `Ipc.listen`. */
 export type Unlisten = () => void;
@@ -21,6 +21,11 @@ export abstract class Ipc {
   /** The days of `month` (1-12) of `year` of every provider, with usage against the budget. */
   month(year: number, month: number): Promise<MonthReport> {
     return this.invoke<MonthReport>("month", { year, month });
+  }
+
+  /** The intraday curve of the local day `date` (`YYYY-MM-DD`) of every provider. */
+  day(date: string): Promise<DayReport> {
+    return this.invoke<DayReport>("day", { date });
   }
 
   /** Whether the OS has the autostart entry (the autostart plugin's `isEnabled`). */

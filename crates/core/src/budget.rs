@@ -185,6 +185,86 @@ pub fn day(
     })
 }
 
+/// One point of the intraday curve of [`intraday`].
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Point {
+    /// Local midnight, or the observation of a snapshot of the day.
+    pub at: Timestamp,
+    /// Usage of the day up to `at`, in the window's unit.
+    pub usage: f64,
+}
+
+/// The running usage of the local calendar day `date` in `tz` for a binding window: the same
+/// high-water rise as [`day`], evaluated after each snapshot of the day.
+///
+/// The first point is 0 at local midnight, then one point per distinct observation instant of
+/// the day, oldest first. The values never decrease (a lower value after a higher one adds
+/// nothing, a reset continues the sum) and the last one equals `day(...).usage`. Snapshots of
+/// the day alone take part, so a caller caps the range it reads at the present: nothing after
+/// `now` is usage yet. A day without a snapshot, or out of range, gives no points.
+#[must_use]
+pub fn intraday(
+    snapshots: &[Snapshot],
+    provider: Provider,
+    window: Window,
+    date: Date,
+    tz: &TimeZone,
+) -> Vec<Point> {
+    let (Ok(start), Ok(end)) = (
+        date.to_zoned(tz.clone()).map(|z| z.timestamp()),
+        date.tomorrow()
+            .and_then(|d| d.to_zoned(tz.clone()))
+            .map(|z| z.timestamp()),
+    ) else {
+        return Vec::new();
+    };
+    let wins = series(snapshots, provider, window);
+    // Per window: its baseline at `start` and its running high-water mark, once touched today.
+    let mut state: Vec<(f64, f64, bool)> = wins
+        .iter()
+        .map(|w| {
+            (
+                baseline(&wins, w, start),
+                w.max_before(start).unwrap_or(0.0),
+                false,
+            )
+        })
+        .collect();
+    let mut today: Vec<(Timestamp, usize, f64)> = wins
+        .iter()
+        .enumerate()
+        .flat_map(|(i, w)| {
+            w.snaps
+                .iter()
+                .filter(|s| start <= s.observed_at && s.observed_at < end)
+                .map(move |s| (s.observed_at, i, s.used))
+        })
+        .collect();
+    if today.is_empty() {
+        return Vec::new();
+    }
+    today.sort_by_key(|&(at, ..)| at);
+    let mut points = vec![Point {
+        at: start,
+        usage: 0.0,
+    }];
+    for (at, i, used) in today {
+        let entry = &mut state[i];
+        entry.1 = entry.1.max(used);
+        entry.2 = true;
+        let usage = state
+            .iter()
+            .filter(|e| e.2)
+            .map(|e| (e.1 - e.0).max(0.0))
+            .sum();
+        match points.last_mut() {
+            Some(last) if last.at == at => last.usage = usage,
+            _ => points.push(Point { at, usage }),
+        }
+    }
+    points
+}
+
 /// Current fill and colour of an informational window (Claude `five_hour`): `used / limit`
 /// against the thresholds, no budget. `None` without snapshots.
 #[must_use]

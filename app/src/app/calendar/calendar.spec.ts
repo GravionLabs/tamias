@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { TestBed, getTestBed } from "@angular/core/testing";
-import { provideRouter } from "@angular/router";
+import { ActivatedRoute, convertToParamMap, provideRouter } from "@angular/router";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Ipc, type Unlisten } from "../core/ipc";
@@ -68,7 +68,7 @@ const NOV_3 = new Date(2026, 10, 3, 10, 5);
 
 async function mount(
   answer: (year: number, month: number) => unknown,
-  options: { firstDay?: FirstDay; now?: Date } = {},
+  options: { firstDay?: FirstDay; now?: Date; month?: string } = {},
 ) {
   const ipc = new StubIpc(answer);
   TestBed.configureTestingModule({
@@ -77,6 +77,16 @@ async function mount(
       { provide: FIRST_DAY, useValue: options.firstDay ?? 1 },
       { provide: NOW, useValue: () => options.now ?? NOV_3 },
       provideRouter([]),
+      ...(options.month === undefined
+        ? []
+        : [
+            {
+              provide: ActivatedRoute,
+              useValue: {
+                snapshot: { queryParamMap: convertToParamMap({ month: options.month }) },
+              },
+            },
+          ]),
     ],
   });
   TestBed.overrideComponent(Calendar, {
@@ -250,6 +260,25 @@ describe("Calendar", () => {
     const { el } = await mount((y, m) => month(y, m, CLAUDE));
     const gear = el.querySelector<HTMLAnchorElement>("[data-testid=gear]")!;
     expect(gear.getAttribute("href")).toBe("/settings");
+  });
+
+  it("links the number of every day up to today to its day view, and no later day", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE));
+    const link = cell(el, "2026-11-03").querySelector<HTMLAnchorElement>("[data-testid=open-day]");
+    expect(link?.getAttribute("href")).toBe("/day/2026-11-03?month=2026-11");
+    expect(cell(el, "2026-11-01").querySelector("[data-testid=open-day]")).not.toBeNull();
+    expect(cell(el, "2026-11-04").querySelector("[data-testid=open-day]")).toBeNull();
+  });
+
+  it("opens on the month of the query, e.g. when coming back from a day", async () => {
+    const { el, ipc } = await mount((y, m) => month(y, m, CLAUDE), { month: "2026-10" });
+    expect(ipc.requests).toEqual([[2026, 10]]);
+    expect(cells(el)).toHaveLength(31);
+  });
+
+  it("ignores an invalid month in the query", async () => {
+    const { ipc } = await mount((y, m) => month(y, m, CLAUDE), { month: "2026-13" });
+    expect(ipc.requests).toEqual([[2026, 11]]);
   });
 
   it("keeps the loading state on a busy store", async () => {
