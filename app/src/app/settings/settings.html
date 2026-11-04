@@ -21,3 +21,59 @@
 <p class="hint" data-testid="hint">
   The app starts in the tray, without a window. Open it with "Open tamias" in the tray menu.
 </p>
+
+<h2>Collection</h2>
+<p class="hint">
+  The <code>tamias</code> command line reads your usage every 5 minutes in the background, also
+  while the app is closed. The app only shows what it collected.
+</p>
+@if (collection.actionError(); as message) {
+  <hx-message severity="error" data-testid="collection-error">{{ message }}</hx-message>
+}
+@let status = collection.status();
+<div class="row collection" data-testid="collection" [attr.data-state]="status?.state ?? null">
+  <span class="state" data-testid="collection-state">
+    @switch (status?.state) {
+      @case ("installed") {
+        Collection is set up.
+      }
+      @case ("not_installed") {
+        Collection is not set up.
+      }
+      @case ("error") {
+        Cannot read the collection status.
+      }
+      @default {
+        Reading the collection status…
+      }
+    }
+  </span>
+  @if (status?.state === "installed") {
+    <button
+      hx-button
+      variant="outlined"
+      data-testid="collection-remove"
+      [disabled]="collection.running()"
+      [loading]="collection.running()"
+      (click)="collection.remove()"
+    >
+      Remove
+    </button>
+  } @else if (status) {
+    <button
+      hx-button
+      data-testid="collection-setup"
+      [disabled]="collection.running()"
+      [loading]="collection.running()"
+      (click)="collection.install()"
+    >
+      Set up
+    </button>
+  }
+</div>
+@if (status?.exe; as exe) {
+  <p class="hint" data-testid="collection-exe">Runs {{ exe }}</p>
+}
+@if (status?.message; as message) {
+  <p class="hint" data-testid="collection-message">{{ message }}</p>
+}

@@ -3,3 +3,5 @@ dist
 .angular
 out-tsc
 src-tauri/gen
+# The CLI sidecar (bundle.externalBin), built by `pnpm sidecar`.
+src-tauri/binaries

@@ -2,10 +2,12 @@
 //! the commands registered in [`run`] through its `Ipc` bridge (`app/src/app/core/ipc.ts`) and
 //! reloads on the [`watch::EVENT`] of the live refresh (`app/src/app/core/store-events.ts`).
 //! The [`tray`] icon shows the traffic light; closing the window hides it to the tray.
+//! The [`service`] commands set up collection with the bundled `tamias` CLI.
 
 pub mod day;
 pub mod launch;
 pub mod month;
+pub mod service;
 pub mod today;
 pub mod tray;
 pub mod watch;
@@ -41,6 +43,22 @@ impl From<today::Error> for CommandError {
             message: error.to_string(),
             busy: error.is_busy(),
         }
+    }
+}
+
+impl From<service::Error> for CommandError {
+    fn from(error: service::Error) -> Self {
+        Self {
+            message: error.to_string(),
+            busy: false,
+        }
+    }
+}
+
+fn join_error(error: &tauri::Error) -> CommandError {
+    CommandError {
+        message: error.to_string(),
+        busy: false,
     }
 }
 
@@ -86,6 +104,60 @@ async fn day(date: String) -> Result<day::DayReport, CommandError> {
             busy: false,
         })?
         .map_err(CommandError::from)
+}
+
+/// Whether collection is set up: `tamias service status` of the bundled CLI, mapped to
+/// `installed | not_installed | error`. Never rejects: every failure, a timeout included, is the
+/// `error` state with its message.
+#[tauri::command]
+async fn service_status() -> service::ServiceStatus {
+    tauri::async_runtime::spawn_blocking(|| match service::Sidecar::bundled() {
+        Ok(sidecar) => sidecar.status(),
+        Err(error) => service::ServiceStatus {
+            state: service::State::Error,
+            message: Some(error.to_string()),
+            exe: None,
+        },
+    })
+    .await
+    .unwrap_or_else(|error| service::ServiceStatus {
+        state: service::State::Error,
+        message: Some(error.to_string()),
+        exe: None,
+    })
+}
+
+/// Sets up collection: `tamias service install` of the bundled CLI (on Linux of its copy in
+/// `~/.local/bin`). Rejects while another install or uninstall runs. The frontend reads the
+/// status again afterwards, also after a failure.
+#[tauri::command]
+async fn service_install(
+    lock: tauri::State<'_, service::ServiceLock>,
+) -> Result<String, CommandError> {
+    let guard = lock.try_lock()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = guard;
+        service::Sidecar::bundled()?.install()
+    })
+    .await
+    .map_err(|e| join_error(&e))?
+    .map_err(CommandError::from)
+}
+
+/// Removes collection: `tamias service uninstall` of the bundled CLI (the data and the log are
+/// kept). Shares the lock of [`service_install`].
+#[tauri::command]
+async fn service_uninstall(
+    lock: tauri::State<'_, service::ServiceLock>,
+) -> Result<String, CommandError> {
+    let guard = lock.try_lock()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = guard;
+        service::Sidecar::bundled()?.uninstall()
+    })
+    .await
+    .map_err(|e| join_error(&e))?
+    .map_err(CommandError::from)
 }
 
 /// The live refresh, owned by the app and stopped on exit.
@@ -164,6 +236,7 @@ pub fn run() {
             }
             Ok(())
         })
+        .manage(service::ServiceLock::default())
         .on_window_event(|window, event| {
             // Closing hides to the tray, "Quit" in the tray menu exits; without a tray the
             // window closes and the app exits.
@@ -175,7 +248,14 @@ pub fn run() {
                 tray::hide_window(window.app_handle());
             }
         })
-        .invoke_handler(tauri::generate_handler![today, month, day])
+        .invoke_handler(tauri::generate_handler![
+            today,
+            month,
+            day,
+            service_status,
+            service_install,
+            service_uninstall
+        ])
         .build(tauri::generate_context!())
         .expect("error while running the tamias app")
         .run(|app, event| match event {

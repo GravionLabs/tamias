@@ -37,6 +37,33 @@ export abstract class Ipc {
   async setAutostart(enabled: boolean): Promise<void> {
     await this.invoke<void>(enabled ? "plugin:autostart|enable" : "plugin:autostart|disable");
   }
+
+  /** Whether collection is set up: `tamias service status` of the bundled CLI; never rejects. */
+  serviceStatus(): Promise<ServiceStatus> {
+    return this.invoke<ServiceStatus>("service_status");
+  }
+
+  /** Sets up collection: `tamias service install` of the bundled CLI. */
+  async serviceInstall(): Promise<void> {
+    await this.invoke<string>("service_install");
+  }
+
+  /** Removes collection: `tamias service uninstall` of the bundled CLI (keeps the data). */
+  async serviceUninstall(): Promise<void> {
+    await this.invoke<string>("service_uninstall");
+  }
+}
+
+/** Whether collection is set up (`State` in `app/src-tauri/src/service.rs`). */
+export type ServiceState = "installed" | "not_installed" | "error";
+
+/** The answer of `service_status` (`ServiceStatus` in `app/src-tauri/src/service.rs`). */
+export interface ServiceStatus {
+  state: ServiceState;
+  /** The error, or the CLI's note on a broken installation. */
+  message: string | null;
+  /** The executable the scheduler runs, when the CLI names it. */
+  exe: string | null;
 }
 
 /** The only caller of Tauri's `invoke` and `listen`. */

@@ -4,7 +4,7 @@ import { TestBed, getTestBed } from "@angular/core/testing";
 import { ActivatedRoute, convertToParamMap, provideRouter } from "@angular/router";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { Ipc, type Unlisten } from "../core/ipc";
+import { Ipc, type ServiceStatus, type Unlisten } from "../core/ipc";
 import { STORE_CHANGED } from "../core/store-events";
 import type { MonthReport, ProviderMonth } from "../core/report";
 import { Calendar, FIRST_DAY, NOW } from "./calendar";
@@ -15,9 +15,20 @@ beforeAll(() => {
 });
 afterEach(() => TestBed.resetTestingModule());
 
-/** An `Ipc` whose `month` answers `answer(year, month)`; `emit` fires the events the view listens to. */
+const INSTALLED: ServiceStatus = { state: "installed", message: null, exe: "/usr/bin/tamias" };
+const NOT_INSTALLED: ServiceStatus = { state: "not_installed", message: null, exe: null };
+
+/**
+ * An `Ipc` whose `month` answers `answer(year, month)`; `emit` fires the events the view listens to.
+ * `service` is what `tamias service status` reports, `install` what `service_install` does.
+ */
 class StubIpc extends Ipc {
   requests: [number, number][] = [];
+  serviceCalls: string[] = [];
+  service: ServiceStatus = INSTALLED;
+  install: () => void = () => {
+    this.service = INSTALLED;
+  };
   private readonly handlers = new Map<string, Set<() => void>>();
 
   constructor(public answer: (year: number, month: number) => unknown) {
@@ -25,6 +36,11 @@ class StubIpc extends Ipc {
   }
 
   override async invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+    if (command === "service_status" || command === "service_install") {
+      this.serviceCalls.push(command);
+      if (command === "service_install") this.install();
+      return (command === "service_status" ? this.service : "installed") as T;
+    }
     if (command !== "month") throw new Error(`unexpected command ${command}`);
     const { year, month } = args as { year: number; month: number };
     this.requests.push([year, month]);
@@ -68,9 +84,10 @@ const NOV_3 = new Date(2026, 10, 3, 10, 5);
 
 async function mount(
   answer: (year: number, month: number) => unknown,
-  options: { firstDay?: FirstDay; now?: Date; month?: string } = {},
+  options: { firstDay?: FirstDay; now?: Date; month?: string; service?: ServiceStatus } = {},
 ) {
   const ipc = new StubIpc(answer);
+  if (options.service) ipc.service = options.service;
   TestBed.configureTestingModule({
     providers: [
       { provide: Ipc, useValue: ipc },
@@ -287,5 +304,86 @@ describe("Calendar", () => {
     });
     expect(el.querySelector("[data-testid=error]")).toBeNull();
     expect(el.querySelector("[role=status]")?.textContent).toContain("Reading the month");
+  });
+});
+
+describe("Calendar: first-start prompt", () => {
+  const CLAUDE_UNAVAILABLE: ProviderMonth = { ...CLAUDE, status: "unavailable", days: [] };
+  /** No database: every provider is unavailable. */
+  const empty = (y: number, m: number) => month(y, m, CLAUDE_UNAVAILABLE, COPILOT_UNAVAILABLE);
+  const prompt = (el: HTMLElement) => el.querySelector("[data-testid=setup-prompt]");
+
+  it("asks to set up collection without data and without a collector", async () => {
+    const { el } = await mount(empty, { service: NOT_INSTALLED });
+    expect(prompt(el)?.textContent).toContain("Collection is not set up — set up now?");
+    expect(el.querySelector<HTMLButtonElement>("[data-testid=setup]")!.disabled).toBe(false);
+  });
+
+  it("does not ask when the collector is installed, e.g. a CLI from the archives", async () => {
+    const { el, ipc } = await mount(empty, { service: INSTALLED });
+    expect(ipc.serviceCalls).toEqual(["service_status"]);
+    expect(prompt(el)).toBeNull();
+  });
+
+  it("does not ask, nor run the CLI, when there is data", async () => {
+    const { el, ipc } = await mount((y, m) => month(y, m, CLAUDE, COPILOT_UNAVAILABLE), {
+      service: NOT_INSTALLED,
+    });
+    expect(ipc.serviceCalls).toEqual([]);
+    expect(prompt(el)).toBeNull();
+  });
+
+  it("asks when a provider is stale without ever having succeeded", async () => {
+    const neverOk: ProviderMonth = { ...CLAUDE, status: "stale", days: [] };
+    const { el } = await mount((y, m) => month(y, m, neverOk), { service: NOT_INSTALLED });
+    expect(prompt(el)).not.toBeNull();
+  });
+
+  it("does not ask when a stale provider had data before", async () => {
+    const stale: ProviderMonth = {
+      ...CLAUDE,
+      status: "stale",
+      stale_since: "2026-11-03T09:00:00Z",
+    };
+    const { el } = await mount((y, m) => month(y, m, stale), { service: NOT_INSTALLED });
+    expect(prompt(el)).toBeNull();
+  });
+
+  it("does not ask when the status cannot be read", async () => {
+    const { el } = await mount(empty, {
+      service: { state: "error", message: "did not answer within 10 s", exe: null },
+    });
+    expect(prompt(el)).toBeNull();
+  });
+
+  it("sets up collection and then shows that it is set up", async () => {
+    const { el, ipc, click, settle } = await mount(empty, { service: NOT_INSTALLED });
+    await click("setup");
+    await settle();
+    expect(ipc.serviceCalls).toEqual(["service_status", "service_install", "service_status"]);
+    expect(prompt(el)).toBeNull();
+    expect(el.querySelector("[data-testid=setup-done]")?.textContent).toContain(
+      "Collection is set up",
+    );
+  });
+
+  it("keeps the prompt with the error when the setup fails, and reads the status again", async () => {
+    const { el, ipc, click, settle } = await mount(empty, { service: NOT_INSTALLED });
+    ipc.install = () => {
+      throw new Error("no systemd user manager");
+    };
+    await click("setup");
+    await settle();
+    expect(ipc.serviceCalls).toEqual(["service_status", "service_install", "service_status"]);
+    expect(el.querySelector("[data-testid=setup-error]")?.textContent).toContain(
+      "Cannot set up collection: no systemd user manager",
+    );
+    expect(el.querySelector("[data-testid=setup-done]")).toBeNull();
+  });
+
+  it("hides the prompt on Not now", async () => {
+    const { el, click } = await mount(empty, { service: NOT_INSTALLED });
+    await click("setup-dismiss");
+    expect(prompt(el)).toBeNull();
   });
 });

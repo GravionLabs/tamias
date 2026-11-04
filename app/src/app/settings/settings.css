@@ -32,3 +32,16 @@ h1 {
   color: var(--h-text-muted-color);
   margin: 4px 0 0;
 }
+
+h2 {
+  margin: 24px 0 4px;
+  font-size: 1.15rem;
+}
+
+.collection {
+  margin-top: 8px;
+}
+
+.collection .state {
+  flex: 1;
+}

@@ -19,6 +19,43 @@
   >
 </header>
 
+@if (setupPrompt()) {
+  <section class="setup" data-testid="setup-prompt" aria-label="Collection setup">
+    <p class="setup-text">Collection is not set up — set up now?</p>
+    <p class="hint">
+      tamias reads your usage every 5 minutes in the background, also while the app is closed.
+    </p>
+    @if (collection.actionError(); as message) {
+      <hx-message severity="error" data-testid="setup-error">{{ message }}</hx-message>
+    } @else if (collection.status()?.message; as note) {
+      <p class="hint" data-testid="setup-note">{{ note }}</p>
+    }
+    <div class="actions">
+      <button
+        hx-button
+        data-testid="setup"
+        [disabled]="collection.running()"
+        [loading]="collection.running()"
+        (click)="setUp()"
+      >
+        Set up
+      </button>
+      <button
+        hx-button
+        variant="outlined"
+        data-testid="setup-dismiss"
+        [disabled]="collection.running()"
+        (click)="collection.dismiss()"
+      >
+        Not now
+      </button>
+    </div>
+  </section>
+} @else if (setupDone()) {
+  <hx-message severity="success" data-testid="setup-done"
+    >Collection is set up. The calendar fills with the next collect, within 5 minutes.</hx-message
+  >
+}
 @if (error(); as message) {
   <hx-message severity="error" data-testid="error">Cannot read the month: {{ message }}</hx-message>
 }
