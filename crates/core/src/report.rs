@@ -355,7 +355,7 @@ pub struct DayEntry {
 /// The days of `month` of `year` (local, in `tz`) up to the local day of `now`, each with the
 /// usage and budget of the binding window of `provider` (`seven_day`, `monthly`).
 ///
-/// Reads the snapshots from [`lookback`] before the first day to the end of the month once and
+/// Reads the snapshots from [`lookback`] before the first day to the end of the month or `now`, whichever is first, once and
 /// derives every day with [`budget::day`], so a day has the same values as that call alone.
 /// Days without a result (no window observed) and days after `now` are absent; an invalid
 /// `year`/`month` gives no days.
@@ -391,7 +391,12 @@ pub fn month(
         .timestamp()
         .checked_sub(lookback(window))
         .unwrap_or_else(|_| from.timestamp());
-    let snapshots = store.snapshots(provider, window, from, to.timestamp())?;
+    // Nothing observed after `now` takes part, so today is judged as `budget::day` alone would.
+    let to = to.timestamp().min(
+        now.checked_add(SignedDuration::from_nanos(1))
+            .unwrap_or(now),
+    );
+    let snapshots = store.snapshots(provider, window, from, to)?;
     // Past days are judged as if fresh: a stale provider greys only today, in the caller.
     let status = budget::Status {
         now,

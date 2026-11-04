@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { daysInMonth, isoDate, leadingBlanks, localeFirstDay, shiftMonth } from "./grid";
 
 describe("grid", () => {
@@ -26,9 +26,43 @@ describe("grid", () => {
     expect(shiftMonth(2026, 6, 1)).toEqual({ year: 2026, month: 7 });
   });
 
-  it("knows the first day of the week of a locale", () => {
-    expect(localeFirstDay("de-DE")).toBe(1);
-    expect(localeFirstDay("en-US")).toBe(7);
-    expect(localeFirstDay("not a locale!!")).toBe(1);
+  describe("localeFirstDay", () => {
+    const real = Intl.Locale;
+    const setLocale = (value: unknown) =>
+      Object.defineProperty(Intl, "Locale", { value, configurable: true, writable: true });
+    const stub = (info: object) => {
+      class Fake {
+        constructor(public tag: string) {
+          if (tag.includes("!")) throw new RangeError("invalid");
+        }
+      }
+      Object.assign(Fake.prototype, info);
+      setLocale(Fake);
+    };
+    afterEach(() => {
+      setLocale(real);
+    });
+
+    it("maps getWeekInfo()", () => {
+      stub({ getWeekInfo: () => ({ firstDay: 7 }) });
+      expect(localeFirstDay("en-US")).toBe(7);
+    });
+
+    it("maps the weekInfo property", () => {
+      stub({ weekInfo: { firstDay: 6 } });
+      expect(localeFirstDay("xx")).toBe(6);
+    });
+
+    it("falls back to Monday without week info or with an out-of-range day", () => {
+      stub({});
+      expect(localeFirstDay("de-DE")).toBe(1);
+      stub({ getWeekInfo: () => ({ firstDay: 9 }) });
+      expect(localeFirstDay("de-DE")).toBe(1);
+    });
+
+    it("falls back to Monday for an invalid locale", () => {
+      stub({ getWeekInfo: () => ({ firstDay: 7 }) });
+      expect(localeFirstDay("not a locale!!")).toBe(1);
+    });
   });
 });
