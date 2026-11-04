@@ -8,7 +8,7 @@ import {
   signal,
   untracked,
 } from "@angular/core";
-import { RouterLink } from "@angular/router";
+import { ActivatedRoute, RouterLink } from "@angular/router";
 import { HxButton, HxMessage, HxProgressSpinner } from "@gravionlabs/helix-ui";
 import { Ipc, errorText, isBusy } from "../core/ipc";
 import { StoreEvents } from "../core/store-events";
@@ -52,6 +52,8 @@ interface Cell {
   day: number;
   date: string;
   today: boolean;
+  /** Days up to today open the day view. */
+  open: boolean;
   chips: Chip[];
   /** "stale since 09:00" on today's cell when a provider is stale. */
   stale: string | null;
@@ -73,9 +75,13 @@ export class Calendar {
   private readonly firstDay = inject(FIRST_DAY);
   private loads = 0;
 
-  private readonly start = this.now();
-  protected readonly year = signal(this.start.getFullYear());
-  protected readonly month = signal(this.start.getMonth() + 1);
+  // `?month=YYYY-MM` is where the day view came from; otherwise the current month.
+  private readonly start = initialMonth(
+    inject(ActivatedRoute).snapshot.queryParamMap.get("month"),
+    this.now(),
+  );
+  protected readonly year = signal(this.start.year);
+  protected readonly month = signal(this.start.month);
   protected readonly report = signal<MonthReport | null>(null);
   protected readonly error = signal<string | null>(null);
 
@@ -113,6 +119,7 @@ export class Calendar {
         day: i + 1,
         date,
         today: isToday,
+        open: date <= today,
         chips: providers.map((p) => chip(p, date, date <= today, isToday)),
         stale: stale ? staleText(stale.stale_since, now) : null,
       };
@@ -170,6 +177,15 @@ export class Calendar {
       this.error.set(errorText(error));
     }
   }
+}
+
+/** The month of a `YYYY-MM` query value, else the month of `now`. */
+function initialMonth(value: string | null, now: Date): { year: number; month: number } {
+  const match = value ? /^(\d{4})-(\d{2})$/.exec(value) : null;
+  const year = Number(match?.[1]);
+  const month = Number(match?.[2]);
+  if (match && month >= 1 && month <= 12) return { year, month };
+  return { year: now.getFullYear(), month: now.getMonth() + 1 };
 }
 
 function chip(p: ProviderMonth, date: string, upToToday: boolean, isToday: boolean): Chip {

@@ -71,7 +71,29 @@ h1 {
   color: var(--h-text-muted-color);
 }
 
+/* The day number links to the day view; its hit area covers the whole cell. */
+.cell {
+  position: relative;
+}
+
+.day.open {
+  text-decoration: none;
+}
+
+.day.open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.cell:has(.open):hover {
+  background: var(--h-surface-100);
+}
+
+/* Above the overlay, so the chips keep their title tooltips. */
 .chips {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: 4px;
 }

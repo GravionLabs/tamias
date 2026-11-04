@@ -2,6 +2,7 @@
 //! the commands registered in [`run`] through its `Ipc` bridge (`app/src/app/core/ipc.ts`) and
 //! reloads on the [`watch::EVENT`] of the live refresh (`app/src/app/core/store-events.ts`).
 
+pub mod day;
 pub mod launch;
 pub mod month;
 pub mod today;
@@ -21,6 +22,15 @@ pub struct CommandError {
     /// The store was locked longer than its busy timeout: not an error state, the next
     /// `store-changed` event retries.
     pub busy: bool,
+}
+
+impl From<day::Error> for CommandError {
+    fn from(error: day::Error) -> Self {
+        Self {
+            message: error.to_string(),
+            busy: error.is_busy(),
+        }
+    }
 }
 
 impl From<today::Error> for CommandError {
@@ -53,6 +63,21 @@ async fn today() -> Result<Report, CommandError> {
 #[tauri::command]
 async fn month(year: i16, month: i8) -> Result<month::MonthReport, CommandError> {
     tauri::async_runtime::spawn_blocking(move || month::current(year, month))
+        .await
+        .map_err(|e| CommandError {
+            message: e.to_string(),
+            busy: false,
+        })?
+        .map_err(CommandError::from)
+}
+
+/// The intraday curve of the local day `date` (`YYYY-MM-DD`) of every provider, with the day's
+/// budget and usage.
+///
+/// Runs off the main thread: reading the store may wait for the collector's lock.
+#[tauri::command]
+async fn day(date: String) -> Result<day::DayReport, CommandError> {
+    tauri::async_runtime::spawn_blocking(move || day::current(&date))
         .await
         .map_err(|e| CommandError {
             message: e.to_string(),
@@ -123,7 +148,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![today, month])
+        .invoke_handler(tauri::generate_handler![today, month, day])
         .build(tauri::generate_context!())
         .expect("error while running the tamias app")
         .run(|app, event| {
