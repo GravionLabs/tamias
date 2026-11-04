@@ -463,6 +463,33 @@ fn fatal_collect_error_does_not_make_today_stale() {
 }
 
 #[test]
+fn provider_failure_with_a_failing_record_error_writes_one_error_line() {
+    let env = Env::new();
+    env.write_credentials();
+    let (ok_url, _requests) = serve(vec![usage_ok()]);
+    env.tamias(&ok_url).arg("collect").assert().code(0);
+    // From now on every write of an error into the store fails.
+    let db = rusqlite::Connection::open(env.path("data").join("tamias.db")).unwrap();
+    db.execute_batch(
+        "CREATE TRIGGER fail_error_write BEFORE UPDATE ON source_status
+         BEGIN SELECT RAISE(ABORT, 'store is read-only'); END;",
+    )
+    .unwrap();
+    drop(db);
+    let (url, _requests) = serve(vec![response("500 Internal Server Error", "{}")]);
+
+    env.tamias(&url).arg("collect").assert().code(1);
+
+    let log = std::fs::read_to_string(env.path("data").join("logs").join("collect.log")).unwrap();
+    let errors: Vec<&str> = log
+        .lines()
+        .filter(|l| l.contains(" claude error "))
+        .collect();
+    assert_eq!(errors.len(), 1, "{log}");
+    assert!(errors[0].contains("fatal: "), "{errors:?}");
+}
+
+#[test]
 fn invalid_color_value_is_a_usage_error() {
     let env = Env::new();
     env.tamias(&closed_url())
