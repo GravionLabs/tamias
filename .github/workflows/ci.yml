@@ -47,6 +47,29 @@ jobs:
       - name: Test
         run: cargo test --workspace --exclude tamias-app --locked
 
+  # The version bumps (set-version.sh) are committed on main only. A bump or a new workspace member on main leaves the
+  # Cargo.lock of release/next stale after the release merge, and --locked then fails in release.yml (#111).
+  # Check the merge result: the lock of a release branch must stay valid once main is merged into it.
+  lock-vs-main:
+    name: Cargo.lock against main
+    if: startsWith(github.base_ref, 'release/') || startsWith(github.ref_name, 'release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # rust-toolchain.toml pins the toolchain; rustup installs it on first use.
+      - name: Install toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Merge main without committing
+        run: |
+          git config user.name ci
+          git config user.email ci@users.noreply.github.com
+          git fetch origin main
+          git merge --no-commit --no-ff origin/main
+      - name: Cargo.lock matches the merged tree
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
   app:
     name: app (${{ matrix.os }})
     strategy:
