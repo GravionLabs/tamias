@@ -2,6 +2,7 @@
 //! the commands registered in [`run`] through its `Ipc` bridge (`app/src/app/core/ipc.ts`) and
 //! reloads on the [`watch::EVENT`] of the live refresh (`app/src/app/core/store-events.ts`).
 
+pub mod month;
 pub mod today;
 pub mod watch;
 
@@ -36,6 +37,21 @@ impl From<today::Error> for CommandError {
 #[tauri::command]
 async fn today() -> Result<Report, CommandError> {
     tauri::async_runtime::spawn_blocking(today::current)
+        .await
+        .map_err(|e| CommandError {
+            message: e.to_string(),
+            busy: false,
+        })?
+        .map_err(CommandError::from)
+}
+
+/// The month of every provider: the days with usage against the budget, and the status of each
+/// provider. `month` is 1-12.
+///
+/// Runs off the main thread: reading the store may wait for the collector's lock.
+#[tauri::command]
+async fn month(year: i16, month: i8) -> Result<month::MonthReport, CommandError> {
+    tauri::async_runtime::spawn_blocking(move || month::current(year, month))
         .await
         .map_err(|e| CommandError {
             message: e.to_string(),
@@ -94,7 +110,7 @@ pub fn run() {
             start_live_refresh(app.handle());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![today])
+        .invoke_handler(tauri::generate_handler![today, month])
         .build(tauri::generate_context!())
         .expect("error while running the tamias app")
         .run(|app, event| {

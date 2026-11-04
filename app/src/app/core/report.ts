@@ -55,6 +55,38 @@ export interface WindowReport {
   ratio?: number;
 }
 
+/** One local day of a binding window, an entry of `MonthReport` (`DayEntry` in `tamias_core::report`). */
+export interface DayEntry {
+  /** `YYYY-MM-DD`, the local day. */
+  date: string;
+  usage: number;
+  budget: number;
+  /** `usage / budget`, absent when the budget is 0. */
+  ratio?: number;
+  /** Never `grey`: a stale provider greys only today, in the view. */
+  colour: Colour;
+}
+
+export interface ProviderMonth {
+  provider: ProviderName;
+  status: Status;
+  /** Last successful collect of a stale provider; absent when it never succeeded. */
+  stale_since?: Timestamp;
+  /** Unit of the days' `usage` and `budget`. */
+  unit: Unit;
+  /** Days with data, oldest first; days without data are absent. */
+  days: DayEntry[];
+}
+
+/** The answer of the `month` command (`MonthReport` in `app/src-tauri/src/month.rs`). */
+export interface MonthReport {
+  year: number;
+  /** 1-12. */
+  month: number;
+  generated_at: Timestamp;
+  providers: ProviderMonth[];
+}
+
 const PROVIDER_LABELS: Record<ProviderName, string> = {
   claude: "Claude",
   copilot: "Copilot",

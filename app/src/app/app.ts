@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component } from "@angular/core";
-import { Overview } from "./overview/overview";
+import { RouterOutlet } from "@angular/router";
 
 @Component({
   selector: "app-root",
-  imports: [Overview],
-  template: "<app-overview />",
+  imports: [RouterOutlet],
+  template: "<router-outlet />",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class App {}

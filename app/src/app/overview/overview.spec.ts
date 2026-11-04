@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { TestBed, getTestBed } from "@angular/core/testing";
+import { provideRouter } from "@angular/router";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Ipc, type Unlisten } from "../core/ipc";
@@ -96,7 +97,9 @@ const COPILOT_STALE: ProviderReport = {
 
 async function mount(answer: () => unknown) {
   const ipc = new StubIpc(answer);
-  TestBed.configureTestingModule({ providers: [{ provide: Ipc, useValue: ipc }] });
+  TestBed.configureTestingModule({
+    providers: [{ provide: Ipc, useValue: ipc }, provideRouter([])],
+  });
   TestBed.overrideComponent(Overview, {
     set: {
       templateUrl: undefined,

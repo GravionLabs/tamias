@@ -6,6 +6,7 @@ import {
   signal,
   untracked,
 } from "@angular/core";
+import { RouterLink } from "@angular/router";
 import { HxCard, HxMessage, HxProgressSpinner, HxTag } from "@gravionlabs/helix-ui";
 import { Ipc, errorText, isBusy } from "../core/ipc";
 import { StoreEvents } from "../core/store-events";
@@ -30,7 +31,7 @@ const STATUS_SEVERITY: Record<Status, "success" | "warn" | "secondary"> = {
 /** Today's report: one card per provider with its windows, used amount and today's budget. */
 @Component({
   selector: "app-overview",
-  imports: [HxCard, HxMessage, HxProgressSpinner, HxTag],
+  imports: [HxCard, HxMessage, HxProgressSpinner, HxTag, RouterLink],
   templateUrl: "./overview.html",
   styleUrl: "./overview.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
