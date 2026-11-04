@@ -2,9 +2,9 @@
 //!
 //! The binding window (Claude `seven_day`) shows used %, today's usage, today's budget and the
 //! colour; the informational window (Claude `five_hour`) shows used % and the reset time only.
-//! [`read`] gathers the store once into a [`Today`]: `--json` prints its [`Report`], the table
-//! and `--short` render its [`Line`]s, which are derived from that report, so all three show
-//! the same numbers.
+//! [`read`] gathers the store once into a [`Today`]: `--json` prints its [`Report`], `--short`
+//! renders the same report, the table renders its [`Line`]s, which are derived from that report,
+//! so all three show the same numbers.
 
 use std::fmt::Write as _;
 
@@ -50,9 +50,9 @@ pub struct Line {
 /// Everything `today` shows, gathered once at one `now`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Today {
-    /// The document of `--json`.
+    /// The document of `--json` and the source of `--short`.
     pub report: Report,
-    /// The rows of the table and the segments of `--short`, derived from `report`.
+    /// The rows of the table, derived from `report`.
     pub lines: Vec<Line>,
 }
 

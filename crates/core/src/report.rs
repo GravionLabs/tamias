@@ -8,6 +8,10 @@
 //! - `today_usage`, `budget` and `ratio` exist only for binding windows (Claude `seven_day`,
 //!   Copilot `monthly`) once a day can be derived ([`budget::today`]).
 //! - A stale provider shows every window `grey`.
+//!
+//! [`short`] renders a report as the compact line of `tamias today --short` and the tray.
+
+pub mod short;
 
 use jiff::civil::Date;
 use jiff::tz::TimeZone;

@@ -76,6 +76,13 @@ describe("Settings", () => {
     expect(toggle().checked).toBe(true);
   });
 
+  it("says how to open the window of a start in the tray", async () => {
+    const { el } = await mount(new StubIpc(true));
+    const hint = el.querySelector("[data-testid=hint]")?.textContent ?? "";
+    expect(hint).toContain("starts in the tray");
+    expect(hint).toContain('"Open tamias" in the tray menu');
+  });
+
   it("enables autostart when the toggle is switched on", async () => {
     const ipc = new StubIpc(false);
     const { toggle, error, click } = await mount(ipc);

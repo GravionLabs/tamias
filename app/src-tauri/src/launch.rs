@@ -1,10 +1,8 @@
 //! How the app was started: the autostart entry passes [`HIDDEN`], which keeps the window
 //! hidden at the start.
 //!
-//! NOTE: the tray (#86) is the way back to a hidden window. As long as it is not merged, a
-//! `--hidden` start leaves no way to open the window; it only happens when the user enabled
-//! autostart (off by default) or passes the argument by hand. Until #86 lands, do not make
-//! autostart the default.
+//! The tray icon ([`crate::tray`]) is the way to a hidden window: a left click (Windows, macOS)
+//! or "Open tamias" in its menu. When the tray cannot be created, the window is shown anyway.
 
 /// The argument the autostart entry passes.
 pub const HIDDEN: &str = "--hidden";
