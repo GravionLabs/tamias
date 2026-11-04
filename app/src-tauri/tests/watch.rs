@@ -42,13 +42,31 @@ fn write(path: PathBuf, content: &str) {
     std::fs::write(path, content).unwrap();
 }
 
+/// A data dir holding a migrated database, made before any watch starts.
+///
+/// The database is created in a sibling directory and renamed into place: `FSEvents` (macOS)
+/// still delivers the creation's writes when a watch starts right after them, which would be
+/// taken for a collect run. The rename leaves those events under the old path.
+fn seeded_data_dir() -> (tempfile::TempDir, PathBuf) {
+    let root = tempfile::tempdir().unwrap();
+    let seed = root.path().join("seed");
+    tamias_core::store::Store::open(seed.join("tamias.db")).unwrap();
+    let data_dir = root.path().join("tamias");
+    std::fs::rename(&seed, &data_dir).unwrap();
+    (root, data_dir)
+}
+
 fn next(rx: &Receiver<Cause>) -> Cause {
     rx.recv_timeout(ARRIVES_WITHIN)
         .expect("no event within the timeout")
 }
 
 fn assert_quiet(rx: &Receiver<Cause>) {
-    match rx.recv_timeout(QUIET_FOR) {
+    assert_quiet_for(rx, QUIET_FOR);
+}
+
+fn assert_quiet_for(rx: &Receiver<Cause>, window: Duration) {
+    match rx.recv_timeout(window) {
         Err(RecvTimeoutError::Timeout) => {}
         other => panic!("expected no event, got {other:?}"),
     }
@@ -56,14 +74,22 @@ fn assert_quiet(rx: &Receiver<Cause>) {
 
 #[test]
 fn two_wal_writes_within_the_debounce_give_one_event() {
+    // Longer than the default, so a slow CI file system still delivers both writes within it.
+    let debounce = Duration::from_secs(2);
     let dir = tempfile::tempdir().unwrap();
-    let (_watch, rx) = start(dir.path(), options());
+    let (_watch, rx) = start(
+        dir.path(),
+        Options {
+            debounce,
+            fallback: NO_TIMER,
+        },
+    );
 
     write(dir.path().join("tamias.db-wal"), "first");
     write(dir.path().join("tamias.db-wal"), "second");
 
     assert_eq!(next(&rx), Cause::Write);
-    assert_quiet(&rx);
+    assert_quiet_for(&rx, debounce + Duration::from_secs(1));
 }
 
 #[test]
@@ -92,10 +118,9 @@ fn writes_to_other_files_give_none() {
 
 #[test]
 fn a_collect_run_gives_one_event_and_the_reload_after_it_none() {
-    let dir = tempfile::tempdir().unwrap();
-    let database = dir.path().join("tamias.db");
-    tamias_core::store::Store::open(&database).unwrap();
-    let (_watch, rx) = start(dir.path(), options());
+    let (_root, data_dir) = seeded_data_dir();
+    let database = data_dir.join("tamias.db");
+    let (_watch, rx) = start(&data_dir, options());
 
     // The collector: open, write a run, close (the checkpoint removes the WAL).
     let mut store = tamias_core::store::Store::open(&database).unwrap();
@@ -121,10 +146,9 @@ fn a_collect_run_gives_one_event_and_the_reload_after_it_none() {
 
 #[test]
 fn reading_the_database_gives_none() {
-    let dir = tempfile::tempdir().unwrap();
-    let database = dir.path().join("tamias.db");
-    tamias_core::store::Store::open(&database).unwrap();
-    let (_watch, rx) = start(dir.path(), options());
+    let (_root, data_dir) = seeded_data_dir();
+    let database = data_dir.join("tamias.db");
+    let (_watch, rx) = start(&data_dir, options());
 
     // What the app does after every event: a read-only open of the store.
     let store = tamias_core::store::Store::open_read_only(&database).unwrap();
