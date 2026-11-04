@@ -6,7 +6,8 @@
 //! | Linux   | `$XDG_DATA_HOME/tamias`, `$XDG_CONFIG_HOME/tamias` |
 //! | Windows | `%APPDATA%\tamias`, `%APPDATA%\tamias\config` |
 //!
-//! `TAMIAS_DATA_DIR` overrides the data directory (used by tests and portable setups).
+//! `TAMIAS_DATA_DIR` overrides the data directory and `TAMIAS_CONFIG_DIR` the config directory
+//! (used by tests and portable setups).
 
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -15,6 +16,9 @@ use directories::ProjectDirs;
 
 /// Environment variable that overrides the data directory.
 pub const DATA_DIR_ENV: &str = "TAMIAS_DATA_DIR";
+
+/// Environment variable that overrides the config directory.
+pub const CONFIG_DIR_ENV: &str = "TAMIAS_CONFIG_DIR";
 
 /// File name of the snapshot database inside the data directory.
 pub const DATABASE_FILE: &str = "tamias.db";
@@ -33,15 +37,13 @@ pub fn data_dir() -> Result<PathBuf, NoHomeDir> {
     resolve_data_dir(std::env::var_os(DATA_DIR_ENV), project_dirs().as_ref())
 }
 
-/// Config directory of the OS.
+/// Config directory: `TAMIAS_CONFIG_DIR` when set and non-empty, else the OS config directory.
 ///
 /// # Errors
 ///
-/// [`NoHomeDir`] when no home directory is available.
+/// [`NoHomeDir`] when neither the override nor a home directory is available.
 pub fn config_dir() -> Result<PathBuf, NoHomeDir> {
-    project_dirs()
-        .map(|dirs| dirs.config_dir().to_path_buf())
-        .ok_or(NoHomeDir)
+    resolve_config_dir(std::env::var_os(CONFIG_DIR_ENV), project_dirs().as_ref())
 }
 
 /// Path of the snapshot database: [`DATABASE_FILE`] inside [`data_dir`].
@@ -67,6 +69,17 @@ fn resolve_data_dir(
     dirs.map(os_data_dir).ok_or(NoHomeDir)
 }
 
+fn resolve_config_dir(
+    env_override: Option<OsString>,
+    dirs: Option<&ProjectDirs>,
+) -> Result<PathBuf, NoHomeDir> {
+    if let Some(dir) = env_override.filter(|value| !value.is_empty()) {
+        return Ok(PathBuf::from(dir));
+    }
+    dirs.map(|dirs| dirs.config_dir().to_path_buf())
+        .ok_or(NoHomeDir)
+}
+
 /// `directories` puts Windows data under `%APPDATA%\tamias\data`; tamias uses `%APPDATA%\tamias`.
 fn os_data_dir(dirs: &ProjectDirs) -> PathBuf {
     let data = dirs.data_dir();
@@ -82,7 +95,7 @@ mod tests {
     use std::ffi::OsString;
     use std::path::{Path, PathBuf};
 
-    use super::{project_dirs, resolve_data_dir};
+    use super::{project_dirs, resolve_config_dir, resolve_data_dir};
 
     #[test]
     fn override_wins_over_the_os_directory() {
@@ -112,6 +125,19 @@ mod tests {
         let dir = resolve_data_dir(None, Some(&dirs)).unwrap();
         assert_eq!(dir.file_name(), Some(Path::new("tamias").as_os_str()));
         assert!(dir.is_absolute());
+    }
+
+    #[test]
+    fn config_override_wins_and_needs_no_home_directory() {
+        let dir = resolve_config_dir(Some(OsString::from("cfg")), None);
+        assert_eq!(dir.unwrap(), PathBuf::from("cfg"));
+    }
+
+    #[test]
+    fn empty_config_override_falls_back_to_the_os_directory() {
+        let Some(dirs) = project_dirs() else { return };
+        let dir = resolve_config_dir(Some(OsString::new()), Some(&dirs)).unwrap();
+        assert_eq!(dir, dirs.config_dir());
     }
 
     #[test]
