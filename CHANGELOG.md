@@ -5,6 +5,43 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.0] — 2026-11-04
+
+### Bug Fixes
+- **app**: Day chart ticks at real local hours on DST days, strict date, calendar a11y (#85)
+- **app**: Gate the Path import to Unix, unused on Windows (#89)
+- Cargo.lock locks tamias-app at 0.1.0 against workspace 0.1.2, so --locked fails after the release merge (#111) (#112)
+- Lock tamias-app at the workspace version after merging main (#111)
+- **ci**: Check Cargo.lock against main on release branches (#111)
+
+
+### Documentation
+- Desktop app page and roadmap 0.3.0 (#90) (#110)
+- Desktop app page and roadmap 0.3.0
+- Fix stale, colour limits, tray and Linux details on the app page (#90)
+- Update CHANGELOG.md for v0.1.0 [skip ci]
+- Update CHANGELOG.md for v0.1.1 [skip ci]
+- Update CHANGELOG.md for v0.1.2 [skip ci]
+
+
+### Features
+- **app**: Tauri app scaffold with Angular, helix-ui themes and the today bridge (#101)
+- **app**: Live refresh when the collector writes new snapshots (#83) (#102)
+- **app**: Live refresh when the collector writes new snapshots (#83)
+- **app**: Month calendar coloured by daily budget, Claude and Copilot side by side (#84) (#103)
+- **app**: Month calendar coloured by daily budget, Claude and Copilot side by side (#84)
+- **app**: Autostart setting, off by default (#87) (#104)
+- **app**: Day view with the intraday curve and the budget line (#85) (#106)
+- **app**: Day view with the intraday curve and the budget line (#85)
+- **app**: Tray icon with traffic light and summary, close hides to tray (#107)
+- **app**: Bundled CLI sidecar and collection setup from the app (#89) (#109)
+- **app**: Bundled CLI sidecar and collection setup from the app (#89)
+
+
+### Refactoring
+- **core**: Move config.toml parsing to tamias-core (#81) (#99)
+
+
 ## [0.1.2] — 2026-11-04
 
 ### Bug Fixes
@@ -18,6 +55,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ### Documentation
 - ADRs are not published on the GitHub Pages site (#73) (#80)
 - **site**: Do not publish the ADRs on the documentation site
+- Update CHANGELOG.md for v0.1.2 [skip ci]
 
 
 ## [0.1.1] — 2026-11-03
