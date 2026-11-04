@@ -48,6 +48,20 @@ impl Env {
         self.path("data").join("logs").join("collect.log")
     }
 
+    /// Points every per-user location (config, data, home) of every OS at the temp dir, so a
+    /// command without `--config` never reads the developer's real config.
+    fn isolate<'a>(&self, cmd: &'a mut Command) -> &'a mut Command {
+        let home = self.path("home");
+        cmd.env("TAMIAS_DATA_DIR", self.path("data"))
+            .env("HOME", &home)
+            .env("USERPROFILE", &home)
+            .env("XDG_CONFIG_HOME", self.path("xdg-config"))
+            .env("XDG_DATA_HOME", self.path("xdg-data"))
+            .env("APPDATA", self.path("appdata"))
+            .env("LOCALAPPDATA", self.path("localappdata"))
+            .env_remove("CLAUDE_CONFIG_DIR")
+    }
+
     fn tamias(&self) -> Command {
         let mut cmd = Command::cargo_bin("tamias").expect("binary tamias is built");
         cmd.env("TAMIAS_DATA_DIR", self.path("data"))
@@ -105,14 +119,12 @@ fn tamiasw_runs_collect_with_the_same_exit_code_and_log() {
     let env = Env::new();
     env.write_credentials();
     let mut cmd = Command::cargo_bin("tamiasw").expect("binary tamiasw is built");
-    cmd.env("TAMIAS_DATA_DIR", env.path("data"))
+    env.isolate(&mut cmd)
         .env(
             "TAMIAS_CLAUDE_CREDENTIALS_FILE",
             env.path("credentials.json"),
         )
         .env("TAMIAS_CLAUDE_USAGE_URL", closed_url())
-        .env("HOME", env.path("home"))
-        .env_remove("CLAUDE_CONFIG_DIR")
         .assert()
         .code(3);
     let log = fs::read_to_string(env.log_path()).unwrap();
@@ -168,6 +180,18 @@ fn a_fatal_error_of_collect_is_logged_without_the_config_path() {
         "{log}"
     );
     assert_eq!(log.lines().count(), 1, "{log}");
+    // The fatal error goes to the log only: the store has no error for `service status` to show.
+    let db = env.path("data").join("tamias.db");
+    if db.exists() {
+        let store = tamias_core::store::Store::open(db).unwrap();
+        let status = store
+            .status(tamias_core::snapshot::Provider::Claude)
+            .unwrap();
+        assert!(
+            status.as_ref().is_none_or(|s| s.last_error.is_none()),
+            "{status:?}"
+        );
+    }
 }
 
 #[test]
@@ -175,13 +199,8 @@ fn a_fatal_error_of_tamiasw_is_logged() {
     let env = Env::new();
     // A directory where the database file belongs: the store cannot be opened.
     fs::create_dir_all(env.path("data").join("tamias.db")).unwrap();
-    Command::cargo_bin("tamiasw")
-        .expect("binary tamiasw is built")
-        .env("TAMIAS_DATA_DIR", env.path("data"))
-        .env("HOME", env.path("home"))
-        .env_remove("CLAUDE_CONFIG_DIR")
-        .assert()
-        .code(1);
+    let mut cmd = Command::cargo_bin("tamiasw").expect("binary tamiasw is built");
+    env.isolate(&mut cmd).assert().code(1);
     let log = fs::read_to_string(env.log_path()).unwrap();
     assert!(log.contains(" claude error fatal: "), "{log}");
 }
