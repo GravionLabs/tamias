@@ -39,15 +39,18 @@ impl Env {
     }
 
     /// A fake `gh` that prints a token for `gh auth token`.
+    #[cfg(windows)]
     fn fake_gh(&self) {
+        std::fs::write(self.gh_path(), format!("@echo off\r\necho {GH_TOKEN}\r\n")).unwrap();
+    }
+
+    /// A fake `gh` that prints a token for `gh auth token`.
+    #[cfg(unix)]
+    fn fake_gh(&self) {
+        use std::os::unix::fs::PermissionsExt;
         let path = self.gh_path();
-        if cfg!(windows) {
-            std::fs::write(&path, format!("@echo off\r\necho {GH_TOKEN}\r\n")).unwrap();
-        } else {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::write(&path, format!("#!/bin/sh\necho {GH_TOKEN}\n")).unwrap();
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        std::fs::write(&path, format!("#!/bin/sh\necho {GH_TOKEN}\n")).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
     }
 
     /// The collect log, one entry per line.
