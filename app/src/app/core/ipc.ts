@@ -22,6 +22,16 @@ export abstract class Ipc {
   month(year: number, month: number): Promise<MonthReport> {
     return this.invoke<MonthReport>("month", { year, month });
   }
+
+  /** Whether the OS has the autostart entry (the autostart plugin's `isEnabled`). */
+  autostartEnabled(): Promise<boolean> {
+    return this.invoke<boolean>("plugin:autostart|is_enabled");
+  }
+
+  /** Creates (`true`) or removes (`false`) the autostart entry of the OS. */
+  async setAutostart(enabled: boolean): Promise<void> {
+    await this.invoke<void>(enabled ? "plugin:autostart|enable" : "plugin:autostart|disable");
+  }
 }
 
 /** The only caller of Tauri's `invoke` and `listen`. */

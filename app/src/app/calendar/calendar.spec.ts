@@ -246,6 +246,12 @@ describe("Calendar", () => {
     expect(el.querySelector("[data-testid=grid]")).toBeNull();
   });
 
+  it("links the gear in the header to the settings", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE));
+    const gear = el.querySelector<HTMLAnchorElement>("[data-testid=gear]")!;
+    expect(gear.getAttribute("href")).toBe("/settings");
+  });
+
   it("keeps the loading state on a busy store", async () => {
     const { el } = await mount(() => {
       throw { message: "busy", busy: true };

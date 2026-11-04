@@ -1,0 +1,21 @@
+<header class="head">
+  <h1>Settings</h1>
+  <a class="muted" routerLink="/">Calendar</a>
+</header>
+
+@if (error(); as message) {
+  <hx-message severity="error" data-testid="error">{{ message }}</hx-message>
+}
+
+<label class="row">
+  <input
+    type="checkbox"
+    hx-switch
+    data-testid="autostart"
+    [checked]="autostart()"
+    [disabled]="!ready() || busy()"
+    (change)="toggle($any($event.target))"
+  />
+  <span>Start tamias at login</span>
+</label>
+<p class="hint">The app starts in the tray, without a window.</p>
