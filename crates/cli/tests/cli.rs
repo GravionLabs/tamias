@@ -75,3 +75,13 @@ fn help_exit_codes_match_the_consumers_doc_table() {
         }
     }
 }
+
+#[test]
+fn help_about_does_not_announce_copilot_as_available() {
+    tamias()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Claude usage limits"))
+        .stdout(predicate::str::contains("Copilot").not());
+}

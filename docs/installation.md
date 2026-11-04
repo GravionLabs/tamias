@@ -69,7 +69,7 @@ Open a new terminal for the changed `PATH` to apply. Windows SmartScreen may war
 
 ```sh
 tamias --version
-tamias collect    # poll Claude once and store (Copilot follows with [#5](https://github.com/GravionLabs/tamias/issues/5)) the snapshots
+tamias collect    # poll Claude once and store the snapshots (Copilot follows with [#5](https://github.com/GravionLabs/tamias/issues/5))
 tamias today      # today's usage against the daily budget
 ```
 
@@ -107,7 +107,7 @@ Every scheduled run appends one line per provider to `logs/collect.log` in the d
 
 ### Check the last run
 
-`tamias service status` prints the registration, the executable, the last run of Claude (Copilot is not polled yet; it is marked as coming with #5) (from the store) and the log path. For the history, read the end of the log:
+`tamias service status` prints the registration, the executable, the last run of Claude (from the store; Copilot is not polled yet, it comes with [#5](https://github.com/GravionLabs/tamias/issues/5)) and the log path. For the history, read the end of the log:
 
 ```text
 2026-11-03T10:15:42Z claude ok stored 2 snapshots
