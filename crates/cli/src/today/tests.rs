@@ -5,7 +5,7 @@ use tamias_core::snapshot::{Provider, Snapshot, Source, Unit, Window};
 use tamias_core::store::SourceStatus;
 
 use super::{Line, State, claude_lines, render, unavailable};
-use crate::claude::Unavailable;
+use crate::unavailable::Unavailable;
 
 fn ts(s: &str) -> Timestamp {
     s.parse().unwrap()
@@ -306,4 +306,196 @@ fn times_are_shown_in_the_local_time_zone() {
     let table = render(&lines, ts(NOW), &tz, false);
     assert!(table.contains("stale since 09:00 (timeout)"), "{table}");
     assert!(table.contains("14:30"), "{table}");
+}
+
+mod copilot {
+    use jiff::tz::TimeZone;
+    use tamias_core::config::{Config, Enabled};
+    use tamias_core::report::Status;
+    use tamias_core::snapshot::{Provider, Snapshot, Source, Unit, Window};
+    use tamias_core::store::Store;
+    use tempfile::TempDir;
+
+    use super::{NOW, ts};
+    use crate::today::{State, Today, read, render};
+
+    /// A store in a temp dir and a config that needs no probing: Claude off, `gh` an existing file.
+    struct Setup {
+        dir: TempDir,
+        config: Config,
+    }
+
+    impl Setup {
+        fn new() -> Self {
+            let dir = tempfile::tempdir().unwrap();
+            let gh = dir.path().join("gh");
+            std::fs::write(&gh, "").unwrap();
+            let mut config = Config::default();
+            config.claude = Enabled::Off;
+            config.copilot = Enabled::Auto;
+            config.gh_path = Some(gh);
+            Self { dir, config }
+        }
+
+        fn store(&self) -> Store {
+            Store::open(self.dir.path().join("tamias.db")).unwrap()
+        }
+
+        fn read(&self) -> Today {
+            read(&self.config, &self.store(), ts(NOW), &TimeZone::UTC).unwrap()
+        }
+    }
+
+    fn copilot_snapshot(used: f64) -> Snapshot {
+        Snapshot {
+            provider: Provider::Copilot,
+            window: Window::Monthly,
+            used,
+            limit: 300.0,
+            unit: Unit::Requests,
+            resets_at: ts("2026-12-01T00:00:00Z"),
+            observed_at: ts("2026-11-03T10:00:00Z"),
+            source: Source::Poll,
+        }
+    }
+
+    fn table(today: &Today) -> String {
+        render(&today.lines, ts(NOW), &TimeZone::UTC, false)
+    }
+
+    fn copilot_status(today: &Today) -> Status {
+        today.report.providers[1].status
+    }
+
+    #[test]
+    fn disabled_is_unavailable() {
+        let mut setup = Setup::new();
+        setup.config.copilot = Enabled::Off;
+        let today = setup.read();
+        assert!(table(&today).ends_with("unavailable (disabled)\n"));
+        assert_eq!(copilot_status(&today), Status::Unavailable);
+    }
+
+    #[test]
+    fn disabled_wins_over_data() {
+        let mut setup = Setup::new();
+        setup
+            .store()
+            .record_run(
+                Provider::Copilot,
+                &[copilot_snapshot(180.0)],
+                ts("2026-11-03T10:00:00Z"),
+            )
+            .unwrap();
+        setup.config.copilot = Enabled::Off;
+        assert_eq!(copilot_status(&setup.read()), Status::Unavailable);
+    }
+
+    #[test]
+    fn missing_gh_with_auto_is_not_set_up() {
+        let mut setup = Setup::new();
+        setup.config.gh_path = Some(setup.dir.path().join("no-such-gh"));
+        let today = setup.read();
+        assert!(table(&today).ends_with("unavailable (not set up)\n"));
+        assert_eq!(copilot_status(&today), Status::Unavailable);
+        assert!(!today.any_stale());
+    }
+
+    #[test]
+    fn stored_reasons_are_shown() {
+        for reason in ["no premium quota", "unlimited"] {
+            let setup = Setup::new();
+            setup
+                .store()
+                .record_unavailable(Provider::Copilot, ts("2026-11-03T10:00:00Z"), reason)
+                .unwrap();
+            let today = setup.read();
+            let expected = format!("unavailable ({reason})\n");
+            assert!(table(&today).ends_with(&expected), "{}", table(&today));
+            assert_eq!(copilot_status(&today), Status::Unavailable);
+            assert!(!today.any_stale());
+        }
+    }
+
+    #[test]
+    fn stored_reason_wins_over_older_snapshots() {
+        let setup = Setup::new();
+        let mut store = setup.store();
+        store
+            .record_run(
+                Provider::Copilot,
+                &[copilot_snapshot(180.0)],
+                ts("2026-11-02T10:00:00Z"),
+            )
+            .unwrap();
+        store
+            .record_unavailable(
+                Provider::Copilot,
+                ts("2026-11-03T10:00:00Z"),
+                "no premium quota",
+            )
+            .unwrap();
+        let today = setup.read();
+        assert_eq!(copilot_status(&today), Status::Unavailable);
+        assert!(today.report.providers[1].windows.is_empty());
+    }
+
+    #[test]
+    fn a_poll_error_after_the_reason_makes_copilot_stale_again() {
+        let setup = Setup::new();
+        let mut store = setup.store();
+        store
+            .record_unavailable(
+                Provider::Copilot,
+                ts("2026-11-03T09:00:00Z"),
+                "no premium quota",
+            )
+            .unwrap();
+        store
+            .record_error(Provider::Copilot, ts("2026-11-03T10:00:00Z"), "network")
+            .unwrap();
+        let today = setup.read();
+        assert_eq!(copilot_status(&today), Status::Stale);
+        assert!(today.any_stale());
+    }
+
+    #[test]
+    fn unknown_stored_reason_is_ignored() {
+        let setup = Setup::new();
+        setup
+            .store()
+            .record_unavailable(
+                Provider::Copilot,
+                ts("2026-11-03T10:00:00Z"),
+                "something new",
+            )
+            .unwrap();
+        assert_ne!(copilot_status(&setup.read()), Status::Unavailable);
+    }
+
+    #[test]
+    fn requests_are_formatted_as_used_over_limit() {
+        let setup = Setup::new();
+        setup
+            .store()
+            .record_run(
+                Provider::Copilot,
+                &[copilot_snapshot(180.0)],
+                ts("2026-11-03T10:00:00Z"),
+            )
+            .unwrap();
+        let today = setup.read();
+        let table = table(&today);
+        let row = table.lines().last().unwrap();
+        assert!(row.starts_with("copilot   monthly  180 / 300"), "{table}");
+        assert!(matches!(today.lines[1].state, State::Colour(_)), "{table}");
+    }
+
+    #[test]
+    fn never_collected_copilot_is_stale() {
+        let today = Setup::new().read();
+        assert_eq!(copilot_status(&today), Status::Stale);
+        assert!(table(&today).ends_with("stale, never collected\n"));
+        assert!(today.any_stale());
+    }
 }

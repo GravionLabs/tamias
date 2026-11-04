@@ -66,13 +66,20 @@ struct Env {
 
 impl Env {
     /// Claude set to `claude` (`true` or `false`) so no credential is probed.
+    ///
+    /// Copilot is `auto` and there is no `gh` (see [`Env::tamias`]): `unavailable`, not set up.
     fn new(claude: bool) -> Self {
+        Self::with_copilot(claude, "\"auto\"")
+    }
+
+    /// Like [`Env::new`] with the `copilot` setting `copilot` (a TOML value).
+    fn with_copilot(claude: bool, copilot: &str) -> Self {
         let env = Self {
             dir: tempfile::tempdir().unwrap(),
         };
         std::fs::write(
             env.path("config.toml"),
-            format!("[providers]\nclaude = {claude}\n"),
+            format!("[providers]\nclaude = {claude}\ncopilot = {copilot}\n"),
         )
         .unwrap();
         env
@@ -90,6 +97,7 @@ impl Env {
         let mut cmd = Command::cargo_bin("tamias").expect("binary tamias is built");
         cmd.env("TAMIAS_DATA_DIR", self.path("data"))
             .env("TAMIAS_CLAUDE_CREDENTIALS_FILE", self.path("missing.json"))
+            .env("TAMIAS_GH", self.path("no-such-gh"))
             .env("TZ", "UTC")
             .env_remove("NO_COLOR")
             .arg("--config")
@@ -169,7 +177,11 @@ fn claude_ok_is_valid() {
     assert_eq!(windows[1]["window"], "five_hour");
     assert_eq!(windows[1]["used"], 12.0);
     assert!(windows[1].get("budget").is_none());
-    assert_eq!(doc["providers"].as_array().unwrap().len(), 1, "no Copilot");
+    assert_eq!(
+        doc["providers"][1],
+        json!({"provider": "copilot", "status": "unavailable", "windows": []}),
+        "no gh"
+    );
 }
 
 #[test]
@@ -217,7 +229,10 @@ fn never_collected_claude_is_stale_without_windows() {
     assert_valid(&doc);
     assert_eq!(
         doc["providers"],
-        json!([{"provider": "claude", "status": "stale", "windows": []}])
+        json!([
+            {"provider": "claude", "status": "stale", "windows": []},
+            {"provider": "copilot", "status": "unavailable", "windows": []}
+        ])
     );
 }
 
@@ -228,13 +243,17 @@ fn unavailable_provider_is_valid() {
     assert_valid(&doc);
     assert_eq!(
         doc["providers"],
-        json!([{"provider": "claude", "status": "unavailable", "windows": []}])
+        json!([
+            {"provider": "claude", "status": "unavailable", "windows": []},
+            {"provider": "copilot", "status": "unavailable", "windows": []}
+        ])
     );
 }
 
 #[test]
 fn seeded_copilot_monthly_window_is_valid() {
-    let env = Env::new(false);
+    let env = Env::with_copilot(true, "true");
+    seed_claude(&mut env.store());
     let snapshots = [snap(Provider::Copilot, Window::Monthly, 120.0, 20 * 24)];
     env.store()
         .record_run(
@@ -249,6 +268,7 @@ fn seeded_copilot_monthly_window_is_valid() {
     let copilot = &doc["providers"][1];
     assert_eq!(copilot["provider"], "copilot");
     assert_eq!(copilot["status"], "ok");
+    assert_eq!(doc["providers"][0]["status"], "ok");
     let monthly = &copilot["windows"][0];
     assert_eq!(monthly["window"], "monthly");
     assert_eq!(monthly["unit"], "requests");
@@ -256,6 +276,59 @@ fn seeded_copilot_monthly_window_is_valid() {
     assert_eq!(monthly["used"], 120.0);
     assert_eq!(monthly["limit"], 300.0);
     assert!(monthly["budget"].is_number(), "{doc:#}");
+}
+
+#[test]
+fn copilot_unavailable_from_a_stored_reason_is_valid() {
+    for reason in ["no premium quota", "unlimited"] {
+        let env = Env::with_copilot(true, "true");
+        let mut store = env.store();
+        seed_claude(&mut store);
+        store
+            .record_unavailable(Provider::Copilot, Timestamp::now(), reason)
+            .unwrap();
+
+        let doc = env.json();
+
+        assert_valid(&doc);
+        assert_eq!(doc["providers"][0]["status"], "ok");
+        assert_eq!(
+            doc["providers"][1],
+            json!({"provider": "copilot", "status": "unavailable", "windows": []}),
+            "{reason}"
+        );
+    }
+}
+
+#[test]
+fn short_shows_both_providers() {
+    let env = Env::with_copilot(true, "true");
+    let mut store = env.store();
+    seed_claude(&mut store);
+    store
+        .record_run(
+            Provider::Copilot,
+            &[snap(Provider::Copilot, Window::Monthly, 120.0, 20 * 24)],
+            at(SignedDuration::from_secs(-60)),
+        )
+        .unwrap();
+
+    env.tamias()
+        .args(["today", "--short", "--color", "never"])
+        .assert()
+        .code(0)
+        .stdout("C 34% · CP 40%\n");
+}
+
+#[test]
+fn short_leaves_out_an_unavailable_provider() {
+    let env = Env::new(true);
+    seed_claude(&mut env.store());
+    env.tamias()
+        .args(["today", "--short", "--color", "never"])
+        .assert()
+        .code(0)
+        .stdout("C 34%\n");
 }
 
 #[test]

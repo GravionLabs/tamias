@@ -8,6 +8,7 @@ mod exit;
 mod service;
 mod short;
 mod today;
+mod unavailable;
 
 use std::io::{IsTerminal, Write};
 use std::path::PathBuf;
