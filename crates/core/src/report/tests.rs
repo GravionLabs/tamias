@@ -93,6 +93,7 @@ fn ok(provider: snapshot::Provider, at: &str) -> SourceStatus {
         last_ok_at: Some(ts(at)),
         last_error_at: None,
         last_error: None,
+        unavailable: None,
     }
 }
 
@@ -179,6 +180,7 @@ fn never_collected_is_stale_without_since_and_windows() {
         last_ok_at: None,
         last_error_at: Some(ts("2026-11-03T10:04:00Z")),
         last_error: Some("http 500".to_owned()),
+        unavailable: None,
     };
     let p = build(snapshot::Provider::Claude, &[], Some(&status));
     assert_eq!(p.status, Status::Stale);
@@ -195,6 +197,7 @@ fn failure_after_success_is_stale_with_grey_windows_but_numbers_kept() {
         last_ok_at: Some(ts("2026-11-03T10:00:00Z")),
         last_error_at: Some(ts("2026-11-03T10:04:00Z")),
         last_error: Some("network".to_owned()),
+        unavailable: None,
     };
     let p = build(snapshot::Provider::Claude, &claude(), Some(&status));
     assert_eq!(p.status, Status::Stale);
@@ -212,6 +215,7 @@ fn stale_reports_the_error_only_when_after_the_success() {
         last_ok_at: Some(ts("2026-11-03T10:00:00Z")),
         last_error_at: Some(ts("2026-11-03T09:55:00Z")),
         last_error: Some("timeout".to_owned()),
+        unavailable: None,
     };
     assert_eq!(stale(Some(&status), ts(NOW), &thresholds), None);
     status.last_error_at = Some(ts("2026-11-03T10:01:00Z"));

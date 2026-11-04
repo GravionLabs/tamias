@@ -3,6 +3,7 @@
 mod claude;
 mod collect;
 mod collect_log;
+mod copilot;
 mod exit;
 mod service;
 mod short;

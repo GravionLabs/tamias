@@ -115,7 +115,7 @@ fn client() -> UsageClient {
 
 /// Whether `url` is `http://` to exactly `127.0.0.1`, `localhost` or `[::1]` (any port, no
 /// userinfo).
-fn is_loopback(url: &str) -> bool {
+pub(crate) fn is_loopback(url: &str) -> bool {
     let Ok(uri) = url.parse::<http::Uri>() else {
         return false;
     };
