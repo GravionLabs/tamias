@@ -303,6 +303,38 @@ fn status_reads_the_last_run_from_the_store() {
 }
 
 #[test]
+fn status_reads_the_last_copilot_run_from_the_store() {
+    let (_dir, mut ok_store) = store();
+    ok_store
+        .record_ok(Provider::Copilot, ts("2026-11-03T10:05:00Z"))
+        .unwrap();
+    let text = execute(
+        Action::Status,
+        &FakeScheduler::default(),
+        || Ok(ok_store),
+        Path::new("l"),
+    )
+    .unwrap();
+    assert!(text.contains("copilot: last run 2026-11-03"), "{text}");
+    assert!(text.contains(" ok"), "{text}");
+    assert!(text.contains("claude: no run yet"), "{text}");
+
+    let (_dir, mut store) = store();
+    store
+        .record_error(Provider::Copilot, ts("2026-11-03T10:05:00Z"), "gh failed")
+        .unwrap();
+    let text = execute(
+        Action::Status,
+        &FakeScheduler::default(),
+        || Ok(store),
+        Path::new("l"),
+    )
+    .unwrap();
+    assert!(text.contains("copilot: last run 2026-11-03"), "{text}");
+    assert!(text.contains("error (gh failed)"), "{text}");
+}
+
+#[test]
 fn status_reports_a_store_that_cannot_be_opened() {
     let err = execute(
         Action::Status,
