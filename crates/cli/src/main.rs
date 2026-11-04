@@ -3,7 +3,6 @@
 mod claude;
 mod collect;
 mod collect_log;
-mod config;
 mod exit;
 mod service;
 mod short;
@@ -110,7 +109,7 @@ fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
         });
     }
-    let config = config::load(cli.config.as_deref())?;
+    let config = tamias_core::config::load(cli.config.as_deref())?;
     let data_dir = paths::data_dir()?;
     let database = data_dir.join(paths::DATABASE_FILE);
     tracing::debug!("database {}", database.display());
@@ -128,7 +127,7 @@ fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             let out = if args.json {
                 today::json(&today.report)?
             } else if args.short {
-                short::render(&today.lines, colour) + "\n"
+                short::render(&today.report, colour) + "\n"
             } else {
                 today::render(&today.lines, now, &tz, colour)
             };

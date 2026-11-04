@@ -1,184 +1,124 @@
 //! `tamias today --short`: one compact line for status lines and plugins.
 //!
-//! One segment per set-up provider, binding window only: `C 62%` (Claude seven-day used %),
-//! `CP 41%` (Copilot monthly used %), joined by ` · `. A stale provider (or one without data
-//! yet) is `C ?`; an unavailable provider is left out.
+//! The segments come from [`tamias_core::report::short`] (the tray shows the same line): one
+//! per set-up provider, binding window only, `C 62% · CP 41%`; a stale provider (or one without
+//! data yet) is `C ?`; an unavailable provider is left out. This module adds the ANSI colours.
 
-use tamias_core::budget::Colour;
-use tamias_core::snapshot::{Provider, Unit, Window};
+use tamias_core::report::Report;
+use tamias_core::report::short::{self, SEPARATOR};
 
-use crate::today::{self, Line, State};
+use crate::today;
 
-/// Separator between segments.
-const SEPARATOR: &str = " · ";
-
-/// Renders the short line of `lines`, without a trailing newline; `colour` adds ANSI colours
+/// Renders the short line of `report`, without a trailing newline; `colour` adds ANSI colours
 /// to each segment. Empty when no provider is set up.
 #[must_use]
-pub fn render(lines: &[Line], colour: bool) -> String {
-    lines
-        .iter()
-        .filter(|line| line.window == Some(binding_window(line.provider)))
-        .filter_map(|line| segment(line, colour))
+pub fn render(report: &Report, colour: bool) -> String {
+    short::segments(report)
+        .into_iter()
+        .map(|segment| match segment.colour.filter(|_| colour) {
+            Some(c) => format!("\x1b[{}m{}\x1b[0m", today::ansi(c), segment.text),
+            None => segment.text,
+        })
         .collect::<Vec<_>>()
         .join(SEPARATOR)
 }
 
-/// The window whose budget is binding for `provider`.
-fn binding_window(provider: Provider) -> Window {
-    match provider {
-        Provider::Claude => Window::SevenDay,
-        Provider::Copilot => Window::Monthly,
-    }
-}
-
-fn label(provider: Provider) -> &'static str {
-    match provider {
-        Provider::Claude => "C",
-        Provider::Copilot => "CP",
-    }
-}
-
-fn segment(line: &Line, colour: bool) -> Option<String> {
-    let label = label(line.provider);
-    let (text, ansi) = match &line.state {
-        State::Unavailable(_) => return None,
-        State::Stale { .. } => (format!("{label} ?"), Some(Colour::Grey)),
-        State::NoData => (format!("{label} ?"), None),
-        State::Colour(c) => match used_percent(line) {
-            Some(percent) => (format!("{label} {percent:.0}%"), Some(*c)),
-            None => (format!("{label} ?"), Some(*c)),
-        },
-    };
-    Some(match ansi.filter(|_| colour) {
-        Some(c) => format!("\x1b[{}m{text}\x1b[0m", today::ansi(c)),
-        None => text,
-    })
-}
-
-/// Used share of the window in percent.
-fn used_percent(line: &Line) -> Option<f64> {
-    let used = line.used?;
-    match line.unit {
-        Unit::Percent => Some(used),
-        Unit::Requests => line
-            .limit
-            .filter(|&limit| limit > 0.0)
-            .map(|limit| used / limit * 100.0),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use tamias_core::budget::Colour;
-    use tamias_core::snapshot::{Provider, Unit, Window};
+    use serde_json::json;
+    use tamias_core::report::Report;
 
     use super::render;
-    use crate::claude::Unavailable;
-    use crate::today::{Line, State, unavailable};
 
-    fn claude(window: Window, used: f64, state: State) -> Line {
-        Line {
-            provider: Provider::Claude,
-            window: Some(window),
-            unit: Unit::Percent,
-            used: Some(used),
-            limit: Some(100.0),
-            usage: None,
-            budget: None,
-            resets_at: None,
-            state,
-        }
+    /// A report document of `providers` (the JSON of `tamias today --json`).
+    fn report(providers: &serde_json::Value) -> Report {
+        Report::parse(
+            &json!({
+                "schema_version": 1,
+                "generated_at": "2026-11-03T10:05:00Z",
+                "providers": providers,
+            })
+            .to_string(),
+        )
+        .unwrap()
     }
 
-    fn copilot(used: f64, limit: f64, state: State) -> Line {
-        Line {
-            provider: Provider::Copilot,
-            window: Some(Window::Monthly),
-            unit: Unit::Requests,
-            used: Some(used),
-            limit: Some(limit),
-            usage: None,
-            budget: None,
-            resets_at: None,
-            state,
-        }
+    fn window(window: &str, unit: &str, used: f64, limit: f64, colour: &str) -> serde_json::Value {
+        json!({
+            "window": window,
+            "binding": window != "five_hour",
+            "unit": unit,
+            "used": used,
+            "limit": limit,
+            "resets_at": "2026-11-07T12:00:00Z",
+            "colour": colour,
+        })
     }
 
-    fn stale() -> State {
-        State::Stale {
-            since: None,
-            error: Some("network".to_owned()),
-        }
+    fn claude(status: &str, colour: &str) -> serde_json::Value {
+        json!({
+            "provider": "claude",
+            "status": status,
+            "windows": [
+                window("seven_day", "percent", 62.0, 100.0, colour),
+                window("five_hour", "percent", 12.0, 100.0, colour),
+            ],
+        })
     }
 
-    fn both_ok() -> Vec<Line> {
-        vec![
-            claude(Window::SevenDay, 62.0, State::Colour(Colour::Yellow)),
-            claude(Window::FiveHour, 12.0, State::Colour(Colour::Green)),
-            copilot(123.0, 300.0, State::Colour(Colour::Green)),
-        ]
+    fn copilot(colour: &str) -> serde_json::Value {
+        json!({
+            "provider": "copilot",
+            "status": "ok",
+            "windows": [window("monthly", "requests", 123.0, 300.0, colour)],
+        })
     }
 
     #[test]
-    fn both_providers_ok_show_the_binding_windows() {
-        assert_eq!(render(&both_ok(), false), "C 62% · CP 41%");
+    fn both_providers_ok_without_colour() {
+        let report = report(&json!([claude("ok", "yellow"), copilot("green")]));
+        assert_eq!(render(&report, false), "C 62% · CP 41%");
     }
 
     #[test]
     fn both_providers_ok_with_colour() {
+        let report = report(&json!([claude("ok", "yellow"), copilot("green")]));
         assert_eq!(
-            render(&both_ok(), true),
+            render(&report, true),
             "\x1b[33mC 62%\x1b[0m · \x1b[32mCP 41%\x1b[0m"
         );
     }
 
     #[test]
     fn stale_provider_is_a_grey_question_mark() {
-        let lines = vec![
-            claude(Window::SevenDay, 62.0, stale()),
-            claude(Window::FiveHour, 12.0, stale()),
-            copilot(123.0, 300.0, State::Colour(Colour::Red)),
-        ];
-        assert_eq!(render(&lines, false), "C ? · CP 41%");
+        let report = report(&json!([claude("stale", "grey"), copilot("red")]));
+        assert_eq!(render(&report, false), "C ? · CP 41%");
         assert_eq!(
-            render(&lines, true),
+            render(&report, true),
             "\x1b[90mC ?\x1b[0m · \x1b[31mCP 41%\x1b[0m"
         );
     }
 
     #[test]
     fn unavailable_provider_is_left_out() {
-        let lines = vec![
-            unavailable(Provider::Claude, Unavailable::NotSetUp),
-            copilot(123.0, 300.0, State::Colour(Colour::Green)),
-        ];
-        assert_eq!(render(&lines, true), "\x1b[32mCP 41%\x1b[0m");
+        let report = report(&json!([
+            { "provider": "claude", "status": "unavailable", "windows": [] },
+            copilot("green"),
+        ]));
+        assert_eq!(render(&report, true), "\x1b[32mCP 41%\x1b[0m");
     }
 
     #[test]
     fn nothing_set_up_is_an_empty_line() {
-        let lines = vec![unavailable(Provider::Claude, Unavailable::Disabled)];
-        assert_eq!(render(&lines, true), "");
-        assert_eq!(render(&[], false), "");
-    }
-
-    #[test]
-    fn without_colour_there_are_no_escape_codes() {
-        let line = render(&both_ok(), false);
-        assert!(!line.contains('\x1b'), "{line:?}");
+        let report = report(&json!([
+            { "provider": "claude", "status": "unavailable", "windows": [] },
+        ]));
+        assert_eq!(render(&report, true), "");
     }
 
     #[test]
     fn no_data_yet_is_an_uncoloured_question_mark() {
-        let mut line = claude(Window::SevenDay, 0.0, State::NoData);
-        line.used = None;
-        assert_eq!(render(&[line], true), "C ?");
-    }
-
-    #[test]
-    fn copilot_with_zero_limit_has_no_percent() {
-        let lines = vec![copilot(5.0, 0.0, State::Colour(Colour::Green))];
-        assert_eq!(render(&lines, false), "CP ?");
+        let report = report(&json!([{ "provider": "claude", "status": "ok", "windows": [] }]));
+        assert_eq!(render(&report, true), "C ?");
     }
 }

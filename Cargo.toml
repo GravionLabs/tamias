@@ -1,6 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["crates/core", "crates/cli"]
+members = ["crates/core", "crates/cli", "app/src-tauri"]
+# The desktop app needs the Tauri system libraries (webkit2gtk on Linux) and the built frontend
+# (app/dist); a plain `cargo build` or `cargo test` in the root leaves it out.
+default-members = ["crates/core", "crates/cli"]
 
 [workspace.package]
 version = "0.1.2"

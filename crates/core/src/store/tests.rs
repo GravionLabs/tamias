@@ -534,6 +534,84 @@ fn failed_run_on_a_busy_database_leaves_neither() {
     assert_eq!(store.status(Provider::Claude).unwrap(), None);
 }
 
+// --- read-only ---
+
+#[test]
+fn read_only_reads_what_the_writer_stored() {
+    let (_dir, path) = temp_db();
+    let mut writer = Store::open(&path).unwrap();
+    writer
+        .record_run(
+            Provider::Claude,
+            &[snapshot("2026-11-03T10:00:00Z", 12.0)],
+            ts("2026-11-03T10:00:01Z"),
+        )
+        .unwrap();
+
+    let reader = Store::open_read_only(&path).unwrap();
+    assert_eq!(all_claude_seven_day(&reader).len(), 1);
+    let status = reader.status(Provider::Claude).unwrap().unwrap();
+    assert_eq!(status.last_ok_at, Some(ts("2026-11-03T10:00:01Z")));
+
+    // Later commits of the collector are seen by the open reader.
+    writer
+        .insert_snapshots(&[snapshot("2026-11-03T11:00:00Z", 14.0)])
+        .unwrap();
+    assert_eq!(all_claude_seven_day(&reader).len(), 2);
+}
+
+#[test]
+fn read_only_does_not_create_a_missing_database() {
+    let (dir, path) = temp_db();
+    assert!(Store::open_read_only(&path).is_err());
+    assert!(!path.exists());
+    assert!(!dir.path().join("nested").exists());
+}
+
+#[test]
+fn read_only_cannot_write() {
+    let (_dir, path) = temp_db();
+    Store::open(&path).unwrap();
+    let mut reader = Store::open_read_only(&path).unwrap();
+    let err = reader
+        .insert_snapshots(&[snapshot("2026-11-03T10:00:00Z", 12.0)])
+        .unwrap_err();
+    assert!(matches!(err, Error::Sqlite(_)), "{err}");
+    assert!(all_claude_seven_day(&reader).is_empty());
+}
+
+#[test]
+fn read_only_does_not_migrate_and_rejects_a_newer_schema() {
+    let (_dir, path) = temp_db();
+    Store::open(&path).unwrap();
+    raw(&path).pragma_update(None, "user_version", 99).unwrap();
+
+    let err = Store::open_read_only(&path).unwrap_err();
+    assert!(
+        matches!(
+            err,
+            Error::SchemaTooNew {
+                found: 99,
+                supported: 1
+            }
+        ),
+        "{err}"
+    );
+    assert_eq!(user_version(&path), 99);
+}
+
+#[test]
+fn read_only_leaves_an_older_schema_unmigrated() {
+    let (_dir, path) = temp_db();
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    raw(&path).execute_batch("CREATE TABLE other (a)").unwrap();
+
+    let reader = Store::open_read_only(&path).unwrap();
+    assert!(reader.status(Provider::Claude).is_err());
+    assert_eq!(user_version(&path), 0);
+    assert_eq!(tables(&path), ["other"]);
+}
+
 // --- concurrency ---
 
 #[test]

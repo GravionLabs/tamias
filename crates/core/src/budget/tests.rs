@@ -4,7 +4,7 @@ use jiff::civil::{Date, date};
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 
-use super::{Colour, Status, Thresholds, day, level, today};
+use super::{Colour, Point, Status, Thresholds, day, intraday, level, today};
 use crate::snapshot::{Provider, Snapshot, Source, Unit, Window};
 
 fn ts(s: &str) -> Timestamp {
@@ -476,4 +476,155 @@ fn thresholds_split_green_yellow_red() {
     assert_eq!(custom.colour(0.49), Colour::Green);
     assert_eq!(custom.colour(0.5), Colour::Yellow);
     assert_eq!(custom.colour(0.91), Colour::Red);
+}
+
+fn curve(snaps: &[Snapshot], d: Date) -> Vec<Point> {
+    intraday(snaps, Provider::Claude, Window::SevenDay, d, &berlin())
+}
+
+fn usages(points: &[Point]) -> Vec<f64> {
+    points.iter().map(|p| p.usage).collect()
+}
+
+/// The invariants of every curve: starts at 0, never decreases, ends at the usage of `day`.
+fn assert_curve_of_day(snaps: &[Snapshot], d: Date, now: &str) {
+    let points = curve(snaps, d);
+    close(points[0].usage, 0.0);
+    assert!(
+        points
+            .windows(2)
+            .all(|w| w[0].at < w[1].at && w[0].usage <= w[1].usage)
+    );
+    close(
+        points.last().unwrap().usage,
+        claude_day(snaps, d, now).usage,
+    );
+}
+
+#[test]
+fn intraday_starts_at_zero_at_local_midnight_and_rises_with_the_snapshots() {
+    let snaps = [
+        week(25.0, WEEK, "2026-11-03T06:00:00Z"),
+        week(27.0, WEEK, "2026-11-03T20:00:00Z"),
+        week(30.0, WEEK, "2026-11-04T07:00:00Z"),
+        week(33.0, WEEK, "2026-11-04T09:00:00Z"),
+    ];
+    let points = curve(&snaps, date(2026, 11, 4));
+    let at: Vec<Timestamp> = points.iter().map(|p| p.at).collect();
+    assert_eq!(
+        at,
+        [
+            ts("2026-11-03T23:00:00Z"),
+            ts("2026-11-04T07:00:00Z"),
+            ts("2026-11-04T09:00:00Z")
+        ]
+    );
+    assert_eq!(usages(&points), [0.0, 3.0, 6.0]);
+    assert_curve_of_day(&snaps, date(2026, 11, 4), "2026-11-04T09:00:00Z");
+}
+
+#[test]
+fn intraday_lower_value_after_a_higher_one_adds_nothing() {
+    let snaps = [
+        week(10.0, WEEK, "2026-11-03T20:00:00Z"),
+        week(14.0, WEEK, "2026-11-04T07:00:00Z"),
+        week(12.0, WEEK, "2026-11-04T08:00:00Z"),
+        week(15.0, WEEK, "2026-11-04T09:00:00Z"),
+    ];
+    assert_eq!(
+        usages(&curve(&snaps, date(2026, 11, 4))),
+        [0.0, 4.0, 4.0, 5.0]
+    );
+    assert_curve_of_day(&snaps, date(2026, 11, 4), "2026-11-04T09:00:00Z");
+}
+
+#[test]
+fn intraday_reset_during_the_day_continues_the_sum() {
+    let snaps = reset_day_snapshots();
+    // 93 (baseline) -> 95 (+2) -> 95 -> new window 0 (+0) -> 1.5 (+1.5)
+    assert_eq!(
+        usages(&curve(&snaps, date(2026, 11, 9))),
+        [0.0, 2.0, 2.0, 2.0, 3.5]
+    );
+    assert_curve_of_day(&snaps, date(2026, 11, 9), "2026-11-09T22:30:00Z");
+}
+
+#[test]
+fn intraday_equal_instants_make_one_point_and_later_days_do_not_count() {
+    let snaps = [
+        week(10.0, WEEK, "2026-11-03T20:00:00Z"),
+        week(12.0, WEEK, "2026-11-04T07:00:00Z"),
+        week(13.0, WEEK, "2026-11-04T07:00:00Z"),
+        week(40.0, WEEK, "2026-11-04T23:30:00Z"), // Nov 5, 00:30 local
+    ];
+    assert_eq!(usages(&curve(&snaps, date(2026, 11, 4))), [0.0, 3.0]);
+}
+
+#[test]
+fn intraday_without_a_snapshot_of_the_day_is_empty() {
+    assert!(curve(&[], date(2026, 11, 4)).is_empty());
+    let snaps = [week(10.0, WEEK, "2026-11-03T20:00:00Z")];
+    assert!(curve(&snaps, date(2026, 11, 4)).is_empty());
+}
+
+#[test]
+fn intraday_ignores_other_series() {
+    let snaps = [
+        week(10.0, WEEK, "2026-11-03T20:00:00Z"),
+        week(12.0, WEEK, "2026-11-04T07:00:00Z"),
+        copilot(250.0, "2026-11-04T08:00:00Z"),
+        snap(
+            Window::FiveHour,
+            90.0,
+            WEEK,
+            "2026-11-04T09:00:00Z",
+            Source::Poll,
+        ),
+    ];
+    assert_eq!(usages(&curve(&snaps, date(2026, 11, 4))), [0.0, 2.0]);
+}
+
+#[test]
+fn intraday_on_the_23_hour_dst_start_day_runs_from_local_midnight() {
+    let old = "2027-03-28T20:00:00Z";
+    let new = "2027-04-04T20:00:00Z";
+    let snaps = [
+        week(90.0, old, "2027-03-27T22:30:00Z"),
+        week(91.0, old, "2027-03-27T23:30:00Z"), // 00:30 CET, Mar 28
+        week(92.0, old, "2027-03-28T19:00:00Z"),
+        week(2.0, new, "2027-03-28T21:00:00Z"), // 23:00 CEST
+    ];
+    let points = curve(&snaps, date(2027, 3, 28));
+    assert_eq!(points[0].at, ts("2027-03-27T23:00:00Z")); // 00:00 CET
+    assert_eq!(points.last().unwrap().at, ts("2027-03-28T21:00:00Z"));
+    assert_curve_of_day(&snaps, date(2027, 3, 28), "2027-03-28T21:00:00Z");
+}
+
+#[test]
+fn intraday_on_the_25_hour_dst_end_day_starts_at_local_midnight() {
+    let old = "2026-10-25T21:00:00Z";
+    let new = "2026-11-01T21:00:00Z";
+    let snaps = [
+        week(80.0, old, "2026-10-24T21:30:00Z"),
+        week(84.0, old, "2026-10-25T10:00:00Z"),
+        week(3.0, new, "2026-10-25T22:30:00Z"),
+    ];
+    let points = curve(&snaps, date(2026, 10, 25));
+    assert_eq!(points[0].at, ts("2026-10-24T22:00:00Z")); // 00:00 CEST
+    assert_eq!(usages(&points), [0.0, 4.0, 7.0]);
+    assert_curve_of_day(&snaps, date(2026, 10, 25), "2026-10-25T22:30:00Z");
+}
+
+#[test]
+fn intraday_across_the_year_boundary_belongs_to_the_local_day() {
+    let resets = "2027-01-05T21:00:00Z";
+    let snaps = [
+        week(50.0, resets, "2026-12-31T22:30:00Z"), // 23:30 CET, Dec 31
+        week(52.0, resets, "2026-12-31T23:30:00Z"), // 00:30 CET, Jan 1
+        week(55.0, resets, "2027-01-01T10:00:00Z"),
+    ];
+    let points = curve(&snaps, date(2027, 1, 1));
+    assert_eq!(points[0].at, ts("2026-12-31T23:00:00Z"));
+    assert_eq!(usages(&points), [0.0, 2.0, 5.0]);
+    assert_curve_of_day(&snaps, date(2027, 1, 1), "2027-01-01T10:00:00Z");
 }

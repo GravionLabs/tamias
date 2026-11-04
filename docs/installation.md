@@ -93,6 +93,16 @@ tamias service uninstall   # remove the registration (exits 0 with a note when t
 | Linux | systemd user timer `tamias-collect.timer` and service `tamias-collect.service` | `$XDG_CONFIG_HOME/systemd/user/` (default `~/.config/systemd/user/`) |
 | Windows | Task Scheduler task `\GravionLabs\tamias-collect`, every 5 minutes | Task Scheduler, runs `tamiasw.exe` |
 
+### From the desktop app
+
+The desktop app only reads; collecting stays the scheduled `tamias collect`. Its bundle ships the `tamias` CLI of the same version (on Windows also `tamiasw.exe`), so the app can set up collection without a separate CLI install:
+
+- On the first start without data and without a registered collector, the calendar asks "Collection is not set up — set up now?". Settings shows the status with "Set up" and "Remove" at any time.
+- "Set up" runs `tamias service install` of the bundled CLI, so the scheduler runs the CLI inside the installed app: `tamias.app/Contents/MacOS/tamias` on macOS, `tamiasw.exe` in the install directory on Windows. On Linux the AppImage is mounted at a new path on every start, so the app first copies the CLI to `~/.local/bin/tamias` (replacing an older copy) and the systemd unit runs that copy.
+- A collector you registered with a CLI from the archives keeps working: the app shows it as set up and does not replace it.
+- Every call of the CLI is limited to 10 seconds; a call that fails or does not answer shows as an error with its message.
+- Removing the app does not remove the collector; run "Remove" in the settings (or `tamias service uninstall`) first.
+
 ### The collect log
 
 Every scheduled run appends one line per provider to `logs/collect.log` in the data directory: time, provider, `ok` or `error`, a short message. A fatal error (invalid config, unreadable data directory or store) is one line too, `error fatal: <reason>`. It is not stored as a provider result, so `tamias today` and `tamias service status` are unaffected; the config path is left out of it. It never contains a token. Above 1 MiB the file is rotated to `collect.log.1` (one generation is kept). The scheduler's own stdout and stderr are discarded; this file is the log.

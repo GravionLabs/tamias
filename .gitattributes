@@ -1,3 +1,5 @@
 # Pinned fixtures are compared byte-for-byte; keep LF on every platform.
 docs/schema/*.json text eol=lf
 crates/core/tests/fixtures/** text eol=lf
+# Prettier checks the app sources for LF on every platform, also on Windows checkouts.
+app/** text=auto eol=lf

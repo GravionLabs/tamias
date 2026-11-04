@@ -1,0 +1,47 @@
+:host {
+  display: block;
+  padding: 24px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.muted {
+  color: var(--h-text-muted-color);
+  margin-left: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hint {
+  color: var(--h-text-muted-color);
+  margin: 4px 0 0;
+}
+
+h2 {
+  margin: 24px 0 4px;
+  font-size: 1.15rem;
+}
+
+.collection {
+  margin-top: 8px;
+}
+
+.collection .state {
+  flex: 1;
+}
