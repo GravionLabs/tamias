@@ -72,11 +72,11 @@ C 62% · CP 41%
 | Code | Meaning (`tamias collect`, `tamiasw` and `tamias today`) |
 | --- | --- |
 | 0 | every set-up provider is ok (unavailable providers do not count) |
-| 1 | error: tamias could not run (invalid config, unreadable store); collect also writes it to collect.log and the store |
+| 1 | error: tamias could not run (invalid config, unreadable store); collect writes it to collect.log only, no provider turns stale |
 | 2 | invalid command line |
 | 3 | at least one set-up provider is not fresh (collect: its poll failed, recorded in the store and collect.log; today: it is stale) |
 
-`tamiasw` is `collect` without a console window and uses the same codes. With 3 from `today` the output is still printed in full, so a consumer can show the stale state itself instead of failing. Only 1 and 2 print nothing on stdout.
+`tamiasw` is `collect` without a console window and uses the same codes. With 3 from `today` the output is still printed in full, so a consumer can show the stale state itself instead of failing. Only 1 and 2 print nothing on stdout. A fatal error of `collect` (1) is logged to `collect.log` without the config path and is not stored, so the next `today` reports a provider stale only for its own failed or outdated poll; a provider that was fine stays fine until `stale_after` passes.
 
 ## Compatibility rule
 

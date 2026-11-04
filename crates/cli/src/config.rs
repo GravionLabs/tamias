@@ -49,6 +49,14 @@ pub struct Error {
     message: String,
 }
 
+impl Error {
+    /// What is wrong, without the path of the file.
+    #[must_use]
+    pub fn reason(&self) -> &str {
+        &self.message
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

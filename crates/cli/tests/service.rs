@@ -156,24 +156,18 @@ fn service_status_shows_the_last_run_and_the_log_path() {
 }
 
 #[test]
-fn a_fatal_error_of_collect_is_logged_and_shown_by_service_status() {
+fn a_fatal_error_of_collect_is_logged_without_the_config_path() {
     let env = Env::new();
     fs::write(env.path("config.toml"), "bogus_key = 1\n").unwrap();
     env.tamias().arg("collect").assert().code(1);
     let log = fs::read_to_string(env.log_path()).unwrap();
     assert!(log.contains(" claude error fatal: "), "{log}");
     assert!(log.contains("bogus_key"), "{log}");
+    assert!(
+        !log.contains(env.path("config.toml").to_str().unwrap()),
+        "{log}"
+    );
     assert_eq!(log.lines().count(), 1, "{log}");
-    #[cfg(target_os = "macos")]
-    {
-        fs::write(env.path("config.toml"), "").unwrap();
-        env.tamias()
-            .args(["service", "status"])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("claude: last run "))
-            .stdout(predicate::str::contains("error (fatal: "));
-    }
 }
 
 #[test]

@@ -69,9 +69,9 @@ pub fn run(
 
 /// A whole collect run as the binaries start it: loads the config, opens the store and runs.
 ///
-/// A fatal error (invalid config, data directory, store) is appended to the collect log and,
-/// when the store can be opened, recorded there as the last error of the provider, so that
-/// `tamias service status` shows it. Neither step fails the run further.
+/// A fatal error (invalid config, data directory, store) is appended to the collect log, without
+/// the config path. It is not written to the store: it is not a failure of Claude, so the next
+/// `tamias today` does not report Claude as stale because of it.
 ///
 /// # Errors
 ///
@@ -81,11 +81,12 @@ pub fn run_logged(config_path: Option<&Path>) -> Result<Outcome, Box<dyn std::er
     let result = run_in(config_path, data_dir.as_deref().ok());
     if let (Err(e), Ok(dir)) = (&result, &data_dir) {
         let now = Timestamp::now();
-        let message = fatal_message(&e.to_string());
+        let text = match e.downcast_ref::<config::Error>() {
+            Some(config_error) => format!("invalid config: {}", config_error.reason()),
+            None => e.to_string(),
+        };
+        let message = fatal_message(&text);
         CollectLog::in_data_dir(dir).record(now, Provider::Claude, RunResult::Error, &message);
-        if let Ok(mut store) = Store::open(dir.join(paths::DATABASE_FILE)) {
-            let _ = store.record_error(Provider::Claude, now, &message);
-        }
     }
     result
 }
