@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitepress';
 import { REPOSITORY, repoLinks } from './repo-links.mts';
-import { PAGES, adrItems } from './sidebar.mts';
+import { PAGES, isAdr } from './sidebar.mts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -13,8 +13,9 @@ const vitepressRequire = createRequire(require.resolve('vitepress/package.json')
 const repoRoot = resolve(here, '../..');
 const docsRoot = resolve(repoRoot, 'docs');
 
-// Every existing file of docs/ is on the site; a link to anything else in the repository goes to GitHub.
-const isOnSite = (absolutePath: string) => existsSync(absolutePath);
+// Every existing file of docs/ except the ADRs is on the site; a link to anything else in the repository goes to GitHub.
+const adrRoot = resolve(docsRoot, 'adr');
+export const isOnSite = (absolutePath: string) => existsSync(absolutePath) && !isAdr(absolutePath, adrRoot);
 
 // On GitHub Pages the site is at https://<owner>.github.io/<repository>/, so every address needs that prefix.
 const base = process.env['SITE_BASE'] ?? '/';
@@ -27,6 +28,8 @@ export default defineConfig({
   base,
   // docs/ is the only source: nothing is copied.
   srcDir: '../docs',
+  // The ADRs stay in the repository (ADR 0003): no page, no sidebar entry, no search entry.
+  srcExclude: ['adr/**'],
   cleanUrls: true,
   lastUpdated: false,
   // Dead links fail the build (no ignoreDeadLinks), so a broken link in any pull request is found by CI.
@@ -50,12 +53,10 @@ export default defineConfig({
     nav: [
       { text: 'Consumers', link: '/consumers' },
       { text: 'Usage sources', link: '/sources' },
-      { text: 'Decisions', link: '/adr/0001-usage-collector-architecture' },
       { text: 'Roadmap', link: '/roadmap' },
     ],
     sidebar: [
       { text: 'tamias', items: [...PAGES] },
-      { text: 'Decisions (ADRs)', items: adrItems(docsRoot) },
     ],
     socialLinks: [{ icon: 'github', link: REPOSITORY }],
     search: { provider: 'local' },

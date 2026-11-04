@@ -48,17 +48,31 @@ impl Env {
         self.path("data").join("logs").join("collect.log")
     }
 
+    /// Points the config dir, data dir and home of every OS at the temp dir, so a command without
+    /// `--config` never reads the developer's real config. `TAMIAS_CONFIG_DIR` is what covers
+    /// Windows, where the OS config dir comes from a known-folder API that ignores env vars.
+    fn isolate<'a>(&self, cmd: &'a mut Command) -> &'a mut Command {
+        let home = self.path("home");
+        cmd.env("TAMIAS_DATA_DIR", self.path("data"))
+            .env("TAMIAS_CONFIG_DIR", self.dir.path())
+            .env("HOME", &home)
+            .env("USERPROFILE", &home)
+            .env("XDG_CONFIG_HOME", self.path("xdg-config"))
+            .env("XDG_DATA_HOME", self.path("xdg-data"))
+            .env("APPDATA", self.path("appdata"))
+            .env("LOCALAPPDATA", self.path("localappdata"))
+            .env_remove("CLAUDE_CONFIG_DIR")
+    }
+
     fn tamias(&self) -> Command {
         let mut cmd = Command::cargo_bin("tamias").expect("binary tamias is built");
-        cmd.env("TAMIAS_DATA_DIR", self.path("data"))
+        self.isolate(&mut cmd)
             .env(
                 "TAMIAS_CLAUDE_CREDENTIALS_FILE",
                 self.path("credentials.json"),
             )
             .env("TAMIAS_CLAUDE_USAGE_URL", closed_url())
-            .env("HOME", self.path("home"))
             .env("TZ", "UTC")
-            .env_remove("CLAUDE_CONFIG_DIR")
             .arg("--config")
             .arg(self.path("config.toml"));
         cmd
@@ -105,14 +119,12 @@ fn tamiasw_runs_collect_with_the_same_exit_code_and_log() {
     let env = Env::new();
     env.write_credentials();
     let mut cmd = Command::cargo_bin("tamiasw").expect("binary tamiasw is built");
-    cmd.env("TAMIAS_DATA_DIR", env.path("data"))
+    env.isolate(&mut cmd)
         .env(
             "TAMIAS_CLAUDE_CREDENTIALS_FILE",
             env.path("credentials.json"),
         )
         .env("TAMIAS_CLAUDE_USAGE_URL", closed_url())
-        .env("HOME", env.path("home"))
-        .env_remove("CLAUDE_CONFIG_DIR")
         .assert()
         .code(3);
     let log = fs::read_to_string(env.log_path()).unwrap();
@@ -156,24 +168,21 @@ fn service_status_shows_the_last_run_and_the_log_path() {
 }
 
 #[test]
-fn a_fatal_error_of_collect_is_logged_and_shown_by_service_status() {
+fn a_fatal_error_of_collect_is_logged_without_the_config_path() {
     let env = Env::new();
     fs::write(env.path("config.toml"), "bogus_key = 1\n").unwrap();
     env.tamias().arg("collect").assert().code(1);
     let log = fs::read_to_string(env.log_path()).unwrap();
     assert!(log.contains(" claude error fatal: "), "{log}");
     assert!(log.contains("bogus_key"), "{log}");
+    assert!(
+        !log.contains(env.path("config.toml").to_str().unwrap()),
+        "{log}"
+    );
     assert_eq!(log.lines().count(), 1, "{log}");
-    #[cfg(target_os = "macos")]
-    {
-        fs::write(env.path("config.toml"), "").unwrap();
-        env.tamias()
-            .args(["service", "status"])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("claude: last run "))
-            .stdout(predicate::str::contains("error (fatal: "));
-    }
+    // The config fails to load before the store is created, so no database exists to show an
+    // error to `service status`.
+    assert!(!env.path("data").join("tamias.db").exists());
 }
 
 #[test]
@@ -181,13 +190,8 @@ fn a_fatal_error_of_tamiasw_is_logged() {
     let env = Env::new();
     // A directory where the database file belongs: the store cannot be opened.
     fs::create_dir_all(env.path("data").join("tamias.db")).unwrap();
-    Command::cargo_bin("tamiasw")
-        .expect("binary tamiasw is built")
-        .env("TAMIAS_DATA_DIR", env.path("data"))
-        .env("HOME", env.path("home"))
-        .env_remove("CLAUDE_CONFIG_DIR")
-        .assert()
-        .code(1);
+    let mut cmd = Command::cargo_bin("tamiasw").expect("binary tamiasw is built");
+    env.isolate(&mut cmd).assert().code(1);
     let log = fs::read_to_string(env.log_path()).unwrap();
     assert!(log.contains(" claude error fatal: "), "{log}");
 }

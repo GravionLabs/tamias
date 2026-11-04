@@ -1,9 +1,10 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { resolveConfig } from 'vitepress';
 import { REPOSITORY, repoUrl, rewriteLink } from '../.vitepress/repo-links.mts';
-import { adrItems, adrTitle, titleOf } from '../.vitepress/sidebar.mts';
+import { isAdr, titleOf } from '../.vitepress/sidebar.mts';
 
 /** A small repository: docs/ with pages, ADRs and a left-out folder, crates with a fixture, a README. */
 function repository() {
@@ -92,38 +93,52 @@ describe('the sidebar', () => {
     expect(titleOf('', 'empty.md')).toBe('empty.md');
   });
 
-  it('shortens the title of an ADR', () => {
-    expect(adrTitle('ADR 0001: Usage collector architecture')).toBe(
-      '0001 Usage collector architecture',
-    );
-    expect(adrTitle('Something else')).toBe('Something else');
-  });
-
-  it('ignores files of docs/adr that are not numbered ADRs', () => {
+  it('recognises a path inside the ADR folder', () => {
     const { docs } = repository();
-    writeFileSync(join(docs, 'adr/README.md'), '# ADRs\n');
-    writeFileSync(join(docs, 'adr/0002-second.md'), 'no heading\n');
+    const adr = join(docs, 'adr');
+    expect(isAdr(join(adr, '0001-x.md'), adr)).toBe(true);
+    expect(isAdr(adr, adr)).toBe(true);
+    expect(isAdr(join(docs, 'adr-notes.md'), adr)).toBe(false);
+    expect(isAdr(join(docs, 'sources.md'), adr)).toBe(false);
+  });
+});
 
-    expect(adrItems(docs)).toEqual([
-      { text: '0001 Collector', link: '/adr/0001-usage-collector-architecture' },
-      { text: '0002-second.md', link: '/adr/0002-second' },
-    ]);
+describe('the site without ADRs', () => {
+  const repoDocs = resolve(import.meta.dirname, '../../docs');
+
+  it('excludes docs/adr from the build, the sidebar, the nav and the search', async () => {
+    const { default: config } = await import('../.vitepress/config.mts');
+    const links = JSON.stringify([config.themeConfig?.nav, config.themeConfig?.sidebar]);
+
+    expect(config.srcExclude).toContain('adr/**');
+    expect(links).not.toContain('/adr/');
+    expect(links).not.toContain('Decisions');
   });
 
-  it('fails when docs/adr is missing', () => {
-    const empty = mkdtempSync(join(tmpdir(), 'tamias-site-empty-'));
-    expect(() => adrItems(empty)).toThrow();
+  it('keeps no page of the site linking to an ADR page', () => {
+    for (const file of readdirSync(repoDocs).filter((name) => name.endsWith('.md'))) {
+      const text = readFileSync(join(repoDocs, file), 'utf8');
+      expect(text, file).not.toMatch(/\]\(\/adr\/|link:\s*\/adr\//);
+    }
   });
 
-  it('lists every ADR of the repository in number order', () => {
-    const items = adrItems(resolve(import.meta.dirname, '../../docs'));
+  it('produces no ADR page, while the other documents are pages', async () => {
+    const site = await resolveConfig(resolve(import.meta.dirname, '..'), 'build', 'production');
 
-    expect(items.length).toBeGreaterThanOrEqual(2);
-    expect(items[0]).toEqual({
-      text: '0001 Usage collector architecture',
-      link: '/adr/0001-usage-collector-architecture',
-    });
-    expect(items[1]?.link).toBe('/adr/0002-documentation-site');
-    expect(items.map((item) => item.link)).toEqual([...items.map((item) => item.link)].sort());
+    expect(site.pages).toContain('sources.md');
+    expect(site.pages.filter((page) => page.startsWith('adr/'))).toEqual([]);
+  });
+
+  it('sends a link from a page to an ADR to GitHub', async () => {
+    const { isOnSite } = await import('../.vitepress/config.mts');
+    const repoRoot = resolve(import.meta.dirname, '../..');
+    const docs = join(repoRoot, 'docs');
+    const adr = readdirSync(join(docs, 'adr')).find((name) => name.endsWith('.md'))!;
+
+    expect(isOnSite(join(docs, 'sources.md'))).toBe(true);
+    expect(isOnSite(join(docs, 'adr', adr))).toBe(false);
+    expect(rewriteLink(`./adr/${adr}`, join(docs, 'index.md'), repoRoot, docs, isOnSite)).toBe(
+      `${REPOSITORY}/blob/main/docs/adr/${adr}`,
+    );
   });
 });

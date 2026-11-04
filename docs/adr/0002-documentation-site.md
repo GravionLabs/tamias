@@ -1,6 +1,6 @@
 # ADR 0002: Documentation site: VitePress on GitHub Pages, with `docs/` as the only source
 
-- Status: Accepted
+- Status: Superseded in part by ADR 0003 (the ADRs are no longer pages of the site)
 - Date: 2026-11-02
 - Builds on: [ADR 0001](0001-usage-collector-architecture.md), the documentation sites of [elysion](https://github.com/GravionLabs/elysion) (its ADR 0022) and [helix](https://github.com/GravionLabs/helix)
 
@@ -11,7 +11,7 @@ tamias is a public repository. Its users need to know what it shows, how to inst
 ## Decision
 
 - **VitePress in `site/`** (a private npm package, `pnpm`), whose `srcDir` is `../docs`: nothing is copied. tamias is a Cargo workspace; `site/` is its only Node project.
-- **Contents:** `docs/index.md` (landing page), installation per platform, configuration (thresholds, polling interval), the JSON schema of `tamias today --json` and how consumers use it, the data sources and their stability, and the ADRs. The ADR sidebar is read from `docs/adr` (number and first heading), so a new ADR needs no change to the site.
+- **Contents:** `docs/index.md` (landing page), installation per platform, configuration (thresholds, polling interval), the JSON schema of `tamias today --json` and how consumers use it, the data sources and their stability. (Superseded by ADR 0003: the ADRs were listed here with a sidebar read from `docs/adr`; they are no longer part of the site.)
 - **Links to files outside the site** (README, `crates/…`, `app/…`) are rewritten to `https://github.com/GravionLabs/tamias/blob/main/<path>` by a small markdown-it plugin, taken over from elysion with its tests. VitePress's **dead link check fails the build**.
 - **Published at `https://gravionlabs.github.io/tamias/`** by `.github/workflows/pages.yml`, structured like elysion's: pull requests that touch `site/`, `docs/` or the workflow build the site; only `main` deploys, and only while the repository variable `DEPLOY_PAGES` is `true`, with the Pages source set to "GitHub Actions". `SITE_BASE` is `/<repository>/`. Actions are pinned by commit SHA.
 - **No demo on the site** for now. A static preview of the Tauri calendar with sample data (like helix's `/demo/`) can be added later under `/demo/`.

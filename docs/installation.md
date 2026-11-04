@@ -69,7 +69,7 @@ Open a new terminal for the changed `PATH` to apply. Windows SmartScreen may war
 
 ```sh
 tamias --version
-tamias collect    # poll Claude once and store (Copilot follows with [#5](https://github.com/GravionLabs/tamias/issues/5)) the snapshots
+tamias collect    # poll Claude once and store the snapshots (Copilot follows with [#5](https://github.com/GravionLabs/tamias/issues/5))
 tamias today      # today's usage against the daily budget
 ```
 
@@ -95,7 +95,7 @@ tamias service uninstall   # remove the registration (exits 0 with a note when t
 
 ### The collect log
 
-Every scheduled run appends one line per provider to `logs/collect.log` in the data directory: time, provider, `ok` or `error`, a short message. A fatal error (invalid config, unreadable data directory or store) is one line too, `error fatal: <reason>`, and `tamias service status` shows it as the last result when the store can be opened. It never contains a token. Above 1 MiB the file is rotated to `collect.log.1` (one generation is kept). The scheduler's own stdout and stderr are discarded; this file is the log.
+Every scheduled run appends one line per provider to `logs/collect.log` in the data directory: time, provider, `ok` or `error`, a short message. A fatal error (invalid config, unreadable data directory or store) is one line too, `error fatal: <reason>`. It is not stored as a provider result, so `tamias today` and `tamias service status` are unaffected; the config path is left out of it. It never contains a token. Above 1 MiB the file is rotated to `collect.log.1` (one generation is kept). The scheduler's own stdout and stderr are discarded; this file is the log.
 
 | Platform | Data directory | Collect log |
 |----------|----------------|-------------|
@@ -107,7 +107,7 @@ Every scheduled run appends one line per provider to `logs/collect.log` in the d
 
 ### Check the last run
 
-`tamias service status` prints the registration, the executable, the last run of Claude (Copilot is not polled yet; it is marked as coming with #5) (from the store) and the log path. For the history, read the end of the log:
+`tamias service status` prints the registration, the executable, the last run of Claude (from the store; Copilot is not polled yet, it comes with [#5](https://github.com/GravionLabs/tamias/issues/5)) and the log path. For the history, read the end of the log:
 
 ```text
 2026-11-03T10:15:42Z claude ok stored 2 snapshots
