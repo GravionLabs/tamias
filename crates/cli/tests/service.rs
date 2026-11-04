@@ -166,9 +166,7 @@ fn service_status_shows_the_last_run_and_the_log_path() {
         .assert()
         .success()
         .stdout(predicate::str::contains("claude: last run "))
-        .stdout(predicate::str::contains(
-            "copilot: not polled yet (coming with #5)",
-        ))
+        .stdout(predicate::str::contains("copilot: "))
         .stdout(predicate::str::contains(format!(
             "log: {}",
             env.log_path().display()
