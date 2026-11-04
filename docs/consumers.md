@@ -45,7 +45,7 @@ Prints one JSON document, never coloured, described by the [JSON Schema](https:/
 | `schema_version` | Version of the format, `1`. Check it first. |
 | `generated_at` | When the report was made (RFC 3339, UTC). |
 | `providers[].provider` | `claude` or `copilot`. |
-| `providers[].status` | `ok`; `stale` (last collect failed or is older than `stale_after`); `unavailable` (not set up, no windows). |
+| `providers[].status` | `ok`; `stale` (last collect failed or is older than `stale_after`); `unavailable` (no windows; the reason is shown by `tamias today`: not set up, disabled, or for Copilot a seat without a countable quota, `no premium quota` or `unlimited`). |
 | `providers[].stale_since` | Last successful collect of a stale provider; absent when there never was one. |
 | `windows[].window` | `seven_day` and `five_hour` (Claude), `monthly` (Copilot). |
 | `windows[].binding` | Whether the window has a daily budget: Claude `seven_day` and Copilot `monthly`. |

@@ -192,7 +192,8 @@ Pending rows go into a follow-up PBI; nothing in them was run or assumed.
 - **Failure modes:** invalid token: HTTP 401 `{"message":"Bad credentials",...}` (`user-unauthorized.json`).
   Other cases (account without Copilot, 403 for managed seats, 404) not observed.
 - **Verdict (macOS, personal free seat):** **Use as primary**; works with the gh token, undocumented, so
-  parse tolerantly. Quota semantics for paid/managed seats **pending**.
+  parse tolerantly. Quota semantics for paid/managed seats **pending**. Implemented: tamias polls it
+  with the `gh` token; a seat with `has_quota` false or `unlimited` true is stored as `unavailable`.
 
 ### `GET /users/{username}/settings/billing/premium_request/usage?year=&month=[&day=]`
 
@@ -204,7 +205,7 @@ Pending rows go into a follow-up PBI; nothing in them was run or assumed.
   usage", "missing permission" and "not available for free seat". Fine-grained PAT (documented permission
   "Plan" read) was **not tried**; the `X-Accepted-GitHub-Permissions` header was empty.
 - **Fields used:** none; no successful response was seen.
-- **Verdict:** **not usable on the owner's seat as tested.** The billing fallback is unconfirmed: it
+- **Verdict:** **not usable on the owner's seat as tested; dropped for v1.** The billing fallback is unconfirmed: it
   returned nothing for a free personal seat with a classic PAT and a gh token, and nothing was run
   for a paid personally billed or enterprise-managed seat (pending). Do not build on it for v1;
   `copilot_internal/user` is the only source, and `stale` carries the risk (ADR 0001).
