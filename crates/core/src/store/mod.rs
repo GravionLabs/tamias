@@ -19,7 +19,10 @@ use crate::snapshot::{Provider, Snapshot, Window};
 mod tests;
 
 /// Migration scripts; script `i` (0-based) brings the schema to `user_version` `i + 1`.
-const MIGRATIONS: &[&str] = &[include_str!("migrations/0001_init.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("migrations/0001_init.sql"),
+    include_str!("migrations/0002_unavailable.sql"),
+];
 
 /// Default bound for a wait on the database lock.
 pub const DEFAULT_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
@@ -94,6 +97,9 @@ pub struct SourceStatus {
     pub last_error_at: Option<Timestamp>,
     /// Message of the last failure, when one was recorded.
     pub last_error: Option<String>,
+    /// Why the provider has no countable quota (for example `no premium quota`), set by the
+    /// last successful poll; `None` when the last poll produced snapshots.
+    pub unavailable: Option<String>,
 }
 
 /// Open snapshot database.
@@ -250,6 +256,30 @@ impl Store {
         record_ok(&self.conn, provider, at)
     }
 
+    /// Records a successful poll of `provider` at `at` that found no countable quota: `reason`
+    /// and `last_ok_at = at` are written by one statement, so a failed write leaves the previous
+    /// status untouched.
+    ///
+    /// `reason` must not contain credentials or tokens.
+    ///
+    /// # Errors
+    ///
+    /// `SQLite` errors (including a busy timeout) or an out-of-range timestamp.
+    pub fn record_unavailable(
+        &mut self,
+        provider: Provider,
+        at: Timestamp,
+        reason: &str,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO source_status (provider, last_ok_at, unavailable) VALUES (?1, ?2, ?3)
+             ON CONFLICT (provider) DO UPDATE
+             SET last_ok_at = excluded.last_ok_at, unavailable = excluded.unavailable",
+            params![provider.as_str(), encode_ts(at)?, reason],
+        )?;
+        Ok(())
+    }
+
     /// Records a failed collector run of `provider` at `at` with `message`.
     ///
     /// `message` must not contain credentials or tokens.
@@ -275,18 +305,19 @@ impl Store {
     pub fn status(&self, provider: Provider) -> Result<Option<SourceStatus>> {
         self.conn
             .query_row(
-                "SELECT last_ok_at, last_error_at, last_error FROM source_status WHERE provider = ?1",
+                "SELECT last_ok_at, last_error_at, last_error, unavailable FROM source_status WHERE provider = ?1",
                 [provider.as_str()],
                 |row| {
                     Ok((
                         row.get::<_, Option<String>>(0)?,
                         row.get::<_, Option<String>>(1)?,
                         row.get::<_, Option<String>>(2)?,
+                        row.get::<_, Option<String>>(3)?,
                     ))
                 },
             )
             .optional()?
-            .map(|(ok, err_at, last_error)| {
+            .map(|(ok, err_at, last_error, unavailable)| {
                 Ok(SourceStatus {
                     provider,
                     last_ok_at: ok.as_deref().map(|s| decode_ts("last_ok_at", s)).transpose()?,
@@ -295,6 +326,7 @@ impl Store {
                         .map(|s| decode_ts("last_error_at", s))
                         .transpose()?,
                     last_error,
+                    unavailable,
                 })
             })
             .transpose()
@@ -360,7 +392,7 @@ fn insert_snapshots(conn: &Connection, snapshots: &[Snapshot]) -> Result<usize> 
 fn record_ok(conn: &Connection, provider: Provider, at: Timestamp) -> Result<()> {
     conn.execute(
         "INSERT INTO source_status (provider, last_ok_at) VALUES (?1, ?2)
-         ON CONFLICT (provider) DO UPDATE SET last_ok_at = excluded.last_ok_at",
+         ON CONFLICT (provider) DO UPDATE SET last_ok_at = excluded.last_ok_at, unavailable = NULL",
         params![provider.as_str(), encode_ts(at)?],
     )?;
     Ok(())

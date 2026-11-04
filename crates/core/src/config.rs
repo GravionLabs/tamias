@@ -7,7 +7,11 @@
 //!
 //! [providers]
 //! claude = "auto"       # "auto" (on when credentials exist), true or false
+//! copilot = "auto"      # "auto" (on when `gh` is found and logged in), true or false
 //! ```
+//!
+//! The top-level `gh_path = "<path>"` names the `gh` executable; without it `PATH` and the known
+//! install locations are searched.
 //!
 //! Every key is optional; a missing default file means all defaults.
 
@@ -43,6 +47,10 @@ pub struct Config {
     pub thresholds: Thresholds,
     /// Whether the Claude provider is collected.
     pub claude: Enabled,
+    /// Whether the Copilot provider is collected.
+    pub copilot: Enabled,
+    /// Configured `gh` executable, if any.
+    pub gh_path: Option<PathBuf>,
 }
 
 /// The config could not be read or is invalid.
@@ -80,6 +88,7 @@ struct RawConfig {
     yellow_at: Option<f64>,
     red_at: Option<f64>,
     stale_after: Option<String>,
+    gh_path: Option<PathBuf>,
     #[serde(default)]
     providers: RawProviders,
 }
@@ -88,6 +97,7 @@ struct RawConfig {
 #[serde(deny_unknown_fields)]
 struct RawProviders {
     claude: Option<RawEnabled>,
+    copilot: Option<RawEnabled>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -154,17 +164,8 @@ pub fn parse(text: &str) -> Result<Config, String> {
         None => defaults.stale_after,
         Some(text) => parse_duration(&text)?,
     };
-    let claude = match raw.providers.claude {
-        None => Enabled::Auto,
-        Some(RawEnabled::Bool(true)) => Enabled::On,
-        Some(RawEnabled::Bool(false)) => Enabled::Off,
-        Some(RawEnabled::Text(text)) if text == "auto" => Enabled::Auto,
-        Some(RawEnabled::Text(text)) => {
-            return Err(format!(
-                "providers.claude = {text:?} must be \"auto\", true or false"
-            ));
-        }
-    };
+    let claude = enabled("claude", raw.providers.claude)?;
+    let copilot = enabled("copilot", raw.providers.copilot)?;
     Ok(Config {
         thresholds: Thresholds {
             yellow_at,
@@ -172,7 +173,21 @@ pub fn parse(text: &str) -> Result<Config, String> {
             stale_after,
         },
         claude,
+        copilot,
+        gh_path: raw.gh_path,
     })
+}
+
+fn enabled(key: &str, raw: Option<RawEnabled>) -> Result<Enabled, String> {
+    match raw {
+        None => Ok(Enabled::Auto),
+        Some(RawEnabled::Bool(true)) => Ok(Enabled::On),
+        Some(RawEnabled::Bool(false)) => Ok(Enabled::Off),
+        Some(RawEnabled::Text(text)) if text == "auto" => Ok(Enabled::Auto),
+        Some(RawEnabled::Text(text)) => Err(format!(
+            "providers.{key} = {text:?} must be \"auto\", true or false"
+        )),
+    }
 }
 
 fn parse_duration(text: &str) -> Result<SignedDuration, String> {
@@ -226,6 +241,33 @@ mod tests {
     }
 
     #[test]
+    fn copilot_accepts_auto_true_and_false_and_defaults_to_auto() {
+        assert_eq!(parse("").unwrap().copilot, Enabled::Auto);
+        for (value, expected) in [
+            ("\"auto\"", Enabled::Auto),
+            ("true", Enabled::On),
+            ("false", Enabled::Off),
+        ] {
+            let config = parse(&format!("[providers]\ncopilot = {value}\n")).unwrap();
+            assert_eq!(config.copilot, expected, "{value}");
+            assert_eq!(config.claude, Enabled::Auto);
+        }
+        let err = parse("[providers]\ncopilot = \"yes\"\n").unwrap_err();
+        assert_eq!(
+            err,
+            "providers.copilot = \"yes\" must be \"auto\", true or false"
+        );
+    }
+
+    #[test]
+    fn gh_path_is_read_and_optional() {
+        assert_eq!(parse("").unwrap().gh_path, None);
+        let config = parse("gh_path = \"/opt/gh/bin/gh\"\n").unwrap();
+        assert_eq!(config.gh_path, Some("/opt/gh/bin/gh".into()));
+        assert!(parse("gh_path = 5\n").is_err());
+    }
+
+    #[test]
     fn other_claude_value_is_rejected() {
         let err = parse("[providers]\nclaude = \"yes\"\n").unwrap_err();
         assert_eq!(
@@ -239,8 +281,10 @@ mod tests {
     fn unknown_key_is_rejected_with_its_name() {
         let err = parse("yelow_at = 0.5\n").unwrap_err();
         assert!(err.contains("yelow_at"), "{err}");
-        let err = parse("[providers]\ncopilot = true\n").unwrap_err();
-        assert!(err.contains("copilot"), "{err}");
+        let err = parse("[providers]\ncopilt = true\n").unwrap_err();
+        assert!(err.contains("copilt"), "{err}");
+        let err = parse("gh = \"x\"\n").unwrap_err();
+        assert!(err.contains("gh"), "{err}");
     }
 
     #[test]

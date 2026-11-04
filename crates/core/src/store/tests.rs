@@ -71,7 +71,7 @@ fn fresh_path_creates_the_database_with_all_migrations() {
     let (_dir, path) = temp_db();
     Store::open(&path).unwrap();
     assert!(path.exists());
-    assert_eq!(user_version(&path), 1);
+    assert_eq!(user_version(&path), 2);
     assert_eq!(tables(&path), ["snapshot", "source_status"]);
 }
 
@@ -95,7 +95,7 @@ fn reopening_is_a_no_op_and_keeps_the_data() {
     drop(store);
 
     let store = Store::open(&path).unwrap();
-    assert_eq!(user_version(&path), 1);
+    assert_eq!(user_version(&path), 2);
     assert_eq!(all_claude_seven_day(&store).len(), 1);
 }
 
@@ -129,11 +129,15 @@ fn failed_migration_rolls_back_to_the_previous_version() {
     let err = Store::open_with_migrations(
         &path,
         DEFAULT_BUSY_TIMEOUT,
-        &[MIGRATIONS[0], "CREATE TABLE extra (a); THIS IS NOT SQL;"],
+        &[
+            MIGRATIONS[0],
+            MIGRATIONS[1],
+            "CREATE TABLE extra (a); THIS IS NOT SQL;",
+        ],
     )
     .unwrap_err();
-    assert!(matches!(err, Error::Migration { version: 2, .. }), "{err}");
-    assert_eq!(user_version(&path), 1);
+    assert!(matches!(err, Error::Migration { version: 3, .. }), "{err}");
+    assert_eq!(user_version(&path), 2);
     assert_eq!(tables(&path), ["snapshot", "source_status"]);
     assert_eq!(all_claude_seven_day(&Store::open(&path).unwrap()).len(), 1);
 }
@@ -150,7 +154,7 @@ fn newer_schema_is_rejected() {
             err,
             Error::SchemaTooNew {
                 found: 99,
-                supported: 1
+                supported: 2
             }
         ),
         "{err}"
@@ -450,6 +454,7 @@ fn ok_and_error_are_recorded_independently() {
             last_ok_at: Some(ts("2026-11-03T10:10:00Z")),
             last_error_at: Some(ts("2026-11-03T10:05:00Z")),
             last_error: Some("HTTP 429".to_owned()),
+            unavailable: None,
         })
     );
     assert_eq!(store.status(Provider::Copilot).unwrap(), None);
@@ -592,7 +597,7 @@ fn read_only_does_not_migrate_and_rejects_a_newer_schema() {
             err,
             Error::SchemaTooNew {
                 found: 99,
-                supported: 1
+                supported: 2
             }
         ),
         "{err}"
@@ -732,4 +737,105 @@ fn non_busy_errors_are_not_busy() {
         supported: 1,
     };
     assert!(!err.is_busy());
+}
+
+// --- unavailable reason ---
+
+#[test]
+fn migration_from_a_0001_database_keeps_all_rows() {
+    let (_dir, path) = temp_db();
+    {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let conn = raw(&path);
+        conn.execute_batch(MIGRATIONS[0]).unwrap();
+        conn.execute_batch(
+            r"INSERT INTO snapshot VALUES
+                 ('claude', 'seven_day', 12.0, 100.0, 'percent', '2026-11-10T00:00:00.000000000Z',
+                  '2026-11-03T10:00:00.000000000Z', 'poll');
+               INSERT INTO source_status VALUES
+                 ('claude', '2026-11-03T10:00:00.000000000Z', '2026-11-03T09:00:00.000000000Z', 'HTTP 429');",
+        )
+        .unwrap();
+        conn.pragma_update(None, "user_version", 1).unwrap();
+    }
+    let store = Store::open(&path).unwrap();
+    assert_eq!(user_version(&path), 2);
+    assert_eq!(all_claude_seven_day(&store).len(), 1);
+    assert_eq!(
+        store.status(Provider::Claude).unwrap(),
+        Some(SourceStatus {
+            provider: Provider::Claude,
+            last_ok_at: Some(ts("2026-11-03T10:00:00Z")),
+            last_error_at: Some(ts("2026-11-03T09:00:00Z")),
+            last_error: Some("HTTP 429".to_owned()),
+            unavailable: None,
+        })
+    );
+}
+
+#[test]
+fn record_unavailable_sets_reason_and_ok_time_together() {
+    let (_dir, path) = temp_db();
+    let mut store = Store::open(&path).unwrap();
+    store
+        .record_unavailable(
+            Provider::Copilot,
+            ts("2026-11-03T10:00:00Z"),
+            "no premium quota",
+        )
+        .unwrap();
+    let status = store.status(Provider::Copilot).unwrap().unwrap();
+    assert_eq!(status.unavailable.as_deref(), Some("no premium quota"));
+    assert_eq!(status.last_ok_at, Some(ts("2026-11-03T10:00:00Z")));
+    assert_eq!(status.last_error, None);
+}
+
+#[test]
+fn run_and_ok_clear_the_unavailable_reason() {
+    let (_dir, path) = temp_db();
+    let mut store = Store::open(&path).unwrap();
+    store
+        .record_unavailable(Provider::Copilot, ts("2026-11-03T10:00:00Z"), "unlimited")
+        .unwrap();
+    store
+        .record_run(Provider::Copilot, &[], ts("2026-11-03T11:00:00Z"))
+        .unwrap();
+    let status = store.status(Provider::Copilot).unwrap().unwrap();
+    assert_eq!(status.unavailable, None);
+    assert_eq!(status.last_ok_at, Some(ts("2026-11-03T11:00:00Z")));
+
+    store
+        .record_unavailable(Provider::Copilot, ts("2026-11-03T12:00:00Z"), "unlimited")
+        .unwrap();
+    store
+        .record_ok(Provider::Copilot, ts("2026-11-03T13:00:00Z"))
+        .unwrap();
+    assert_eq!(
+        store
+            .status(Provider::Copilot)
+            .unwrap()
+            .unwrap()
+            .unavailable,
+        None
+    );
+}
+
+#[test]
+fn failed_record_unavailable_keeps_the_previous_status() {
+    let (_dir, path) = temp_db();
+    let mut store = Store::open(&path).unwrap();
+    store
+        .record_unavailable(Provider::Copilot, ts("2026-11-03T10:00:00Z"), "unlimited")
+        .unwrap();
+    let before = store.status(Provider::Copilot).unwrap();
+
+    let err = store
+        .record_unavailable(
+            Provider::Copilot,
+            ts("-000001-06-01T00:00:00Z"),
+            "no premium quota",
+        )
+        .unwrap_err();
+    assert!(matches!(err, Error::TimestampOutOfRange(_)), "{err}");
+    assert_eq!(store.status(Provider::Copilot).unwrap(), before);
 }

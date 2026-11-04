@@ -308,7 +308,7 @@ fn other_store_errors_are_not_busy() {
     assert_eq!(
         serde_json::to_value(&err).unwrap(),
         serde_json::json!({
-            "message": "database schema version 99 is newer than the supported version 1",
+            "message": "database schema version 99 is newer than the supported version 2",
             "busy": false,
         })
     );

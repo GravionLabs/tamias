@@ -30,6 +30,7 @@ fn ok_status(at: &str) -> SourceStatus {
         last_ok_at: Some(ts(at)),
         last_error_at: None,
         last_error: None,
+        unavailable: None,
     }
 }
 
@@ -162,6 +163,7 @@ fn failed_last_run_is_stale_since_the_last_success_with_the_error_class() {
         last_ok_at: Some(ts("2026-11-03T10:00:00Z")),
         last_error_at: Some(ts("2026-11-03T10:04:00Z")),
         last_error: Some("http 500".to_owned()),
+        unavailable: None,
     };
     let lines = claude_lines(
         &series(),
@@ -187,6 +189,7 @@ fn error_before_the_last_success_is_not_stale() {
         last_ok_at: Some(ts("2026-11-03T10:00:00Z")),
         last_error_at: Some(ts("2026-11-03T09:55:00Z")),
         last_error: Some("timeout".to_owned()),
+        unavailable: None,
     };
     let lines = claude_lines(
         &series(),
@@ -237,6 +240,7 @@ fn never_collected_is_stale_without_numbers() {
         last_ok_at: None,
         last_error_at: Some(ts("2026-11-03T10:04:00Z")),
         last_error: Some("unauthorized".to_owned()),
+        unavailable: None,
     };
     let lines = claude_lines(
         &[],
@@ -289,6 +293,7 @@ fn times_are_shown_in_the_local_time_zone() {
         last_ok_at: Some(ts("2026-11-03T08:00:00Z")),
         last_error_at: Some(ts("2026-11-03T10:00:00Z")),
         last_error: Some("timeout".to_owned()),
+        unavailable: None,
     };
     let tz = TimeZone::get("Europe/Zurich").unwrap();
     let lines = claude_lines(

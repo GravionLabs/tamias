@@ -62,6 +62,8 @@ impl Env {
             .env("APPDATA", self.path("appdata"))
             .env("LOCALAPPDATA", self.path("localappdata"))
             .env_remove("CLAUDE_CONFIG_DIR")
+            // No `gh`: Copilot is skipped as "not set up" on every machine.
+            .env("TAMIAS_GH", self.path("no-such-gh"))
     }
 
     fn tamias(&self) -> Command {
@@ -96,8 +98,9 @@ fn a_failed_poll_exits_3_and_appends_an_error_line_without_the_token() {
 
     let log = fs::read_to_string(env.log_path()).unwrap();
     let lines: Vec<&str> = log.lines().collect();
-    assert_eq!(lines.len(), 2, "{log}");
-    for line in lines {
+    // Two runs, each with one Claude and one Copilot line.
+    assert_eq!(lines.len(), 4, "{log}");
+    for line in lines.iter().step_by(2) {
         let fields: Vec<&str> = line.splitn(4, ' ').collect();
         assert!(fields[0].ends_with('Z'), "{line}");
         assert_eq!(fields[1..3], ["claude", "error"], "{line}");
@@ -111,7 +114,13 @@ fn a_skipped_provider_is_logged_as_ok() {
     fs::write(env.path("config.toml"), "[providers]\nclaude = false\n").unwrap();
     env.tamias().arg("collect").assert().success();
     let log = fs::read_to_string(env.log_path()).unwrap();
-    assert!(log.ends_with(" claude ok skipped (disabled)\n"), "{log}");
+    let lines: Vec<&str> = log.lines().collect();
+    assert_eq!(lines.len(), 2, "{log}");
+    assert!(lines[0].ends_with(" claude ok skipped (disabled)"), "{log}");
+    assert!(
+        lines[1].ends_with(" copilot ok skipped (not set up)"),
+        "{log}"
+    );
 }
 
 #[test]

@@ -25,6 +25,7 @@ fn status(ok: Option<&str>, err: Option<&str>, message: Option<&str>) -> Option<
         last_ok_at: ok.map(ts),
         last_error_at: err.map(ts),
         last_error: message.map(str::to_owned),
+        unavailable: None,
     })
 }
 
