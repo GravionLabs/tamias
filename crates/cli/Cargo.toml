@@ -1,6 +1,6 @@
 [package]
 name = "tamias"
-description = "Shows how much of your Claude and Copilot usage limits you used today against the daily budget"
+description = "Shows how much of your Claude usage limits you used today against the daily budget"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
