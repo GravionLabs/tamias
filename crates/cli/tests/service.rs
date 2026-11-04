@@ -48,11 +48,13 @@ impl Env {
         self.path("data").join("logs").join("collect.log")
     }
 
-    /// Points every per-user location (config, data, home) of every OS at the temp dir, so a
-    /// command without `--config` never reads the developer's real config.
+    /// Points the config dir, data dir and home of every OS at the temp dir, so a command without
+    /// `--config` never reads the developer's real config. `TAMIAS_CONFIG_DIR` is what covers
+    /// Windows, where the OS config dir comes from a known-folder API that ignores env vars.
     fn isolate<'a>(&self, cmd: &'a mut Command) -> &'a mut Command {
         let home = self.path("home");
         cmd.env("TAMIAS_DATA_DIR", self.path("data"))
+            .env("TAMIAS_CONFIG_DIR", self.dir.path())
             .env("HOME", &home)
             .env("USERPROFILE", &home)
             .env("XDG_CONFIG_HOME", self.path("xdg-config"))
@@ -64,15 +66,13 @@ impl Env {
 
     fn tamias(&self) -> Command {
         let mut cmd = Command::cargo_bin("tamias").expect("binary tamias is built");
-        cmd.env("TAMIAS_DATA_DIR", self.path("data"))
+        self.isolate(&mut cmd)
             .env(
                 "TAMIAS_CLAUDE_CREDENTIALS_FILE",
                 self.path("credentials.json"),
             )
             .env("TAMIAS_CLAUDE_USAGE_URL", closed_url())
-            .env("HOME", self.path("home"))
             .env("TZ", "UTC")
-            .env_remove("CLAUDE_CONFIG_DIR")
             .arg("--config")
             .arg(self.path("config.toml"));
         cmd
@@ -180,18 +180,9 @@ fn a_fatal_error_of_collect_is_logged_without_the_config_path() {
         "{log}"
     );
     assert_eq!(log.lines().count(), 1, "{log}");
-    // The fatal error goes to the log only: the store has no error for `service status` to show.
-    let db = env.path("data").join("tamias.db");
-    if db.exists() {
-        let store = tamias_core::store::Store::open(db).unwrap();
-        let status = store
-            .status(tamias_core::snapshot::Provider::Claude)
-            .unwrap();
-        assert!(
-            status.as_ref().is_none_or(|s| s.last_error.is_none()),
-            "{status:?}"
-        );
-    }
+    // The config fails to load before the store is created, so no database exists to show an
+    // error to `service status`.
+    assert!(!env.path("data").join("tamias.db").exists());
 }
 
 #[test]
