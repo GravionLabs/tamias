@@ -139,3 +139,26 @@ h1 {
   align-items: center;
   gap: 8px;
 }
+
+.setup {
+  border: 1px solid var(--h-surface-300);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.setup-text {
+  margin: 0;
+  font-weight: 600;
+}
+
+.setup .hint {
+  color: var(--h-text-muted-color);
+  margin: 4px 0 8px;
+}
+
+.setup .actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}

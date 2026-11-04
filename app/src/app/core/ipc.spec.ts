@@ -37,6 +37,30 @@ describe("TauriIpc", () => {
     expect(tauri.calls("plugin:autostart|disable")).toHaveLength(1);
   });
 
+  it("reads, sets up and removes collection with the service commands, without arguments", async () => {
+    const status = { state: "not_installed", message: null, exe: null };
+    tauri.answer("service_status", () => status);
+    tauri.answer("service_install", () => "installed: tamias collect runs every 5 minutes");
+    tauri.answer("service_uninstall", () => "uninstalled; the data and the log are kept");
+    const ipc = new TauriIpc();
+    await expect(ipc.serviceStatus()).resolves.toEqual(status);
+    await expect(ipc.serviceInstall()).resolves.toBeUndefined();
+    await expect(ipc.serviceUninstall()).resolves.toBeUndefined();
+    expect(tauri.calls("service_status")).toEqual([undefined]);
+    expect(tauri.calls("service_install")).toEqual([undefined]);
+    expect(tauri.calls("service_uninstall")).toEqual([undefined]);
+  });
+
+  it("rejects a failed setup with the error of the backend", async () => {
+    tauri.answer("service_install", () => {
+      throw { message: "collection setup is already running", busy: false };
+    });
+    await expect(new TauriIpc().serviceInstall()).rejects.toEqual({
+      message: "collection setup is already running",
+      busy: false,
+    });
+  });
+
   it("passes commands and arguments through to Tauri", async () => {
     tauri.answer("echo", (args) => args);
     await expect(new TauriIpc().invoke("echo", { day: "2026-11-03" })).resolves.toEqual({

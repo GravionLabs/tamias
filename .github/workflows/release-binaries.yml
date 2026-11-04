@@ -15,8 +15,8 @@
 # rename them to tamias-app-<version>-<target>.<ext>: .dmg (aarch64 and x86_64 apple-darwin), .msi
 # (x86_64-pc-windows-msvc), .AppImage and .deb (x86_64-unknown-linux-gnu). The version is the Cargo workspace version
 # (tauri.conf.json has none, so Tauri takes it from the crate), which set-version.sh wrote into the tag. SHA256SUMS
-# covers the CLI archives and the bundles. A CLI sidecar (#89) would be built before `tauri build` and placed under
-# app/src-tauri/binaries/ in the marked step.
+# covers the CLI archives and the bundles. Each bundle ships the CLI as a sidecar (#89): built for the same target by
+# `pnpm sidecar` before `tauri build` and placed under app/src-tauri/binaries/.
 # No build cache: release binaries are built from a clean state.
 name: Release binaries
 
@@ -194,8 +194,26 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      # PBI #89: build the CLI for $TARGET here and copy it to app/src-tauri/binaries/tamias-$TARGET[.exe]
-      # (bundle.externalBin) before the bundle step.
+      # The CLI sidecar (#89, bundle.externalBin) of the same version and target, built before the bundle step:
+      # app/src-tauri/binaries/tamias-$TARGET[.exe], on Windows also tamiasw-$TARGET.exe. The app runs it for
+      # `tamias service status|install|uninstall`. x86_64-apple-darwin is cross-compiled and not run.
+      - name: Build the CLI sidecar
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          pnpm sidecar --release --target "$TARGET"
+          ls -l src-tauri/binaries
+          exe=''
+          [[ "$TARGET" == *-windows-* ]] && exe=.exe
+          bin="src-tauri/binaries/tamias-$TARGET$exe"
+          if [ "$TARGET" != x86_64-apple-darwin ]; then
+            out="$("$bin" --version)"
+            [ "$out" = "tamias $VERSION" ] || { echo "::error::sidecar reports '$out', expected 'tamias $VERSION'"; exit 1; }
+          fi
+          if [ -n "$exe" ] && [ ! -f "src-tauri/binaries/tamiasw-$TARGET.exe" ]; then
+            echo "::error::tamiasw-$TARGET.exe missing"
+            exit 1
+          fi
 
       # beforeBuildCommand (pnpm build) builds the frontend; no signing keys are set, so the bundles are unsigned.
       - name: Build the bundles

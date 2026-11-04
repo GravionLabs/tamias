@@ -10,6 +10,7 @@ import {
 } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { HxButton, HxMessage, HxProgressSpinner } from "@gravionlabs/helix-ui";
+import { Collection, hasNoData } from "../core/collection";
 import { Ipc, errorText, isBusy } from "../core/ipc";
 import { StoreEvents } from "../core/store-events";
 import {
@@ -61,7 +62,10 @@ interface Cell {
 
 const LETTERS: Record<ProviderName, string> = { claude: "C", copilot: "CP" };
 
-/** The month calendar: one cell per day, Claude and Copilot side by side, coloured by the daily budget. */
+/**
+ * The month calendar: one cell per day, Claude and Copilot side by side, coloured by the daily budget.
+ * Without data and without a collector it offers to set up collection.
+ */
 @Component({
   selector: "app-calendar",
   imports: [HxButton, HxMessage, HxProgressSpinner, RouterLink],
@@ -73,6 +77,7 @@ export class Calendar {
   private readonly ipc = inject(Ipc);
   private readonly now = inject(NOW);
   private readonly firstDay = inject(FIRST_DAY);
+  protected readonly collection = inject(Collection);
   private loads = 0;
 
   // `?month=YYYY-MM` is where the day view came from; otherwise the current month.
@@ -126,6 +131,21 @@ export class Calendar {
     });
   });
 
+  /**
+   * "Collection is not set up — set up now?": no data and no collector, until "Not now". It stays
+   * after a failed setup to show its error, unless the CLI then reports an installed collector.
+   */
+  protected readonly setupPrompt = computed(() => {
+    const report = this.report();
+    const status = this.collection.status();
+    if (!report || !hasNoData(report) || !status || this.collection.dismissed()) return false;
+    if (status.state === "installed") return false;
+    return status.state === "not_installed" || this.collection.actionError() !== null;
+  });
+
+  /** Set up from the prompt and the CLI now reports the collector: the first data is on its way. */
+  protected readonly setupDone = signal(false);
+
   protected readonly isCurrentMonth = computed(() => {
     const now = this.now();
     return this.year() === now.getFullYear() && this.month() === now.getMonth() + 1;
@@ -155,6 +175,11 @@ export class Calendar {
     this.go({ year: now.getFullYear(), month: now.getMonth() + 1 });
   }
 
+  protected async setUp(): Promise<void> {
+    await this.collection.install();
+    this.setupDone.set(this.collection.status()?.state === "installed");
+  }
+
   private go(to: { year: number; month: number }): void {
     this.year.set(to.year);
     this.month.set(to.month);
@@ -172,6 +197,8 @@ export class Calendar {
       if (load !== this.loads) return;
       this.report.set(report);
       this.error.set(null);
+      // Only without data: the status runs the CLI, which a filled calendar does not need.
+      if (hasNoData(report) && this.collection.status() === null) void this.collection.refresh();
     } catch (error) {
       if (load !== this.loads || isBusy(error)) return;
       this.error.set(errorText(error));

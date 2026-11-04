@@ -38,6 +38,7 @@
     "category": "Utility",
     "shortDescription": "Today's usage against the daily budget per provider",
     "targets": "all",
+    "externalBin": ["binaries/tamias"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

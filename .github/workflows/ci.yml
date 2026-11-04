@@ -89,6 +89,10 @@ jobs:
       # The Tauri macros read the built frontend (frontendDist in tauri.conf.json).
       - name: Build the frontend
         run: pnpm build
+      # bundle.externalBin: the tauri-build script of tamias-app needs the CLI sidecar
+      # src-tauri/binaries/tamias-<host triple> (Windows also tamiasw); scripts/sidecar.mjs builds it.
+      - name: Build the CLI sidecar
+        run: pnpm sidecar
       - name: Clippy
         run: cargo clippy -p tamias-app --all-targets --locked -- -D warnings
       - name: Test

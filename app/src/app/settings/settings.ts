@@ -1,21 +1,24 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
 import { RouterLink } from "@angular/router";
-import { HxMessage, HxSwitch } from "@gravionlabs/helix-ui";
+import { HxButton, HxMessage, HxSwitch } from "@gravionlabs/helix-ui";
+import { Collection } from "../core/collection";
 import { Ipc, errorText } from "../core/ipc";
 
 /**
- * The settings view. Autostart is the only setting; the OS is its source of truth (the plugin's
- * `isEnabled`), the app keeps no settings file of its own.
+ * The settings view: autostart, and the collection status with "Set up" / "Remove". The OS is the
+ * source of truth of autostart (the plugin's `isEnabled`), the CLI of collection (`tamias service
+ * status`); the app keeps no settings file of its own.
  */
 @Component({
   selector: "app-settings",
-  imports: [HxMessage, HxSwitch, RouterLink],
+  imports: [HxButton, HxMessage, HxSwitch, RouterLink],
   templateUrl: "./settings.html",
   styleUrl: "./settings.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Settings {
   private readonly ipc = inject(Ipc);
+  protected readonly collection = inject(Collection);
 
   /** Off until the OS answered: never shown as enabled without knowing. */
   protected readonly autostart = signal(false);
@@ -25,6 +28,7 @@ export class Settings {
 
   constructor() {
     void this.read();
+    void this.collection.refresh();
   }
 
   private async read(): Promise<void> {
