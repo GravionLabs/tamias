@@ -84,7 +84,16 @@ tamias polls GitHub Copilot through the GitHub CLI `gh`; it reads the token of `
 
 Until the first collect, `tamias today` shows Copilot as `stale, never collected` and exits with 3. After a successful collect it shows the monthly quota like Claude's windows.
 
-Two optional settings in `config.toml` (in the data directory, see [The collect log](#the-collect-log)):
+Two optional settings in `config.toml`, which lives in the config directory:
+
+| Platform | Config directory |
+|----------|------------------|
+| macOS | `~/Library/Application Support/tamias` |
+| Linux | `$XDG_CONFIG_HOME/tamias` (default `~/.config/tamias`) |
+| Windows | `%APPDATA%\tamias\config` |
+
+`TAMIAS_CONFIG_DIR` overrides the config directory on every platform.
+
 
 ```toml
 gh_path = "/opt/gh/bin/gh"   # top level: use this gh instead of searching for one
@@ -93,9 +102,9 @@ gh_path = "/opt/gh/bin/gh"   # top level: use this gh instead of searching for o
 copilot = "auto"             # "auto" (default), true or false
 ```
 
-- `"auto"`: Copilot is polled when a `gh` executable can be found (`gh_path`, then `PATH` and the usual install locations). Without one it shows as `unavailable (not set up)`. Whether you are logged in is not checked up front: with `gh` installed but logged out, the poll fails and Copilot turns `stale` with the error.
-- `true`: always poll; a missing `gh` is an error (`stale`), not `unavailable`.
-- `false`: opt out. Copilot shows as `unavailable (disabled)` and is not polled.
+- `"auto"`: Copilot is polled when a `gh` executable can be found (`gh_path`, then `PATH` and the usual install locations). Without one it shows as `unavailable (not set up)`. The same happens with `gh` installed but logged out (`gh auth token` fails): Copilot shows as `unavailable (not set up)` and the run is logged as skipped.
+- `true`: always poll; a missing or logged-out `gh` is an error (`stale` with the error), not `unavailable`.
+- `false`: opt out. Copilot shows as `unavailable (disabled)` and is skipped.
 
 A seat without a countable monthly quota is not an error. A free seat shows as `unavailable (no premium quota)`, a seat with unlimited premium requests as `unavailable (unlimited)`. Neither has a daily budget, and neither turns the exit code to 3.
 
@@ -152,7 +161,7 @@ An `error` line names a class of failure, for example an expired login; fix it a
 
 ### `gh` not found under the service
 
-The scheduler starts `tamias collect` with a minimal `PATH`, often without the directory of `gh` (for example `/opt/homebrew/bin` or `~/.local/bin`). If `tamias collect` works in your shell but Copilot shows `unavailable (not set up)` under the service, set `gh_path` in `config.toml` to the full path of `gh` (`which gh`, `Get-Command gh` on Windows). The service must also run as the user that ran `gh auth login`, because the login lives in that user's `gh` configuration or keyring. Check `logs/collect.log` for the `copilot` lines.
+The scheduler starts `tamias collect` with a minimal `PATH`, often without the directory of `gh` (tamias itself also looks in `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin` and `/snap/bin`, but not in places such as `~/.local/bin` or a custom prefix). `unavailable (not set up)` means `gh` is missing or logged out. If `tamias collect` works in your shell but Copilot shows `unavailable (not set up)` under the service, set `gh_path` in `config.toml` (config directory, see [Copilot](#copilot)) to the full path of `gh` (`which gh`, `Get-Command gh` on Windows). The service must also run as the user that ran `gh auth login`, because the login lives in that user's `gh` configuration or keyring. Check `logs/collect.log` for the `copilot` lines.
 
 ### macOS
 
