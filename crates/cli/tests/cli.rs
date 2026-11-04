@@ -41,3 +41,37 @@ fn unknown_argument_is_rejected() {
             "unexpected argument '--no-such-flag'",
         ));
 }
+
+/// The `Exit codes:` lines of `--help` as `(code, description)`.
+fn help_exit_codes(command: &str) -> Vec<(String, String)> {
+    let out = tamias()
+        .args([command, "--help"])
+        .output()
+        .expect("help runs");
+    let text = String::from_utf8(out.stdout).expect("utf-8 help");
+    text.lines()
+        .skip_while(|l| *l != "Exit codes:")
+        .skip(1)
+        .map(|l| {
+            let (code, rest) = l.trim().split_once("  ").expect("code and description");
+            (code.to_string(), rest.trim().to_string())
+        })
+        .collect()
+}
+
+#[test]
+fn help_exit_codes_match_the_consumers_doc_table() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/consumers.md");
+    let doc = std::fs::read_to_string(path).expect("docs/consumers.md is readable");
+    for command in ["collect", "today"] {
+        let codes = help_exit_codes(command);
+        assert_eq!(codes.len(), 4, "{command} lists four exit codes");
+        for (code, description) in codes {
+            let row = format!("| {code} | {description} |");
+            assert!(
+                doc.contains(&row),
+                "docs/consumers.md lacks `{row}` ({command})"
+            );
+        }
+    }
+}

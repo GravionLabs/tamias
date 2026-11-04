@@ -26,9 +26,9 @@ use crate::exit::{EXIT_ERROR, EXIT_STALE};
 const EXIT_CODES: &str = "\
 Exit codes:
   0  every set-up provider is ok (unavailable providers do not count)
-  1  error: tamias could not run (invalid config, unreadable store)
+  1  error: tamias could not run (invalid config, unreadable store); collect also writes it to collect.log and the store
   2  invalid command line
-  3  at least one set-up provider is not fresh (collect: its poll failed; today: it is stale)";
+  3  at least one set-up provider is not fresh (collect: its poll failed, recorded in the store and collect.log; today: it is stale)";
 
 /// Shows how much of your Claude and Copilot usage limits you used today
 /// and whether that fits the daily budget left until the next reset.
