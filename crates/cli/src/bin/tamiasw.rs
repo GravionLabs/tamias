@@ -12,8 +12,6 @@ mod claude;
 mod collect;
 #[path = "../collect_log.rs"]
 mod collect_log;
-#[path = "../config.rs"]
-mod config;
 #[path = "../exit.rs"]
 mod exit;
 

@@ -11,7 +11,7 @@
 use tamias_core::credentials::{self, CredentialSource, FileSource};
 use tamias_core::provider::claude::{self, ClaudeProvider, Error, TIMEOUT, UsageClient};
 
-use crate::config::Enabled;
+use tamias_core::config::Enabled;
 
 /// Test-only override of the credential source.
 pub const CREDENTIALS_FILE_ENV: &str = "TAMIAS_CLAUDE_CREDENTIALS_FILE";
@@ -132,7 +132,7 @@ mod tests {
     use tamias_core::provider::claude::Error;
 
     use super::{Unavailable, is_loopback, unavailable_for};
-    use crate::config::Enabled;
+    use tamias_core::config::Enabled;
 
     #[test]
     fn loopback_urls_are_accepted() {

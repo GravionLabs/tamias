@@ -16,7 +16,7 @@ use tamias_core::snapshot::{Provider, Unit, Window};
 use tamias_core::store::{self, SourceStatus, Store};
 
 use crate::claude::{self, Unavailable};
-use crate::config::Config;
+use tamias_core::config::Config;
 
 /// State shown in the last column.
 #[derive(Debug, Clone, PartialEq)]

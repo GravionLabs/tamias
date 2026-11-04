@@ -3,6 +3,7 @@
 #![warn(missing_docs)]
 
 pub mod budget;
+pub mod config;
 pub mod credentials;
 pub mod paths;
 pub mod provider;
