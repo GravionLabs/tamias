@@ -1,0 +1,45 @@
+<header class="head">
+  <h1>Today</h1>
+  @if (report(); as r) {
+    <span class="muted">as of {{ time(r.generated_at) }}</span>
+  }
+</header>
+
+@if (error(); as message) {
+  <hx-message severity="error" data-testid="error"
+    >Cannot read today's usage: {{ message }}</hx-message
+  >
+} @else if (report(); as r) {
+  <div class="providers">
+    @for (p of r.providers; track p.provider) {
+      <hx-card [attr.data-provider]="p.provider" [attr.data-status]="p.status">
+        <div hxCardHeader class="card-head">
+          <h2>{{ providerLabel(p.provider) }}</h2>
+          <hx-tag [severity]="severity(p.status)" [value]="p.status" />
+        </div>
+        @if (p.status === "stale") {
+          <p class="note" data-testid="stale">{{ staleText(p.stale_since) }}</p>
+        } @else if (p.status === "unavailable") {
+          <p class="note" data-testid="unavailable">Not set up on this machine, or disabled.</p>
+        }
+        @if (p.windows.length > 0) {
+          <ul class="windows">
+            @for (w of p.windows; track w.window) {
+              <li [attr.data-window]="w.window">
+                <span class="dot" [class]="'colour-' + w.colour" aria-hidden="true"></span>
+                <span class="name">{{ windowLabel(w.window) }}</span>
+                <span class="used">{{ usedText(w) }}</span>
+                <span class="today">{{ todayText(w) }}</span>
+                <span class="resets muted">resets {{ time(w.resets_at) }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </hx-card>
+    }
+  </div>
+} @else {
+  <p class="loading" role="status">
+    <hx-progress-spinner ariaLabel="Reading today's usage" /> Reading today's usage…
+  </p>
+}

@@ -1,0 +1,7 @@
+dist
+.angular
+node_modules
+out-tsc
+src-tauri
+pnpm-lock.yaml
+*.md

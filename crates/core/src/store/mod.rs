@@ -9,7 +9,9 @@ use std::path::Path;
 use std::time::Duration;
 
 use jiff::Timestamp;
-use rusqlite::{Connection, ErrorCode, OptionalExtension, Row, TransactionBehavior, params};
+use rusqlite::{
+    Connection, ErrorCode, OpenFlags, OptionalExtension, Row, TransactionBehavior, params,
+};
 
 use crate::snapshot::{Provider, Snapshot, Window};
 
@@ -119,6 +121,34 @@ impl Store {
     /// As [`Store::open`].
     pub fn open_with_busy_timeout(path: impl AsRef<Path>, busy_timeout: Duration) -> Result<Self> {
         Self::open_with_migrations(path.as_ref(), busy_timeout, MIGRATIONS)
+    }
+
+    /// Opens the existing database at `path` read-only with [`DEFAULT_BUSY_TIMEOUT`], for readers
+    /// such as the desktop app: no directory or file is created and no migration runs, so the
+    /// reader never takes the write lock. Every write through it fails.
+    ///
+    /// A database of an older schema is opened as it is; reads of what it lacks fail.
+    ///
+    /// # Errors
+    ///
+    /// `SQLite` errors (a missing file is one), or [`Error::SchemaTooNew`] when the database was
+    /// written by a newer tamias.
+    pub fn open_read_only(path: impl AsRef<Path>) -> Result<Self> {
+        let conn = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+                | OpenFlags::SQLITE_OPEN_URI
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        conn.busy_timeout(DEFAULT_BUSY_TIMEOUT)?;
+        let found = user_version(&conn)?;
+        if usize::try_from(found).map_or(true, |version| version > MIGRATIONS.len()) {
+            return Err(Error::SchemaTooNew {
+                found,
+                supported: MIGRATIONS.len(),
+            });
+        }
+        Ok(Self { conn })
     }
 
     fn open_with_migrations(

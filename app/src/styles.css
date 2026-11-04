@@ -1,0 +1,23 @@
+/* App chrome on the helix tokens (--h-*, from tokens.css; dark under .app-dark, set by HxTheme). */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  background: var(--h-surface-50);
+  color: var(--h-text-color);
+  font:
+    14px/1.5 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+:root.app-dark body {
+  background: var(--h-surface-950);
+}
