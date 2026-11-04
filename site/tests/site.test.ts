@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { resolveConfig } from 'vitepress';
 import { REPOSITORY, repoUrl, rewriteLink } from '../.vitepress/repo-links.mts';
 import { isAdr, titleOf } from '../.vitepress/sidebar.mts';
 
@@ -121,13 +122,23 @@ describe('the site without ADRs', () => {
     }
   });
 
-  it('sends a link from a page to an ADR to GitHub', () => {
-    const { root, docs } = repository();
-    const adrRoot = join(docs, 'adr');
-    const onSite = (path: string) => existsSync(path) && !isAdr(path, adrRoot);
+  it('produces no ADR page, while the other documents are pages', async () => {
+    const site = await resolveConfig(resolve(import.meta.dirname, '..'), 'build', 'production');
 
-    expect(
-      rewriteLink('./adr/0001-usage-collector-architecture.md', join(docs, 'index.md'), root, docs, onSite),
-    ).toBe(`${REPOSITORY}/blob/main/docs/adr/0001-usage-collector-architecture.md`);
+    expect(site.pages).toContain('sources.md');
+    expect(site.pages.filter((page) => page.startsWith('adr/'))).toEqual([]);
+  });
+
+  it('sends a link from a page to an ADR to GitHub', async () => {
+    const { isOnSite } = await import('../.vitepress/config.mts');
+    const repoRoot = resolve(import.meta.dirname, '../..');
+    const docs = join(repoRoot, 'docs');
+    const adr = readdirSync(join(docs, 'adr')).find((name) => name.endsWith('.md'))!;
+
+    expect(isOnSite(join(docs, 'sources.md'))).toBe(true);
+    expect(isOnSite(join(docs, 'adr', adr))).toBe(false);
+    expect(rewriteLink(`./adr/${adr}`, join(docs, 'index.md'), repoRoot, docs, isOnSite)).toBe(
+      `${REPOSITORY}/blob/main/docs/adr/${adr}`,
+    );
   });
 });

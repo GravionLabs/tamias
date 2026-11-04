@@ -15,7 +15,7 @@ const docsRoot = resolve(repoRoot, 'docs');
 
 // Every existing file of docs/ except the ADRs is on the site; a link to anything else in the repository goes to GitHub.
 const adrRoot = resolve(docsRoot, 'adr');
-const isOnSite = (absolutePath: string) => existsSync(absolutePath) && !isAdr(absolutePath, adrRoot);
+export const isOnSite = (absolutePath: string) => existsSync(absolutePath) && !isAdr(absolutePath, adrRoot);
 
 // On GitHub Pages the site is at https://<owner>.github.io/<repository>/, so every address needs that prefix.
 const base = process.env['SITE_BASE'] ?? '/';
