@@ -127,7 +127,7 @@ fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             let out = if args.json {
                 today::json(&today.report)?
             } else if args.short {
-                short::render(&today.lines, colour) + "\n"
+                short::render(&today.report, colour) + "\n"
             } else {
                 today::render(&today.lines, now, &tz, colour)
             };

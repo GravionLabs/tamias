@@ -1,18 +1,20 @@
 //! Desktop app of tamias: a thin Tauri shell over `tamias-core`. The frontend (`app/src`) calls
 //! the commands registered in [`run`] through its `Ipc` bridge (`app/src/app/core/ipc.ts`) and
 //! reloads on the [`watch::EVENT`] of the live refresh (`app/src/app/core/store-events.ts`).
+//! The [`tray`] icon shows the traffic light; closing the window hides it to the tray.
 
 pub mod day;
 pub mod launch;
 pub mod month;
 pub mod today;
+pub mod tray;
 pub mod watch;
 
 use std::sync::{Mutex, PoisonError};
 
 use tamias_core::paths;
 use tamias_core::report::Report;
-use tauri::{Emitter, Manager, RunEvent};
+use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
 /// Error of a command as the frontend receives it.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -89,6 +91,13 @@ async fn day(date: String) -> Result<day::DayReport, CommandError> {
 /// The live refresh, owned by the app and stopped on exit.
 struct LiveRefresh(Mutex<Option<watch::Watch>>);
 
+/// Updates the tray from a blocking thread: the read waits for the store, the update for the main
+/// thread, and neither may hold up the watcher thread (joined on exit) or the main thread.
+fn refresh_tray(app: &tauri::AppHandle) {
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || tray::refresh(&handle));
+}
+
 /// Starts the watch of the data directory; without one there is nothing to refresh.
 fn start_live_refresh(app: &tauri::AppHandle) {
     let data_dir = match paths::data_dir() {
@@ -100,6 +109,7 @@ fn start_live_refresh(app: &tauri::AppHandle) {
     };
     let handle = app.clone();
     let emit = move |_| {
+        refresh_tray(&handle);
         if let Err(error) = handle.emit(watch::EVENT, ()) {
             eprintln!(
                 "tamias-app: live refresh: cannot emit {}: {error}",
@@ -139,21 +149,41 @@ pub fn run() {
             Some(vec![launch::HIDDEN]),
         ))
         .setup(|app| {
+            let tray = tray::create(app.handle());
+            if let Err(error) = &tray {
+                eprintln!("tamias-app: tray: cannot create: {error}");
+            }
             start_live_refresh(app.handle());
-            // The window is created hidden (tauri.conf.json) and shown unless `--hidden`.
-            if launch::initial_visibility(std::env::args().skip(1))
-                && let Some(window) = app.get_webview_window("main")
-            {
-                window.show()?;
+            refresh_tray(app.handle());
+            // The window is created hidden (tauri.conf.json) and shown unless `--hidden`; without
+            // a tray there is no way to open it later, so it is shown then.
+            if tray.is_err() || launch::initial_visibility(std::env::args().skip(1)) {
+                tray::show_window(app.handle());
+            } else {
+                tray::hide_dock_icon(app.handle());
             }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Closing hides to the tray, "Quit" in the tray menu exits; without a tray the
+            // window closes and the app exits.
+            if let WindowEvent::CloseRequested { api, .. } = event
+                && window.label() == tray::MAIN_WINDOW
+                && tray::exists(window.app_handle())
+            {
+                api.prevent_close();
+                tray::hide_window(window.app_handle());
+            }
         })
         .invoke_handler(tauri::generate_handler![today, month, day])
         .build(tauri::generate_context!())
         .expect("error while running the tamias app")
-        .run(|app, event| {
-            if let RunEvent::Exit = event {
-                stop_live_refresh(app);
-            }
+        .run(|app, event| match event {
+            // "Quit" in the tray and every other exit: the watcher thread is stopped and joined.
+            RunEvent::Exit => stop_live_refresh(app),
+            // The dock icon of a hidden window (should it still be shown) opens the window.
+            #[cfg(target_os = "macos")]
+            RunEvent::Reopen { .. } => tray::show_window(app),
+            _ => {}
         });
 }
