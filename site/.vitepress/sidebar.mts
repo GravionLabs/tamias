@@ -20,6 +20,7 @@ export function isAdr(absolutePath: string, adrRoot: string): boolean {
 export const PAGES: readonly SidebarItem[] = [
   { text: 'Overview', link: '/' },
   { text: 'Installation', link: '/installation' },
+  { text: 'Desktop app', link: '/app' },
   { text: 'Consumers', link: '/consumers' },
   { text: 'Usage sources', link: '/sources' },
   { text: 'Roadmap', link: '/roadmap' },
