@@ -5,11 +5,29 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.4.0] — 2026-11-05
+
+### Bug Fixes
+- Day view charts grow with the window (#143) (#147)
+
+
+### Documentation
+- **site**: Drop roadmap and ADR links, add icon, calendar screenshots and CLI page (#142) (#146)
+
+
+### Features
+- **app**: Week starts on Monday by default, configurable in config.toml (#144)
+
+
 ## [0.3.1] — 2026-11-05
 
 ### Bug Fixes
 - Release build of the app loads no component styles (#138) (#139)
 - **app**: Release build lost component styles because critical CSS inlining made the CSP ignore 'unsafe-inline'
+
+
+### Documentation
+- Update CHANGELOG.md for v0.3.1 [skip ci]
 
 
 ## [0.3.0] — 2026-11-05
