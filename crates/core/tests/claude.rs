@@ -10,7 +10,9 @@ use std::time::Duration;
 
 use jiff::Timestamp;
 use tamias_core::credentials::{CredentialSource, FileSource, Secret, parse_credentials};
-use tamias_core::provider::claude::{ClaudeProvider, Error, UsageClient, parse_usage};
+use tamias_core::provider::claude::{
+    ClaudeProvider, Error, UsageClient, parse_statusline, parse_usage,
+};
 use tamias_core::snapshot::{Provider, Snapshot, Source, Unit, Window};
 
 const TOKEN: &str = "sk-ant-oat01-TEST-TOKEN-must-never-leak";
@@ -459,5 +461,101 @@ fn error_class_is_short_and_never_carries_the_message() {
     ];
     for (err, class) in cases {
         assert_eq!(err.class(), class, "{err:?}");
+    }
+}
+
+// --- parse_statusline ------------------------------------------------------------------------
+
+fn statusline_snapshot(window: Window, used: f64, resets_at: i64) -> Snapshot {
+    Snapshot {
+        provider: Provider::Claude,
+        window,
+        used,
+        limit: 100.0,
+        unit: Unit::Percent,
+        resets_at: Timestamp::from_second(resets_at).unwrap(),
+        observed_at: now(),
+        source: Source::Statusline,
+    }
+}
+
+fn statusline(rate_limits: &str) -> Vec<u8> {
+    format!(r#"{{"session_id":"x","rate_limits":{rate_limits}}}"#).into_bytes()
+}
+
+#[test]
+fn statusline_fixture_yields_both_windows() {
+    let snapshots = parse_statusline(&fixture("statusline-synthetic.json"), now()).unwrap();
+    assert_eq!(
+        snapshots,
+        vec![
+            statusline_snapshot(Window::FiveHour, 23.5, 1_793_000_000),
+            statusline_snapshot(Window::SevenDay, 41.2, 1_793_400_000),
+        ]
+    );
+}
+
+#[test]
+fn statusline_one_window_only() {
+    let body = statusline(r#"{"seven_day":{"used_percentage":10,"resets_at":1793400000}}"#);
+    assert_eq!(
+        parse_statusline(&body, now()).unwrap(),
+        vec![statusline_snapshot(Window::SevenDay, 10.0, 1_793_400_000)]
+    );
+}
+
+#[test]
+fn statusline_boundaries_0_and_100_are_valid() {
+    let body = statusline(
+        r#"{"five_hour":{"used_percentage":0,"resets_at":1},"seven_day":{"used_percentage":100,"resets_at":2}}"#,
+    );
+    assert_eq!(parse_statusline(&body, now()).unwrap().len(), 2);
+}
+
+#[test]
+fn statusline_without_limits_is_empty() {
+    let empty = |body: &[u8]| parse_statusline(body, now()).unwrap().is_empty();
+    assert!(empty(&statusline("null")));
+    assert!(empty(br#"{"session_id":"x"}"#));
+    assert!(empty(&statusline("{}")));
+    assert!(empty(&fixture("statusline-no-limits.json")));
+}
+
+#[test]
+fn statusline_unavailable_flag_wins_over_limits() {
+    let body = br#"{"rate_limits_available":false,"rate_limits":{"five_hour":{"used_percentage":5,"resets_at":1}}}"#;
+    assert!(parse_statusline(body, now()).unwrap().is_empty());
+}
+
+#[test]
+fn statusline_invalid_values_are_schema_errors() {
+    for rate_limits in [
+        r#"{"five_hour":{"used_percentage":100.1,"resets_at":1}}"#,
+        r#"{"five_hour":{"used_percentage":-1,"resets_at":1}}"#,
+        r#"{"five_hour":{"used_percentage":"5","resets_at":1}}"#,
+        r#"{"five_hour":{"resets_at":1}}"#,
+        r#"{"five_hour":{"used_percentage":5,"resets_at":"2026-11-02T06:00:00Z"}}"#,
+        r#"{"five_hour":{"used_percentage":5,"resets_at":1.5}}"#,
+        r#"{"five_hour":{"used_percentage":5}}"#,
+        r#"{"five_hour":5}"#,
+        r#""text""#,
+        // one bad window rejects the whole document
+        r#"{"five_hour":{"used_percentage":5,"resets_at":1},"seven_day":{"used_percentage":101,"resets_at":1}}"#,
+    ] {
+        let result = parse_statusline(&statusline(rate_limits), now());
+        assert!(
+            matches!(result, Err(Error::Schema(_))),
+            "{rate_limits}: {result:?}"
+        );
+    }
+}
+
+#[test]
+fn statusline_garbage_is_a_schema_error() {
+    for body in [&b""[..], b"not json", b"[]", b"42"] {
+        assert!(matches!(
+            parse_statusline(body, now()),
+            Err(Error::Schema(_))
+        ));
     }
 }
