@@ -10,8 +10,11 @@ use std::thread;
 use assert_cmd::Command;
 use jiff::{SignedDuration, Timestamp};
 use predicates::prelude::*;
+use tamias_core::snapshot::{Provider, Window};
+use tamias_core::store::Store;
 use tempfile::TempDir;
 
+const GH_TOKEN: &str = "gho_FAKE-GH-TEST-TOKEN-must-never-leak";
 const TOKEN: &str = "sk-ant-oat01-CLI-TEST-TOKEN-must-never-leak";
 
 struct Env {
@@ -29,6 +32,36 @@ impl Env {
 
     fn path(&self, name: &str) -> PathBuf {
         self.dir.path().join(name)
+    }
+
+    fn gh_path(&self) -> PathBuf {
+        self.path(if cfg!(windows) { "gh.cmd" } else { "gh" })
+    }
+
+    /// A fake `gh` that prints a token for `gh auth token`.
+    #[cfg(windows)]
+    fn fake_gh(&self) {
+        std::fs::write(self.gh_path(), format!("@echo off\r\necho {GH_TOKEN}\r\n")).unwrap();
+    }
+
+    /// A fake `gh` that prints a token for `gh auth token`.
+    #[cfg(unix)]
+    fn fake_gh(&self) {
+        use std::os::unix::fs::PermissionsExt;
+        let path = self.gh_path();
+        std::fs::write(&path, format!("#!/bin/sh\necho {GH_TOKEN}\n")).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    /// The collect log, one entry per line.
+    fn log_lines(&self) -> Vec<String> {
+        let text = std::fs::read_to_string(self.path("data").join("logs").join("collect.log"))
+            .unwrap_or_default();
+        text.lines().map(str::to_owned).collect()
+    }
+
+    fn store(&self) -> Store {
+        Store::open_read_only(self.path("data").join("tamias.db")).unwrap()
     }
 
     fn write_config(&self, text: &str) {
@@ -55,6 +88,9 @@ impl Env {
                 self.path("credentials.json"),
             )
             .env("TAMIAS_CLAUDE_USAGE_URL", url)
+            // Hermetic Copilot: no `gh` (unless a test writes `fake_gh`) and nothing to call.
+            .env("TAMIAS_GH", self.gh_path())
+            .env("TAMIAS_COPILOT_USER_URL", closed_url())
             .env("TZ", "UTC")
             .env_remove("CLAUDE_CONFIG_DIR")
             .env_remove("NO_COLOR")
@@ -132,6 +168,33 @@ fn no_token() -> impl Predicate<str> {
     predicate::str::contains("TEST-TOKEN").not()
 }
 
+/// Loopback server answering one Copilot user request with `body`; returns the URL.
+fn copilot_server(body: &str) -> String {
+    let (url, _requests) = serve(vec![response("200 OK", body)]);
+    url
+}
+
+fn copilot_paid() -> String {
+    format!(
+        r#"{{"quota_snapshots":{{"premium_interactions":{{"entitlement":300,"remaining":250,"unlimited":false,"has_quota":true}}}},"quota_reset_date_utc":"{}"}}"#,
+        in_hours(240)
+    )
+}
+
+fn copilot_free() -> String {
+    r#"{"quota_snapshots":{"premium_interactions":{"entitlement":0,"remaining":0,"unlimited":false,"has_quota":false}},"quota_reset_date_utc":null}"#.to_owned()
+}
+
+fn copilot_snapshots(env: &Env) -> usize {
+    let now = Timestamp::now();
+    let from = now.checked_sub(SignedDuration::from_hours(1)).unwrap();
+    let to = now.checked_add(SignedDuration::from_hours(1)).unwrap();
+    env.store()
+        .snapshots(Provider::Copilot, Window::Monthly, from, to)
+        .unwrap()
+        .len()
+}
+
 #[test]
 fn collect_then_today_shows_both_claude_windows() {
     let env = Env::new();
@@ -150,7 +213,7 @@ fn collect_then_today_shows_both_claude_windows() {
 
     let table = stdout_of(env.tamias(&closed_url()).arg("today"));
     let lines: Vec<&str> = table.lines().collect();
-    assert_eq!(lines.len(), 3, "{table}");
+    assert_eq!(lines.len(), 4, "{table}");
     assert!(lines[0].starts_with("PROVIDER  WINDOW"), "{table}");
     assert!(lines[1].starts_with("claude    seven_day  34%"), "{table}");
     assert!(lines[1].ends_with("green"), "{table}");
@@ -159,6 +222,10 @@ fn collect_then_today_shows_both_claude_windows() {
         "{table}"
     );
     assert!(lines[2].ends_with("green"), "{table}");
+    assert!(
+        lines[3].starts_with("copilot   -") && lines[3].ends_with("unavailable (not set up)"),
+        "no gh: Copilot is unavailable: {table}"
+    );
     assert!(
         !table.contains('\x1b'),
         "no colour when stdout is not a TTY"
@@ -514,4 +581,230 @@ fn help_documents_the_exit_codes() {
                     )),
             );
     }
+}
+
+#[test]
+fn paid_copilot_seat_stores_one_monthly_snapshot_next_to_claude() {
+    let env = Env::new();
+    env.write_credentials();
+    env.fake_gh();
+    let (claude_url, _r) = serve(vec![usage_ok()]);
+    let copilot_url = copilot_server(&copilot_paid());
+
+    env.tamias(&claude_url)
+        .env("TAMIAS_COPILOT_USER_URL", copilot_url)
+        .arg("collect")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("GH-TEST-TOKEN").not());
+
+    assert_eq!(copilot_snapshots(&env), 1);
+    let store = env.store();
+    let status = store.status(Provider::Copilot).unwrap().unwrap();
+    assert!(status.last_ok_at.is_some());
+    assert_eq!(status.unavailable, None);
+    assert!(
+        store
+            .status(Provider::Claude)
+            .unwrap()
+            .unwrap()
+            .last_ok_at
+            .is_some()
+    );
+    let log = env.log_lines();
+    assert_eq!(log.len(), 2, "{log:?}");
+    assert!(log[0].ends_with("claude ok stored 2 snapshots"), "{log:?}");
+    assert!(log[1].ends_with("copilot ok stored 1 snapshots"), "{log:?}");
+}
+
+#[test]
+fn free_copilot_seat_is_recorded_unavailable_without_a_snapshot() {
+    let env = Env::new();
+    env.write_config("[providers]\nclaude = false\n");
+    env.fake_gh();
+    let copilot_url = copilot_server(&copilot_free());
+
+    env.tamias(&closed_url())
+        .env("TAMIAS_COPILOT_USER_URL", copilot_url)
+        .arg("collect")
+        .assert()
+        .success();
+
+    assert_eq!(copilot_snapshots(&env), 0);
+    let status = env.store().status(Provider::Copilot).unwrap().unwrap();
+    assert_eq!(status.unavailable.as_deref(), Some("no premium quota"));
+    assert!(status.last_ok_at.is_some());
+    let log = env.log_lines();
+    assert!(
+        log[1].ends_with("copilot ok skipped (no premium quota)"),
+        "{log:?}"
+    );
+}
+
+#[test]
+fn today_shows_the_stored_reason_of_a_free_copilot_seat() {
+    let env = Env::new();
+    env.write_config("[providers]\nclaude = false\n");
+    env.fake_gh();
+    let copilot_url = copilot_server(&copilot_free());
+    env.tamias(&closed_url())
+        .env("TAMIAS_COPILOT_USER_URL", copilot_url)
+        .arg("collect")
+        .assert()
+        .success();
+
+    let table = stdout_of(env.tamias(&closed_url()).arg("today"));
+
+    let lines: Vec<&str> = table.lines().collect();
+    assert_eq!(lines.len(), 3, "{table}");
+    assert!(lines[1].ends_with("unavailable (disabled)"), "{table}");
+    assert!(
+        lines[2].starts_with("copilot   -") && lines[2].ends_with("unavailable (no premium quota)"),
+        "{table}"
+    );
+}
+
+#[test]
+fn unlimited_copilot_seat_is_recorded_unavailable_with_its_reason() {
+    let env = Env::new();
+    env.write_config("[providers]\nclaude = false\n");
+    env.fake_gh();
+    let copilot_url = copilot_server(
+        r#"{"quota_snapshots":{"premium_interactions":{"entitlement":0,"remaining":0,"unlimited":true,"has_quota":true}}}"#,
+    );
+    env.tamias(&closed_url())
+        .env("TAMIAS_COPILOT_USER_URL", copilot_url)
+        .arg("collect")
+        .assert()
+        .success();
+    let status = env.store().status(Provider::Copilot).unwrap().unwrap();
+    assert_eq!(status.unavailable.as_deref(), Some("unlimited"));
+}
+
+#[test]
+fn a_later_paid_poll_clears_the_unavailable_reason() {
+    let env = Env::new();
+    env.write_config("[providers]\nclaude = false\n");
+    env.fake_gh();
+    let free = copilot_server(&copilot_free());
+    env.tamias(&closed_url())
+        .env("TAMIAS_COPILOT_USER_URL", free)
+        .arg("collect")
+        .assert()
+        .success();
+    let paid = copilot_server(&copilot_paid());
+    env.tamias(&closed_url())
+        .env("TAMIAS_COPILOT_USER_URL", paid)
+        .arg("collect")
+        .assert()
+        .success();
+    assert_eq!(
+        env.store()
+            .status(Provider::Copilot)
+            .unwrap()
+            .unwrap()
+            .unavailable,
+        None
+    );
+    assert_eq!(copilot_snapshots(&env), 1);
+}
+
+#[test]
+fn missing_gh_with_auto_is_skipped_not_set_up() {
+    let env = Env::new();
+    env.write_config("[providers]\nclaude = false\n");
+    // No fake gh written.
+    env.tamias(&closed_url()).arg("collect").assert().success();
+    assert_eq!(env.store().status(Provider::Copilot).unwrap(), None);
+    let log = env.log_lines();
+    assert_eq!(log.len(), 2, "{log:?}");
+    assert!(
+        log[1].ends_with("copilot ok skipped (not set up)"),
+        "{log:?}"
+    );
+}
+
+#[test]
+fn missing_gh_with_true_is_an_error_and_recorded() {
+    let env = Env::new();
+    env.write_config("[providers]\nclaude = false\ncopilot = true\n");
+    env.tamias(&closed_url())
+        .arg("collect")
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("no GitHub credentials"));
+    let status = env.store().status(Provider::Copilot).unwrap().unwrap();
+    assert_eq!(status.last_error.as_deref(), Some("no credentials"));
+    assert!(env.log_lines()[1].ends_with("copilot error no credentials"));
+}
+
+#[test]
+fn disabled_copilot_is_skipped() {
+    let env = Env::new();
+    env.write_config("[providers]\nclaude = false\ncopilot = false\n");
+    env.fake_gh();
+    env.tamias(&closed_url()).arg("collect").assert().success();
+    assert_eq!(env.store().status(Provider::Copilot).unwrap(), None);
+    assert!(env.log_lines()[1].ends_with("copilot ok skipped (disabled)"));
+}
+
+#[test]
+fn gh_path_of_the_config_is_used() {
+    let env = Env::new();
+    env.fake_gh();
+    let gh = env.gh_path();
+    env.write_config(&format!(
+        "gh_path = {:?}\n[providers]\nclaude = false\n",
+        gh.display().to_string()
+    ));
+    let copilot_url = copilot_server(&copilot_paid());
+    env.tamias(&closed_url())
+        .env_remove("TAMIAS_GH")
+        .env("TAMIAS_COPILOT_USER_URL", copilot_url)
+        .arg("collect")
+        .assert()
+        .success();
+    assert_eq!(copilot_snapshots(&env), 1);
+}
+
+#[test]
+fn copilot_failure_never_skips_claude_and_exits_3() {
+    let env = Env::new();
+    env.write_credentials();
+    env.fake_gh();
+    let (claude_url, _r) = serve(vec![usage_ok()]);
+    let (copilot_url, _r2) = serve(vec![response("500 Internal Server Error", "{}")]);
+
+    env.tamias(&claude_url)
+        .env("TAMIAS_COPILOT_USER_URL", copilot_url)
+        .arg("collect")
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("GH-TEST-TOKEN").not());
+
+    let store = env.store();
+    let claude = store.status(Provider::Claude).unwrap().unwrap();
+    assert!(claude.last_ok_at.is_some());
+    assert_eq!(claude.last_error, None);
+    let copilot = store.status(Provider::Copilot).unwrap().unwrap();
+    assert_eq!(copilot.last_error.as_deref(), Some("http 500"));
+    let log = env.log_lines();
+    assert_eq!(log.len(), 2, "{log:?}");
+    assert!(log[0].ends_with("claude ok stored 2 snapshots"), "{log:?}");
+    assert!(log[1].ends_with("copilot error http 500"), "{log:?}");
+}
+
+#[test]
+fn claude_failure_does_not_skip_copilot() {
+    let env = Env::new();
+    env.write_credentials();
+    env.fake_gh();
+    let copilot_url = copilot_server(&copilot_paid());
+    env.tamias(&closed_url())
+        .env("TAMIAS_COPILOT_USER_URL", copilot_url)
+        .arg("collect")
+        .assert()
+        .code(3);
+    assert_eq!(copilot_snapshots(&env), 1);
+    assert_eq!(env.log_lines().len(), 2);
 }

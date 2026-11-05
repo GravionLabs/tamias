@@ -15,7 +15,8 @@ use tamias_core::report::{self, Report};
 use tamias_core::snapshot::{Provider, Unit, Window};
 use tamias_core::store::{self, SourceStatus, Store};
 
-use crate::claude::{self, Unavailable};
+use crate::claude;
+use crate::unavailable::Unavailable;
 use tamias_core::config::Config;
 
 /// State shown in the last column.
@@ -127,33 +128,22 @@ enum Entry {
     Read(report::Provider, Option<SourceStatus>),
 }
 
-/// Claude (unless unavailable), then Copilot when the store has anything of it.
+/// Claude, then Copilot: each is `Unavailable` with its reason or read from the store.
 fn gather(
     config: &Config,
     store: &Store,
     now: Timestamp,
     tz: &TimeZone,
 ) -> Result<Vec<Entry>, store::Error> {
-    let mut entries = Vec::new();
-    if let Some(why) = claude::availability(config.claude) {
-        entries.push(Entry::Unavailable(Provider::Claude, why));
-    } else {
-        entries.push(read_provider(
-            store,
-            Provider::Claude,
-            now,
-            tz,
-            &config.thresholds,
-        )?);
-    }
-    // No Copilot provider yet (#5): shown only when seeded into the store.
-    let copilot = read_provider(store, Provider::Copilot, now, tz, &config.thresholds)?;
-    if let Entry::Read(report, status) = &copilot
-        && (status.is_some() || !report.windows.is_empty())
-    {
-        entries.push(copilot);
-    }
-    Ok(entries)
+    let claude = match claude::availability(config.claude) {
+        Some(why) => Entry::Unavailable(Provider::Claude, why),
+        None => read_provider(store, Provider::Claude, now, tz, &config.thresholds)?,
+    };
+    let copilot = match tamias_core::unavailable::copilot(config, store)? {
+        Some(why) => Entry::Unavailable(Provider::Copilot, why),
+        None => read_provider(store, Provider::Copilot, now, tz, &config.thresholds)?,
+    };
+    Ok(vec![claude, copilot])
 }
 
 fn read_provider(
@@ -247,7 +237,7 @@ pub fn render(lines: &[Line], now: Timestamp, tz: &TimeZone, colour: bool) -> St
             let cells = [
                 line.provider.to_string(),
                 line.window.map_or_else(dash, |w| w.to_string()),
-                line.used.map_or_else(dash, |v| amount(v, line.unit, 0)),
+                used_cell(line),
                 line.usage.map_or_else(dash, |v| amount(v, line.unit, 1)),
                 line.budget.map_or_else(dash, |v| amount(v, line.unit, 1)),
                 line.resets_at.map_or_else(dash, |t| local_time(t, now, tz)),
@@ -289,6 +279,15 @@ fn push_row(out: &mut String, cells: &[String; 7], widths: &[usize; 7], ansi: Op
 
 fn dash() -> String {
     "-".to_owned()
+}
+
+/// Used column: `34%` for a percent window, `180 / 300` for a request window.
+fn used_cell(line: &Line) -> String {
+    match (line.used, line.unit, line.limit) {
+        (Some(used), Unit::Requests, Some(limit)) => format!("{used:.0} / {limit:.0}"),
+        (Some(used), unit, _) => amount(used, unit, 0),
+        (None, ..) => dash(),
+    }
 }
 
 fn amount(value: f64, unit: Unit, decimals: usize) -> String {

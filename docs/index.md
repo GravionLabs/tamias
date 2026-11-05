@@ -18,7 +18,7 @@ hero:
 
 features:
   - title: One collector
-    details: Polls Claude every 5 minutes (Copilot is coming with [#5](https://github.com/GravionLabs/tamias/issues/5)) as a user-level scheduled job on Linux, Windows and macOS, and stores snapshots in SQLite.
+    details: Polls Claude and GitHub Copilot every 5 minutes as a user-level scheduled job on Linux, Windows and macOS, and stores snapshots in SQLite.
   - title: A dynamic daily budget
     details: What is left until the next reset, divided by the days left. Today is green below 80 %, yellow from 80 to 100 %, red above, grey when the data is stale.
   - title: Thin consumers
@@ -35,6 +35,6 @@ tamias is in development. Read on:
 - [Desktop app](./app.md): download, first start, the calendar, the day view, the tray and autostart.
 - [Consumers](./consumers.md): how to read tamias from scripts, plugins and Rust.
 - [Usage sources](./sources.md): where the numbers come from and how stable each source is.
-- [Roadmap](./roadmap.md): the milestones and their Features.
+- [Roadmap](./roadmap.md): the milestones, the tag that ships each, and their Features.
 - Decisions: [ADR 0001](./adr/0001-usage-collector-architecture.md) (collector architecture) and [ADR 0002](./adr/0002-documentation-site.md) (this site), on GitHub.
 

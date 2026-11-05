@@ -44,7 +44,8 @@ export type ChipColour = Colour | "neutral";
 
 interface Chip {
   provider: ProviderName;
-  letters: string;
+  /** "C 64 %": the letters and, when the day has a budget, the usage ratio. */
+  label: string;
   colour: ChipColour;
   title: string;
 }
@@ -55,6 +56,9 @@ interface Cell {
   today: boolean;
   /** Days up to today open the day view. */
   open: boolean;
+  /** A day after today: quieter, no data yet. */
+  future: boolean;
+  weekend: boolean;
   chips: Chip[];
   /** "stale since 09:00" on today's cell when a provider is stale. */
   stale: string | null;
@@ -125,6 +129,8 @@ export class Calendar {
         date,
         today: isToday,
         open: date <= today,
+        future: date > today,
+        weekend: [0, 6].includes(new Date(year, month - 1, i + 1).getDay()),
         chips: providers.map((p) => chip(p, date, date <= today, isToday)),
         stale: stale ? staleText(stale.stale_since, now) : null,
       };
@@ -217,7 +223,8 @@ function initialMonth(value: string | null, now: Date): { year: number; month: n
 
 function chip(p: ProviderMonth, date: string, upToToday: boolean, isToday: boolean): Chip {
   const name = providerLabel(p.provider);
-  const base = { provider: p.provider, letters: LETTERS[p.provider] };
+  const letters = LETTERS[p.provider];
+  const base = { provider: p.provider, label: letters };
   if (p.status === "unavailable") {
     return { ...base, colour: "neutral", title: `${name}: unavailable` };
   }
@@ -228,6 +235,7 @@ function chip(p: ProviderMonth, date: string, upToToday: boolean, isToday: boole
   if (!day) return { ...base, colour: "neutral", title: `${name}: no data` };
   return {
     ...base,
+    label: day.ratio === undefined ? letters : `${letters} ${Math.round(day.ratio * 100)} %`,
     colour: day.colour,
     title: `${name}: ${amount(day.usage, p.unit)} of ${amount(day.budget, p.unit)}`,
   };

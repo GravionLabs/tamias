@@ -1,3 +1,5 @@
+<img src="app/src-tauri/icons/128x128.png" alt="tamias icon" width="96" align="right">
+
 # tamias
 
 tamias (Greek ταμίας, treasurer) shows how much of your Claude and GitHub Copilot usage limits you used today, and whether that fits the daily budget left until the next reset.

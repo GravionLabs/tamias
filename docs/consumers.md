@@ -30,7 +30,8 @@ Prints one JSON document, never coloured, described by the [JSON Schema](https:/
           "colour": "green",
           "today_usage": 4.0,
           "budget": 10.0,
-          "ratio": 0.4
+          "ratio": 0.4,
+          "month_usage": 4.0
         }
       ]
     }
@@ -45,7 +46,7 @@ Prints one JSON document, never coloured, described by the [JSON Schema](https:/
 | `schema_version` | Version of the format, `1`. Check it first. |
 | `generated_at` | When the report was made (RFC 3339, UTC). |
 | `providers[].provider` | `claude` or `copilot`. |
-| `providers[].status` | `ok`; `stale` (last collect failed or is older than `stale_after`); `unavailable` (not set up, no windows). |
+| `providers[].status` | `ok`; `stale` (last collect failed or is older than `stale_after`); `unavailable` (no windows; the reason is shown by `tamias today`: not set up, disabled, or for Copilot a seat without a countable quota, `no premium quota` or `unlimited`). |
 | `providers[].stale_since` | Last successful collect of a stale provider; absent when there never was one. |
 | `windows[].window` | `seven_day` and `five_hour` (Claude), `monthly` (Copilot). |
 | `windows[].binding` | Whether the window has a daily budget: Claude `seven_day` and Copilot `monthly`. |
@@ -54,6 +55,7 @@ Prints one JSON document, never coloured, described by the [JSON Schema](https:/
 | `windows[].resets_at` | End of the most recently observed window. |
 | `windows[].colour` | `green` below 80 % of the daily budget, `yellow` 80 to 100 %, `red` above, `grey` when the provider is stale. |
 | `windows[].today_usage`, `budget`, `ratio` | Usage of the local day, the budget of the local day and `today_usage / budget`. Only on binding windows, once a day can be derived; `ratio` is absent when the budget is 0. |
+| `windows[].month_usage` | Usage of the local month up to and including today, in `unit`: the sum of the daily usage (as `today_usage`); days without snapshots count 0. Only on binding windows, once a day can be derived. |
 
 A window without any snapshot is left out. Optional fields are absent, never `null`.
 
@@ -66,6 +68,8 @@ C 62% · CP 41%
 ```
 
 `C` is Claude (seven-day used %), `CP` is Copilot (monthly used %). A stale provider shows `?` (`C ?`); an unavailable provider is left out. `--color` controls ANSI colours; the default colours only a terminal without `NO_COLOR`. `--short` and `--json` cannot be combined.
+
+To show this line in the status line of Claude Code, see [Claude Code status line](./statusline.md).
 
 ## Exit codes
 

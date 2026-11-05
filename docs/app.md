@@ -42,7 +42,7 @@ Every call of the CLI is limited to 10 seconds; a call that fails or does not an
 
 ## Calendar
 
-The calendar opens on the current month. Previous, Today and Next move between months. Claude (`C`) and Copilot (`CP`) are shown side by side in each day's cell. A chip's colour is the colour of that day against the daily budget. The limits are the defaults of `yellow_at` (0.8) and `red_at` (1.0) in `config.toml`; green is below `yellow_at`, yellow up to and including `red_at`, red above:
+The calendar opens on the current month. Previous, Today and Next move between months. Claude (`C`) and Copilot (`CP`) are shown side by side in each day's cell as status pills with the usage of the day against the budget, for example `C 64 %`. Today's number sits on a filled badge, future days and days without data are quieter (dashed outline pills), weekends are lightly tinted, and clickable days show a hover and keyboard focus state. A chip's colour is the colour of that day against the daily budget. The limits are the defaults of `yellow_at` (0.8) and `red_at` (1.0) in `config.toml`; green is below `yellow_at`, yellow up to and including `red_at`, red above:
 
 | Colour | Meaning |
 | --- | --- |
@@ -68,9 +68,9 @@ The tray icon shows the worst colour of the binding windows of the set-up provid
 
 | Icon | When |
 | --- | --- |
-| Hollow ring | no provider is set up |
-| Green, yellow, red disc | the worst binding window is green, yellow or red |
-| Grey disc | a set-up provider is stale or has no data, or the last read failed |
+| Hollow gauge outline | no provider is set up |
+| Green, yellow, red gauge | the worst binding window is green, yellow or red |
+| Grey gauge | a set-up provider is stale or has no data, or the last read failed |
 
 Grey wins over red: a stale provider's numbers may be outdated.
 
@@ -80,11 +80,15 @@ Grey wins over red: a stale provider's numbers may be outdated.
 
 If the tray icon cannot be created (for example on Linux without an AppIndicator library), the window is shown even when the app was started hidden, and closing the window closes the app, because there would be no other way to open it again.
 
+## Unavailable providers
+
+The app shows the same document as `tamias today --json`. A provider that is `unavailable` has no windows, no calendar chips and a grey tray (when all are unavailable). For Copilot that is: `copilot = false` in `config.toml` (old data is ignored), `auto` without a `gh` executable (not set up), and a seat without a countable monthly quota (`no premium quota` for a free seat, `unlimited`), as recorded by the last `tamias collect`. An error recorded after that makes it `stale` instead. With `gh` installed but logged out, Copilot is `stale` (never collected), not unavailable. See [Copilot](./installation.md#copilot).
+
 ## Start at login
 
 Settings has "Start tamias at login". The setting is the state of the operating system's autostart entry, so it is off until you turn it on. The entry starts the app with `--hidden`: only the tray icon appears, and the window opens with "Open tamias" in the tray menu, or on Windows and macOS with a left click on the icon.
 
-Removing the app does not remove the autostart entry; turn it off in Settings first.
+Removing the app does not remove the autostart entry; turn it off in Settings first. In a dev build (`pnpm tauri dev`) the switch is disabled with a hint, because a dev executable cannot run on its own after a reboot.
 
 ## The CLI is still the collector
 

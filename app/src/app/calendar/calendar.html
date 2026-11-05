@@ -1,17 +1,44 @@
 <header class="head">
   <h1 data-testid="title">{{ title() }}</h1>
   <nav class="nav" aria-label="Month">
-    <button hx-button variant="outlined" data-testid="prev" (click)="previous()">Previous</button>
     <button
       hx-button
-      variant="outlined"
+      variant="text"
+      size="small"
+      iconOnly
+      data-testid="prev"
+      aria-label="Previous month"
+      title="Previous month"
+      (click)="previous()"
+    >
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="2" />
+      </svg>
+    </button>
+    <button
+      hx-button
+      variant="text"
+      size="small"
       data-testid="today"
       [disabled]="isCurrentMonth()"
       (click)="goToday()"
     >
       Today
     </button>
-    <button hx-button variant="outlined" data-testid="next" (click)="next()">Next</button>
+    <button
+      hx-button
+      variant="text"
+      size="small"
+      iconOnly
+      data-testid="next"
+      aria-label="Next month"
+      title="Next month"
+      (click)="next()"
+    >
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" />
+      </svg>
+    </button>
   </nav>
   <a class="muted" routerLink="/today">Today overview</a>
   <a class="gear" routerLink="/settings" aria-label="Settings" title="Settings" data-testid="gear"
@@ -74,6 +101,10 @@
         data-testid="cell"
         [attr.data-date]="cell.date"
         [class.today]="cell.today"
+        [class.future]="cell.future"
+        [class.weekend]="cell.weekend"
+        [class.nodata]="!cell.future && !cell.chips.some((c) => c.colour !== 'neutral')"
+        [attr.aria-current]="cell.today ? 'date' : null"
       >
         @if (cell.open) {
           <a
@@ -95,7 +126,7 @@
               [attr.data-provider]="c.provider"
               [attr.data-colour]="c.colour"
               [attr.title]="c.title"
-              >{{ c.letters }}</span
+              >{{ c.label }}</span
             >
           }
         </span>

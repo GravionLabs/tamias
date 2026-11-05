@@ -69,15 +69,47 @@ Open a new terminal for the changed `PATH` to apply. Windows SmartScreen may war
 
 ```sh
 tamias --version
-tamias collect    # poll Claude once and store the snapshots (Copilot follows with [#5](https://github.com/GravionLabs/tamias/issues/5))
+tamias collect    # poll Claude and Copilot once and store the snapshots
 tamias today      # today's usage against the daily budget
 ```
 
-To poll every 5 minutes without running `collect` by hand, see [Scheduled collection](#scheduled-collection).
+To poll every 5 minutes without running `collect` by hand, see [Scheduled collection](#scheduled-collection). To show the usage in the Claude Code status line, see [Claude Code status line](./statusline.md).
+
+## Copilot
+
+tamias polls GitHub Copilot through the GitHub CLI `gh`; it reads the token of `gh auth token` and sends it only to `api.github.com`.
+
+1. Install [`gh`](https://cli.github.com/) and run `gh auth login` once.
+2. Run `tamias collect`, then `tamias today`.
+
+Until the first collect, `tamias today` shows Copilot as `stale, never collected` and exits with 3. After a successful collect it shows the monthly quota like Claude's windows.
+
+Two optional settings in `config.toml`, which lives in the config directory:
+
+| Platform | Config directory |
+|----------|------------------|
+| macOS | `~/Library/Application Support/tamias` |
+| Linux | `$XDG_CONFIG_HOME/tamias` (default `~/.config/tamias`) |
+| Windows | `%APPDATA%\tamias\config` |
+
+`TAMIAS_CONFIG_DIR` overrides the config directory on every platform.
+
+```toml
+gh_path = "/opt/gh/bin/gh"   # top level: use this gh instead of searching for one
+
+[providers]
+copilot = "auto"             # "auto" (default), true or false
+```
+
+- `"auto"`: Copilot is polled when a `gh` executable can be found (`gh_path`, then `PATH` and the usual install locations). Without one it shows as `unavailable (not set up)`. Login is not checked up front: with `gh` installed but logged out (`gh auth token` fails), the run is logged as skipped in `logs/collect.log` and nothing is stored, so `tamias today` shows Copilot as `stale, never collected` until you run `gh auth login`.
+- `true`: always poll; a missing or logged-out `gh` is an error (`stale` with the error), not `unavailable`.
+- `false`: opt out. Copilot shows as `unavailable (disabled)` and is skipped.
+
+A seat without a countable monthly quota is not an error. A free seat shows as `unavailable (no premium quota)`, a seat with unlimited premium requests as `unavailable (unlimited)`. Neither has a daily budget, and neither turns the exit code to 3.
 
 ## Scheduled collection
 
-tamias reads Claude usage by polling every 5 minutes. `tamias service` registers that poll with the scheduler of your operating system. It runs in your user account on all three platforms: no administrator rights, no `sudo`, no stored password.
+tamias reads Claude and Copilot usage by polling every 5 minutes. `tamias service` registers that poll with the scheduler of your operating system. It runs in your user account on all three platforms: no administrator rights, no `sudo`, no stored password.
 
 ```text
 tamias service install     # register the collector (run again to replace it)
@@ -117,7 +149,7 @@ Every scheduled run appends one line per provider to `logs/collect.log` in the d
 
 ### Check the last run
 
-`tamias service status` prints the registration, the executable, the last run of Claude (from the store; Copilot is not polled yet, it comes with [#5](https://github.com/GravionLabs/tamias/issues/5)) and the log path. For the history, read the end of the log:
+`tamias service status` prints the registration, the executable, the last run per provider (Claude and Copilot, from the store) and the log path. For the history, read the end of the log:
 
 ```text
 2026-11-03T10:15:42Z claude ok stored 2 snapshots
@@ -125,6 +157,10 @@ Every scheduled run appends one line per provider to `logs/collect.log` in the d
 ```
 
 An `error` line names a class of failure, for example an expired login; fix it and the next run recovers. A source that keeps failing shows as `stale` in `tamias today`.
+
+### `gh` not found under the service
+
+The scheduler starts `tamias collect` with a minimal `PATH`, often without the directory of `gh` (tamias itself also looks in `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin` and `/snap/bin`, but not in places such as `~/.local/bin` or a custom prefix). `unavailable (not set up)` means `gh` was not found. If `tamias collect` works in your shell but Copilot shows `unavailable (not set up)` under the service, set `gh_path` in `config.toml` (config directory, see [Copilot](#copilot)) to the full path of `gh` (`which gh`, `Get-Command gh` on Windows). The service must also run as the user that ran `gh auth login`, because the login lives in that user's `gh` configuration or keyring. If Copilot shows `stale, never collected` instead, `gh` was found but is logged out for that user: run `gh auth login` as that user. Check `logs/collect.log` for the `copilot` lines.
 
 ### macOS
 

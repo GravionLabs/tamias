@@ -1,0 +1,6 @@
+{
+  "session_id": "00000000-0000-0000-0000-000000000000",
+  "model": { "id": "claude-synthetic", "display_name": "Synthetic" },
+  "rate_limits_available": false,
+  "rate_limits": null
+}

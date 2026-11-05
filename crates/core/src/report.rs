@@ -5,7 +5,7 @@
 //! fields are only ever added as optional; a rename or removal bumps [`SCHEMA_VERSION`].
 //!
 //! - A window without any snapshot in the store is left out.
-//! - `today_usage`, `budget` and `ratio` exist only for binding windows (Claude `seven_day`,
+//! - `today_usage`, `budget`, `ratio` and `month_usage` exist only for binding windows (Claude `seven_day`,
 //!   Copilot `monthly`) once a day can be derived ([`budget::today`]).
 //! - A stale provider shows every window `grey`.
 //!
@@ -147,6 +147,10 @@ pub struct Window {
     /// `today_usage / budget` (binding windows, absent when the budget is 0).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ratio: Option<f64>,
+    /// Usage of the local month up to and including today (binding windows): the sum of the
+    /// daily usage of [`budget::day`], days without snapshots counting 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub month_usage: Option<f64>,
 }
 
 /// Why a provider is stale.
@@ -272,6 +276,9 @@ pub fn provider(
                 today_usage: day.map(|d| d.usage),
                 budget: day.map(|d| d.budget),
                 ratio: day.and_then(|d| d.ratio),
+                month_usage: day.map(|_| {
+                    month_usage(snapshots, provider, window, tz, budget_status, thresholds)
+                }),
             })
         })
         .collect();
@@ -287,8 +294,31 @@ pub fn provider(
     }
 }
 
+/// Sum of [`budget::day`] usage over the local days of the month of `status.now`, up to and
+/// including that day.
+fn month_usage(
+    snapshots: &[Snapshot],
+    provider: snapshot::Provider,
+    window: snapshot::Window,
+    tz: &TimeZone,
+    status: budget::Status,
+    thresholds: &Thresholds,
+) -> f64 {
+    let today = status.now.to_zoned(tz.clone()).date();
+    let mut total = 0.0;
+    let mut date = today.first_of_month();
+    while date <= today {
+        if let Some(d) = budget::day(snapshots, provider, window, date, tz, status, thresholds) {
+            total += d.usage;
+        }
+        let Ok(next) = date.tomorrow() else { break };
+        date = next;
+    }
+    total
+}
+
 /// Snapshots of every window of `provider` needed at `now` (from [`lookback`] before the start
-/// of the local day in `tz`), oldest first per window.
+/// of the local month in `tz`), oldest first per window.
 ///
 /// # Errors
 ///
@@ -301,7 +331,9 @@ pub fn snapshots(
 ) -> store::Result<Vec<Snapshot>> {
     let start = now
         .to_zoned(tz.clone())
-        .start_of_day()
+        .date()
+        .first_of_month()
+        .to_zoned(tz.clone())
         .map_or(now, |z| z.timestamp());
     let to = now
         .checked_add(SignedDuration::from_hours(48))

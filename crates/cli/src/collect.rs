@@ -4,11 +4,13 @@ use std::path::Path;
 
 use jiff::Timestamp;
 use tamias_core::paths;
+use tamias_core::provider::copilot::Poll;
 use tamias_core::snapshot::Provider;
 use tamias_core::store::Store;
 
 use crate::claude;
 use crate::collect_log::{CollectLog, RunResult};
+use crate::copilot;
 use tamias_core::config::{self, Config};
 
 /// Longest message of a fatal-error line in the log.
@@ -23,7 +25,9 @@ pub enum Outcome {
     ProviderFailed,
 }
 
-/// Polls Claude, records the run in `store` and appends one line per provider to `log`.
+/// Polls Claude, then Copilot, records each in `store` and appends one line per provider to `log`.
+///
+/// A provider is polled, recorded and logged on its own: a failure of one never skips the other.
 ///
 /// # Errors
 ///
@@ -33,10 +37,29 @@ pub fn run(
     store: &mut Store,
     log: &CollectLog,
 ) -> Result<Outcome, tamias_core::store::Error> {
+    let claude = run_claude(config, store, log)?;
+    let copilot = run_copilot(config, store, log)?;
+    Ok(if claude == Outcome::Ok && copilot == Outcome::Ok {
+        Outcome::Ok
+    } else {
+        Outcome::ProviderFailed
+    })
+}
+
+fn run_claude(
+    config: &Config,
+    store: &mut Store,
+    log: &CollectLog,
+) -> Result<Outcome, tamias_core::store::Error> {
     let provider = Provider::Claude;
     if let Some(why) = claude::availability_from_config(config.claude) {
         tracing::info!("{provider}: unavailable ({}), skipped", why.reason());
-        log.record(Timestamp::now(), provider, RunResult::Ok, &skipped(why));
+        log.record(
+            Timestamp::now(),
+            provider,
+            RunResult::Ok,
+            &skipped(why.reason()),
+        );
         return Ok(Outcome::Ok);
     }
     let now = Timestamp::now();
@@ -56,11 +79,61 @@ pub fn run(
         Err(e) => {
             if let Some(why) = claude::unavailable_for(config.claude, &e) {
                 tracing::info!("{provider}: unavailable ({}), skipped: {e}", why.reason());
-                log.record(now, provider, RunResult::Ok, &skipped(why));
+                log.record(now, provider, RunResult::Ok, &skipped(why.reason()));
                 return Ok(Outcome::Ok);
             }
             tracing::error!("{provider}: {e}");
             // Store first: if it fails, `run_logged` writes the one error line (fatal).
+            store.record_error(provider, now, &e.class())?;
+            log.record(now, provider, RunResult::Error, &e.class());
+            Ok(Outcome::ProviderFailed)
+        }
+    }
+}
+
+fn run_copilot(
+    config: &Config,
+    store: &mut Store,
+    log: &CollectLog,
+) -> Result<Outcome, tamias_core::store::Error> {
+    let provider = Provider::Copilot;
+    if let Some(why) = copilot::availability_from_config(config.copilot) {
+        tracing::info!("{provider}: unavailable ({}), skipped", why.reason());
+        log.record(
+            Timestamp::now(),
+            provider,
+            RunResult::Ok,
+            &skipped(why.reason()),
+        );
+        return Ok(Outcome::Ok);
+    }
+    let now = Timestamp::now();
+    match copilot::provider(config).poll(now) {
+        Ok(Poll::Quota(snapshot)) => {
+            let inserted = store.record_run(provider, &[snapshot], now)?;
+            tracing::info!("{provider}: stored {inserted} snapshots");
+            log.record(
+                now,
+                provider,
+                RunResult::Ok,
+                &format!("stored {inserted} snapshots"),
+            );
+            Ok(Outcome::Ok)
+        }
+        Ok(Poll::NoQuota(no_quota)) => {
+            let reason = no_quota.reason();
+            store.record_unavailable(provider, now, reason)?;
+            tracing::info!("{provider}: {reason}, no snapshot");
+            log.record(now, provider, RunResult::Ok, &skipped(reason));
+            Ok(Outcome::Ok)
+        }
+        Err(e) => {
+            if let Some(why) = copilot::unavailable_for(config.copilot, &e) {
+                tracing::info!("{provider}: unavailable ({}), skipped: {e}", why.reason());
+                log.record(now, provider, RunResult::Ok, &skipped(why.reason()));
+                return Ok(Outcome::Ok);
+            }
+            tracing::error!("{provider}: {e}");
             store.record_error(provider, now, &e.class())?;
             log.record(now, provider, RunResult::Error, &e.class());
             Ok(Outcome::ProviderFailed)
@@ -114,6 +187,6 @@ fn fatal_message(error: &str) -> String {
     )
 }
 
-fn skipped(why: claude::Unavailable) -> String {
-    format!("skipped ({})", why.reason())
+fn skipped(reason: &str) -> String {
+    format!("skipped ({reason})")
 }

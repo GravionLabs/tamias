@@ -13,30 +13,12 @@ use tamias_core::provider::claude::{self, ClaudeProvider, Error, TIMEOUT, UsageC
 
 use tamias_core::config::Enabled;
 
+use crate::unavailable::Unavailable;
+
 /// Test-only override of the credential source.
 pub const CREDENTIALS_FILE_ENV: &str = "TAMIAS_CLAUDE_CREDENTIALS_FILE";
 /// Test-only override of the usage endpoint (loopback only).
 pub const USAGE_URL_ENV: &str = "TAMIAS_CLAUDE_USAGE_URL";
-
-/// Why a provider is `unavailable`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Unavailable {
-    /// Disabled in the config.
-    Disabled,
-    /// `auto` and no credentials on this machine.
-    NotSetUp,
-}
-
-impl Unavailable {
-    /// Short reason shown by `today`.
-    #[must_use]
-    pub fn reason(self) -> &'static str {
-        match self {
-            Unavailable::Disabled => "disabled",
-            Unavailable::NotSetUp => "not set up",
-        }
-    }
-}
 
 /// Whether `error` means "no credentials on this machine" for the setting `enabled`.
 #[must_use]
@@ -115,7 +97,7 @@ fn client() -> UsageClient {
 
 /// Whether `url` is `http://` to exactly `127.0.0.1`, `localhost` or `[::1]` (any port, no
 /// userinfo).
-fn is_loopback(url: &str) -> bool {
+pub(crate) fn is_loopback(url: &str) -> bool {
     let Ok(uri) = url.parse::<http::Uri>() else {
         return false;
     };
@@ -131,7 +113,8 @@ fn is_loopback(url: &str) -> bool {
 mod tests {
     use tamias_core::provider::claude::Error;
 
-    use super::{Unavailable, is_loopback, unavailable_for};
+    use super::{is_loopback, unavailable_for};
+    use crate::unavailable::Unavailable;
     use tamias_core::config::Enabled;
 
     #[test]

@@ -25,6 +25,7 @@ fn status(ok: Option<&str>, err: Option<&str>, message: Option<&str>) -> Option<
         last_ok_at: ok.map(ts),
         last_error_at: err.map(ts),
         last_error: message.map(str::to_owned),
+        unavailable: None,
     })
 }
 
@@ -62,7 +63,6 @@ fn status_of_an_installed_agent_with_runs() {
              definition: /h/agent.plist\n\
              exe: {}\n\
              claude: last run 2026-11-03 10:05 ok\n\
-             copilot: not polled yet (coming with #5)\n\
              log: /d/logs/collect.log\n",
             exe.display()
         )
@@ -109,7 +109,7 @@ fn status_when_not_installed_shows_the_log_path() {
     );
     assert_eq!(
         text,
-        "service: not installed (run `tamias service install`)\ncopilot: not polled yet (coming with #5)\nlog: /d/collect.log\n"
+        "service: not installed (run `tamias service install`)\nlog: /d/collect.log\n"
     );
 }
 
@@ -299,10 +299,39 @@ fn status_reads_the_last_run_from_the_store() {
     .unwrap();
     assert!(text.contains("claude: last run 2026-11-03"), "{text}");
     assert!(text.contains("error (rate limited)"), "{text}");
-    assert!(
-        text.contains("copilot: not polled yet (coming with #5)"),
-        "{text}"
-    );
+    assert!(text.contains("copilot: no run yet"), "{text}");
+}
+
+#[test]
+fn status_reads_the_last_copilot_run_from_the_store() {
+    let (_dir, mut ok_store) = store();
+    ok_store
+        .record_ok(Provider::Copilot, ts("2026-11-03T10:05:00Z"))
+        .unwrap();
+    let text = execute(
+        Action::Status,
+        &FakeScheduler::default(),
+        || Ok(ok_store),
+        Path::new("l"),
+    )
+    .unwrap();
+    assert!(text.contains("copilot: last run 2026-11-03"), "{text}");
+    assert!(text.contains(" ok"), "{text}");
+    assert!(text.contains("claude: no run yet"), "{text}");
+
+    let (_dir, mut store) = store();
+    store
+        .record_error(Provider::Copilot, ts("2026-11-03T10:05:00Z"), "gh failed")
+        .unwrap();
+    let text = execute(
+        Action::Status,
+        &FakeScheduler::default(),
+        || Ok(store),
+        Path::new("l"),
+    )
+    .unwrap();
+    assert!(text.contains("copilot: last run 2026-11-03"), "{text}");
+    assert!(text.contains("error (gh failed)"), "{text}");
 }
 
 #[test]

@@ -137,6 +137,80 @@ fn snapshot(window: Window, json: Option<WindowJson>, now: Timestamp) -> Result<
     })
 }
 
+/// Maps a Claude Code status line document (stdin of the `statusLine` command) to snapshots of
+/// `rate_limits.five_hour` and `rate_limits.seven_day`, observed at `now`.
+///
+/// Only `used_percentage` (0 to 100) and `resets_at` (Unix epoch seconds) are read, every other
+/// key is ignored (see `docs/sources.md`, "Status line"). Each window is optional: it is present
+/// only while Claude Code reports it. `rate_limits` null or absent, or `rate_limits_available`
+/// false, gives no snapshot. The snapshots have the source [`Source::Statusline`].
+///
+/// # Errors
+///
+/// [`Error::Schema`] when the body is not a JSON object, or a reported window is not an object or
+/// has a missing or out-of-range `used_percentage` or a `resets_at` that is not a whole number
+/// of seconds. Nothing is returned partially.
+pub fn parse_statusline(body: &[u8], now: Timestamp) -> Result<Vec<Snapshot>> {
+    let doc: serde_json::Value = serde_json::from_slice(body)
+        .map_err(|e| Error::Schema(format!("status line input: {e}")))?;
+    let doc = doc
+        .as_object()
+        .ok_or_else(|| Error::Schema("status line input is not an object".to_owned()))?;
+    if doc.get("rate_limits_available") == Some(&serde_json::Value::Bool(false)) {
+        return Ok(Vec::new());
+    }
+    let limits = match doc.get("rate_limits") {
+        None | Some(serde_json::Value::Null) => return Ok(Vec::new()),
+        Some(serde_json::Value::Object(limits)) => limits,
+        Some(_) => return Err(Error::Schema("rate_limits is not an object".to_owned())),
+    };
+    let mut snapshots = Vec::new();
+    for window in [Window::FiveHour, Window::SevenDay] {
+        match limits.get(window.as_str()) {
+            None | Some(serde_json::Value::Null) => {}
+            Some(json) => snapshots.push(statusline_snapshot(window, json, now)?),
+        }
+    }
+    Ok(snapshots)
+}
+
+fn statusline_snapshot(
+    window: Window,
+    json: &serde_json::Value,
+    now: Timestamp,
+) -> Result<Snapshot> {
+    let name = window.as_str();
+    let used = json
+        .get("used_percentage")
+        .and_then(serde_json::Value::as_f64)
+        .ok_or_else(|| {
+            Error::Schema(format!("{name}.used_percentage is missing or not a number"))
+        })?;
+    if !(0.0..=100.0).contains(&used) {
+        return Err(Error::Schema(format!(
+            "{name}.used_percentage {used} is not between 0 and 100"
+        )));
+    }
+    let seconds = json
+        .get("resets_at")
+        .and_then(serde_json::Value::as_i64)
+        .ok_or_else(|| {
+            Error::Schema(format!("{name}.resets_at is missing or not epoch seconds"))
+        })?;
+    let resets_at = Timestamp::from_second(seconds)
+        .map_err(|e| Error::Schema(format!("{name}.resets_at {seconds} is out of range: {e}")))?;
+    Ok(Snapshot {
+        provider: Provider::Claude,
+        window,
+        used,
+        limit: 100.0,
+        unit: Unit::Percent,
+        resets_at,
+        observed_at: now,
+        source: Source::Statusline,
+    })
+}
+
 /// HTTP client of the usage endpoint.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UsageClient {

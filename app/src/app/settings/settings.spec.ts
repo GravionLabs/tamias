@@ -29,6 +29,7 @@ class StubIpc extends Ipc {
   calls: string[] = [];
   serviceCalls: string[] = [];
   fail: unknown = null;
+  available = true;
   service: ServiceStatus = NOT_INSTALLED;
   install: () => Promise<void> = async () => {
     this.service = INSTALLED;
@@ -45,8 +46,9 @@ class StubIpc extends Ipc {
     if (command.startsWith("service_")) return this.serviceCommand(command) as T;
     this.calls.push(command);
     if (this.fail) throw this.fail;
+    if (command === "autostart_available") return this.available as T;
     if (command === "plugin:autostart|is_enabled") return this.enabled as T;
-    if (command === "plugin:autostart|enable") this.enabled = true;
+    if (command === "autostart_enable") this.enabled = true;
     else if (command === "plugin:autostart|disable") this.enabled = false;
     else throw new Error(`unexpected command ${command}`);
     return undefined as T;
@@ -123,6 +125,21 @@ describe("Settings", () => {
     expect(error()).toBeNull();
   });
 
+  it("disables the toggle with a hint when autostart is not available (dev build)", async () => {
+    const ipc = new StubIpc(false);
+    ipc.available = false;
+    const { toggle, text } = await mount(ipc);
+    expect(toggle().disabled).toBe(true);
+    expect(text("autostart-unavailable")).toBe(
+      "Autostart is only available in an installed build.",
+    );
+  });
+
+  it("shows no unavailable hint in an installed build", async () => {
+    const { find } = await mount(new StubIpc(false));
+    expect(find("autostart-unavailable")).toBeNull();
+  });
+
   it("shows the toggle on when the OS has the autostart entry", async () => {
     const { toggle } = await mount(new StubIpc(true));
     expect(toggle().checked).toBe(true);
@@ -139,7 +156,11 @@ describe("Settings", () => {
     const ipc = new StubIpc(false);
     const { toggle, error, click } = await mount(ipc);
     await click();
-    expect(ipc.calls).toEqual(["plugin:autostart|is_enabled", "plugin:autostart|enable"]);
+    expect(ipc.calls).toEqual([
+      "autostart_available",
+      "plugin:autostart|is_enabled",
+      "autostart_enable",
+    ]);
     expect(ipc.enabled).toBe(true);
     expect(toggle().checked).toBe(true);
     expect(error()).toBeNull();
@@ -149,7 +170,11 @@ describe("Settings", () => {
     const ipc = new StubIpc(true);
     const { toggle, click } = await mount(ipc);
     await click();
-    expect(ipc.calls).toEqual(["plugin:autostart|is_enabled", "plugin:autostart|disable"]);
+    expect(ipc.calls).toEqual([
+      "autostart_available",
+      "plugin:autostart|is_enabled",
+      "plugin:autostart|disable",
+    ]);
     expect(ipc.enabled).toBe(false);
     expect(toggle().checked).toBe(false);
   });

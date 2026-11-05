@@ -114,6 +114,10 @@
         "ratio": {
           "description": "today_usage / budget (binding windows only; absent when the budget is 0).",
           "$ref": "#/$defs/amount"
+        },
+        "month_usage": {
+          "description": "Usage of the local month up to and including today in unit: the sum of the daily usage; days without snapshots count 0 (binding windows only).",
+          "$ref": "#/$defs/amount"
         }
       },
       "allOf": [
@@ -125,7 +129,8 @@
               "anyOf": [
                 { "required": ["today_usage"] },
                 { "required": ["budget"] },
-                { "required": ["ratio"] }
+                { "required": ["ratio"] },
+                { "required": ["month_usage"] }
               ]
             }
           }

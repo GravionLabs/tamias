@@ -1,8 +1,8 @@
 //! The `month` command: the days of one month of every provider with their usage against the
 //! budget, plus each provider's `status` / `stale_since` as in [`today`].
 //!
-//! - A provider that is `unavailable` (switched off, not set up, Copilot until it has a
-//!   collector) has no days.
+//! - A provider that is `unavailable` (switched off, not set up, Copilot without a countable
+//!   quota) has no days.
 //! - Days are the local days of the system time zone up to today; a day without data is absent.
 
 use std::path::Path;

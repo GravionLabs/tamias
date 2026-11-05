@@ -173,8 +173,42 @@ describe("Calendar", () => {
     expect(chip(el, "2026-11-01", "claude").dataset["colour"]).toBe("green");
     expect(chip(el, "2026-11-02", "claude").dataset["colour"]).toBe("yellow");
     expect(chip(el, "2026-11-03", "claude").dataset["colour"]).toBe("red");
-    expect(chip(el, "2026-11-03", "claude").textContent).toBe("C");
+    expect(chip(el, "2026-11-03", "claude").textContent).toBe("C 150 %");
     expect(chip(el, "2026-11-03", "copilot").textContent).toBe("CP");
+  });
+
+  it("shows the usage ratio in the chip and just the letters without a ratio", async () => {
+    const { el } = await mount((y, m) =>
+      month(y, m, {
+        ...CLAUDE,
+        days: [
+          { date: "2026-11-01", usage: 2, budget: 10, ratio: 0.2, colour: "green" },
+          { date: "2026-11-02", usage: 9, budget: 10, ratio: 0.644, colour: "yellow" },
+          { date: "2026-11-03", usage: 1, budget: 10, colour: "green" },
+        ],
+      }),
+    );
+    expect(chip(el, "2026-11-01", "claude").textContent).toBe("C 20 %");
+    expect(chip(el, "2026-11-02", "claude").textContent).toBe("C 64 %");
+    expect(chip(el, "2026-11-03", "claude").textContent).toBe("C");
+  });
+
+  it("marks today, future days and weekends by class and aria-current", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE));
+    expect(cell(el, "2026-11-03").classList.contains("today")).toBe(true);
+    expect(cell(el, "2026-11-03").getAttribute("aria-current")).toBe("date");
+    expect(cell(el, "2026-11-04").classList.contains("future")).toBe(true);
+    expect(cell(el, "2026-11-01").classList.contains("weekend")).toBe(true); // a Sunday
+    expect(cell(el, "2026-11-02").classList.contains("weekend")).toBe(false);
+  });
+
+  it("carries both weekend and future classes on a future weekend day", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE));
+    for (const date of ["2026-11-07", "2026-11-08"]) {
+      expect(cell(el, date).classList.contains("weekend")).toBe(true);
+      expect(cell(el, date).classList.contains("future")).toBe(true);
+    }
+    expect(cell(el, "2026-11-09").classList.contains("weekend")).toBe(false);
   });
 
   it("keeps future days and days without data neutral", async () => {
@@ -241,6 +275,17 @@ describe("Calendar", () => {
     await click("today");
     expect(ipc.requests.at(-1)).toEqual([2026, 11]);
     expect(cells(el)).toHaveLength(30);
+  });
+
+  it("names the icon-only month buttons for assistive technology", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE));
+    const prev = el.querySelector("[data-testid=prev]")!;
+    const next = el.querySelector("[data-testid=next]")!;
+    expect(prev.getAttribute("aria-label")).toBe("Previous month");
+    expect(prev.getAttribute("title")).toBe("Previous month");
+    expect(next.getAttribute("aria-label")).toBe("Next month");
+    expect(next.getAttribute("title")).toBe("Next month");
+    expect(el.querySelector<HTMLButtonElement>("[data-testid=today]")!.disabled).toBe(true);
   });
 
   it("crosses the year boundary", async () => {

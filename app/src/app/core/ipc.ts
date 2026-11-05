@@ -33,9 +33,14 @@ export abstract class Ipc {
     return this.invoke<boolean>("plugin:autostart|is_enabled");
   }
 
-  /** Creates (`true`) or removes (`false`) the autostart entry of the OS. */
+  /** Whether autostart can be enabled: false in a dev build (the backend refuses it there). */
+  autostartAvailable(): Promise<boolean> {
+    return this.invoke<boolean>("autostart_available");
+  }
+
+  /** Creates (`true`, the backend refuses it in a dev build) or removes (`false`) the entry. */
   async setAutostart(enabled: boolean): Promise<void> {
-    await this.invoke<void>(enabled ? "plugin:autostart|enable" : "plugin:autostart|disable");
+    await this.invoke<void>(enabled ? "autostart_enable" : "plugin:autostart|disable");
   }
 
   /** Whether collection is set up: `tamias service status` of the bundled CLI; never rejects. */

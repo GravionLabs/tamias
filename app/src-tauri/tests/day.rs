@@ -6,7 +6,6 @@ use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use tamias_app_lib::day::{self, Error};
 use tamias_core::budget::Colour;
-use tamias_core::config::Config;
 use tamias_core::paths::DATABASE_FILE;
 use tamias_core::report::Status;
 use tamias_core::snapshot::{Provider, Snapshot, Source, Unit, Window};
@@ -41,7 +40,9 @@ fn database(dir: &tempfile::TempDir, snapshots: &[Snapshot]) -> PathBuf {
 }
 
 fn read(path: &Path, date: &str) -> Result<day::DayReport, Error> {
-    day::read(path, &Config::default(), date, ts(NOW), &TimeZone::UTC)
+    // No `gh` whatever this machine has, so Copilot `auto` is unavailable (not set up).
+    let config = tamias_core::config::parse("gh_path = \"/nonexistent/tamias-test/gh\"\n").unwrap();
+    day::read(path, &config, date, ts(NOW), &TimeZone::UTC)
 }
 
 #[test]

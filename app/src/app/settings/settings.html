@@ -13,11 +13,16 @@
     hx-switch
     data-testid="autostart"
     [checked]="autostart()"
-    [disabled]="!ready() || busy()"
+    [disabled]="!ready() || !available() || busy()"
     (change)="toggle($any($event.target))"
   />
   <span>Start tamias at login</span>
 </label>
+@if (!available()) {
+  <p class="hint" data-testid="autostart-unavailable">
+    Autostart is only available in an installed build.
+  </p>
+}
 <p class="hint" data-testid="hint">
   The app starts in the tray, without a window. Open it with "Open tamias" in the tray menu.
 </p>

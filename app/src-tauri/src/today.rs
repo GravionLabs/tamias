@@ -4,9 +4,12 @@
 //! - A missing database file is not an error: the collector has not run yet, so every provider
 //!   is `unavailable`.
 //! - Claude switched off in `config.toml` (`claude = false`) is `unavailable`.
-//! - A provider that never ran and has no snapshot is `unavailable` (Copilot has no collector
-//!   yet), except Claude switched on explicitly (`claude = true`), which is `stale` then, as in
-//!   the CLI.
+//! - Copilot is `unavailable` as in the CLI ([`tamias_core::unavailable::copilot`]): switched off
+//!   (`copilot = false`), `auto` without a `gh` executable, or the seat has no countable quota
+//!   (stored reason, unless an error was recorded after it).
+//! - Claude that never ran and has no snapshot is `unavailable`, except switched on explicitly
+//!   (`claude = true`), which is `stale` then, as in the CLI. Copilot `auto` with `gh` but never
+//!   collected is `stale`, as in the CLI.
 
 use std::path::Path;
 
@@ -17,6 +20,7 @@ use tamias_core::paths;
 use tamias_core::report::{self, Report};
 use tamias_core::snapshot::Provider;
 use tamias_core::store::{self, Store};
+use tamias_core::unavailable;
 
 /// Providers of the report, in this order.
 pub const PROVIDERS: [Provider; 2] = [Provider::Claude, Provider::Copilot];
@@ -93,16 +97,19 @@ fn read_provider(
     now: Timestamp,
     tz: &TimeZone,
 ) -> Result<report::Provider, store::Error> {
-    let enabled = match provider {
-        Provider::Claude => config.claude,
-        Provider::Copilot => Enabled::Auto,
-    };
-    if enabled == Enabled::Off {
+    if provider == Provider::Copilot {
+        return if unavailable::copilot(config, store)?.is_some() {
+            Ok(report::unavailable(provider))
+        } else {
+            report::read(store, provider, now, tz, &config.thresholds)
+        };
+    }
+    if config.claude == Enabled::Off {
         return Ok(report::unavailable(provider));
     }
     let read = report::read(store, provider, now, tz, &config.thresholds)?;
     let never_ran = store.status(provider)?.is_none() && read.windows.is_empty();
-    if never_ran && enabled == Enabled::Auto {
+    if never_ran && config.claude == Enabled::Auto {
         return Ok(report::unavailable(provider));
     }
     Ok(read)
