@@ -4,9 +4,18 @@ tamias v1 is planned in the Epic [#1](https://github.com/GravionLabs/tamias/issu
 
 Work lands on `release/next`; a milestone is released from it once all its issues are closed. The milestones on GitHub are the source of the sections below.
 
-## 0.1.0 – Usable CLI
+Milestones are named `M<n>`; a closed one is renamed `M<n> (x.y.z)` after its release tag. The two legacy milestones `0.1.0` and `0.1.1` and the old plan `0.2.0` keep their version names.
 
-Goal: one collector runs every 5 minutes on Linux, Windows and macOS, and `tamias today` (also as `--json` and `--short`) shows the usage against the daily budget. Consumers can build on the stable schema v1. Closed and tagged.
+| Milestone | Release tag | State |
+|---|---|---|
+| `0.1.0` Usable CLI | v0.1.0 | Closed |
+| `0.2.0` Fixes and documentation (legacy name) | v0.1.1 | Closed |
+| M1 (0.2.0) Desktop app | v0.2.0 | Closed |
+| M2 Copilot and verified sources | not yet known | Open |
+
+## 0.1.0 – Usable CLI (legacy name)
+
+Goal: one collector runs every 5 minutes on Linux, Windows and macOS, and `tamias today` (also as `--json` and `--short`) shows the usage against the daily budget. Consumers can build on the stable schema v1. Closed; shipped as tag v0.1.0.
 
 | Feature | Content |
 |---|---|
@@ -16,22 +25,22 @@ Goal: one collector runs every 5 minutes on Linux, Windows and macOS, and `tamia
 | [#3](https://github.com/GravionLabs/tamias/issues/3) Documentation site | VitePress on GitHub Pages from `docs/` |
 | [#10](https://github.com/GravionLabs/tamias/issues/10) Releases on GitHub | CLI archives with checksums for five targets (Linux x86_64 and arm64, macOS Intel and Apple silicon, Windows x86_64) |
 
-## 0.2.0 – Fixes and documentation
+## 0.2.0 – Fixes and documentation (legacy name)
 
-Goal: the fixes and documentation PBIs that followed 0.1.0. No Feature; the milestone is closed.
+Goal: the fixes and documentation PBIs that followed 0.1.0. No Feature; the milestone is closed and shipped as tag v0.1.1. It no longer promises the desktop app; that is M1.
 
-## 0.3.0 – Desktop app
+## M1 (0.2.0) – Desktop app
 
-Goal: a Tauri app with a month calendar coloured by daily budget, an intraday view per day and a tray icon on all three platforms, with collection set up from the app and unsigned bundles on the release page. Open.
+Goal: a Tauri app with a month calendar coloured by daily budget, an intraday view per day and a tray icon on all three platforms, with collection set up from the app and unsigned bundles on the release page. Closed; shipped as tag v0.2.0.
 
 | Feature | Content |
 |---|---|
 | [#9](https://github.com/GravionLabs/tamias/issues/9) Desktop app | Angular and helix-ui; calendar, day view, tray, optional autostart, collection set up from the app; the [app page](./app.md) |
 | [#88](https://github.com/GravionLabs/tamias/issues/88) Releases (follow-up) | Unsigned Tauri bundles in the release workflow |
 
-## 0.4.0 – Copilot and verified sources
+## M2 – Copilot and verified sources
 
-Goal: Copilot is polled and shown next to Claude, the Claude Code status line is a fallback source, and the usage sources are verified on all three platforms. Open.
+Goal: Copilot is polled and shown next to Claude, the Claude Code status line is a fallback source, and the usage sources are verified on all three platforms. Open; its tag is not yet known.
 
 | Feature | Content |
 |---|---|
@@ -57,4 +66,4 @@ Not planned yet and without an issue; each becomes a Feature when it is picked u
 - Demo of the calendar with sample data on the site under `/demo/` (ADR 0002).
 - Retention of old snapshots (about 1,700 rows per day with both providers), for example daily aggregates beyond a cut-off.
 - Dependency automation: Dependabot for the SHA-pinned actions and Cargo, `cargo-deny` in CI.
-- Remove the throwaway probes in `spikes/` once 0.1.0 is released.
+- Remove the throwaway probes in `spikes/` once v0.1.0 is released.

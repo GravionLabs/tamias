@@ -35,6 +35,6 @@ tamias is in development. Read on:
 - [Desktop app](./app.md): download, first start, the calendar, the day view, the tray and autostart.
 - [Consumers](./consumers.md): how to read tamias from scripts, plugins and Rust.
 - [Usage sources](./sources.md): where the numbers come from and how stable each source is.
-- [Roadmap](./roadmap.md): the milestones and their Features.
+- [Roadmap](./roadmap.md): the milestones (`M<n>`), the tag that ships each, and their Features.
 - Decisions: [ADR 0001](./adr/0001-usage-collector-architecture.md) (collector architecture) and [ADR 0002](./adr/0002-documentation-site.md) (this site), on GitHub.
 
