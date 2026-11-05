@@ -53,6 +53,8 @@ export interface WindowReport {
   budget?: number;
   /** `today_usage / budget` (binding windows, absent when the budget is 0). */
   ratio?: number;
+  /** Usage of the local month up to and including today (binding windows). */
+  month_usage?: number;
 }
 
 /** One local day of a binding window, an entry of `MonthReport` (`DayEntry` in `tamias_core::report`). */
@@ -207,4 +209,39 @@ export function localTime(at: Timestamp, now: Date = new Date()): string {
   return sameDay
     ? time
     : `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${time}`;
+}
+
+/** The month projection of a binding window, in the window's unit. */
+export interface Projection {
+  /** Expected usage of the whole month. */
+  projected: number;
+  /** Monthly budget: the daily budget times the days in the month. */
+  budget: number;
+  /** `projected / budget` in percent, whole number (not capped). */
+  percent: number;
+}
+
+/**
+ * The month projection ("Hochrechnung"): `monthUsage / elapsedDays * daysInMonth` against the monthly
+ * budget (`dailyBudget * daysInMonth`). `elapsedDays` counts the local days of the month up to and
+ * including today (so at least 1); when it equals `daysInMonth` (month end, past months) the result is the
+ * usage itself. `null` without usage, without a budget or with a budget of 0 or less.
+ */
+export function monthProjection(
+  monthUsage: number | undefined,
+  dailyBudget: number | undefined,
+  elapsedDays: number,
+  daysInMonth: number,
+): Projection | null {
+  if (monthUsage === undefined || dailyBudget === undefined) return null;
+  if (!(dailyBudget > 0) || !(elapsedDays >= 1) || !(daysInMonth >= 1)) return null;
+  const projected = (monthUsage / Math.min(elapsedDays, daysInMonth)) * daysInMonth;
+  const budget = dailyBudget * daysInMonth;
+  return { projected, budget, percent: Math.round((projected / budget) * 100) };
+}
+
+/** The projection of a binding window of today's report at `now` (local month); `null` as `monthProjection`. */
+export function windowProjection(w: WindowReport, now: Date = new Date()): Projection | null {
+  const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return monthProjection(w.month_usage, w.budget, now.getDate(), days);
 }

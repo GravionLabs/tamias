@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   amount,
   localTime,
+  monthProjection,
+  windowProjection,
   providerLabel,
   staleText,
   todayPercent,
@@ -157,5 +159,57 @@ describe("todayText", () => {
     expect(todayText({ ...SEVEN_DAY, today_usage: 0, budget: 0, ratio: undefined })).toBe(
       "today 0% of 0%",
     );
+  });
+});
+
+describe("monthProjection", () => {
+  it("extrapolates mid-month: 15 of 30 days used 30 against a daily budget of 4", () => {
+    expect(monthProjection(30, 4, 15, 30)).toEqual({ projected: 60, budget: 120, percent: 50 });
+  });
+
+  it("on day 1 takes the usage of the day times the days of the month", () => {
+    expect(monthProjection(2, 10, 1, 30)).toEqual({ projected: 60, budget: 300, percent: 20 });
+  });
+
+  it("is 0 without usage, not NaN", () => {
+    expect(monthProjection(0, 10, 5, 30)).toEqual({ projected: 0, budget: 300, percent: 0 });
+  });
+
+  it("at month end is the usage itself", () => {
+    expect(monthProjection(150, 10, 30, 30)?.projected).toBe(150);
+  });
+
+  it("can exceed 100 percent", () => {
+    expect(monthProjection(30, 10, 2, 30)?.percent).toBe(150);
+  });
+
+  it("is null for informational windows (no month usage or no budget) and a budget of 0", () => {
+    expect(monthProjection(undefined, 10, 5, 30)).toBeNull();
+    expect(monthProjection(5, undefined, 5, 30)).toBeNull();
+    expect(monthProjection(5, 0, 5, 30)).toBeNull();
+    expect(monthProjection(5, 10, 0, 30)).toBeNull();
+  });
+});
+
+describe("windowProjection", () => {
+  const w = {
+    window: "seven_day",
+    binding: true,
+    unit: "percent",
+    used: 54,
+    limit: 100,
+    resets_at: "2026-11-07T12:00:00Z",
+    colour: "green",
+    budget: 10,
+    month_usage: 30,
+  } satisfies WindowReport;
+
+  it("uses the local day of the month and its length", () => {
+    // 3 November 2026: 30 / 3 * 30 = 300 of 300.
+    expect(windowProjection(w, new Date(2026, 10, 3, 10, 0))?.percent).toBe(100);
+  });
+
+  it("is null for a window without month usage", () => {
+    expect(windowProjection({ ...w, month_usage: undefined }, new Date(2026, 10, 3))).toBeNull();
   });
 });

@@ -46,6 +46,22 @@
   >
 </header>
 
+@if (monthLines().length > 0) {
+  <p class="month-lines" data-testid="month-lines">
+    @for (line of monthLines(); track line.provider) {
+      <span
+        class="chip"
+        [class]="'chip colour-' + line.colour"
+        data-testid="month-line"
+        [attr.data-provider]="line.provider"
+        [attr.data-colour]="line.colour"
+        [attr.title]="line.title"
+        >{{ line.label }}</span
+      >
+    }
+  </p>
+}
+
 @if (setupPrompt()) {
   <section class="setup" data-testid="setup-prompt" aria-label="Collection setup">
     <p class="setup-text">Collection is not set up — set up now?</p>

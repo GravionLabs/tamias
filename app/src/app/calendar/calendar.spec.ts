@@ -540,3 +540,40 @@ describe("Calendar: first-start prompt", () => {
     expect(prompt(el)).toBeNull();
   });
 });
+
+describe("Calendar month projection", () => {
+  const lines = (el: HTMLElement) =>
+    [...el.querySelectorAll("[data-testid=month-line]")].map((e) => ({
+      text: e.textContent?.trim(),
+      colour: e.getAttribute("data-colour"),
+    }));
+
+  it("projects the current month: 26 in 3 days against a daily 10 is 260 of 300", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE, COPILOT_UNAVAILABLE));
+    expect(lines(el)).toEqual([{ text: "Claude: projected 87 %", colour: "red" }]);
+  });
+
+  it("shows the final usage of a past month, without projection", async () => {
+    const october: ProviderMonth = {
+      ...CLAUDE,
+      days: [{ date: "2026-10-31", usage: 62, budget: 10, ratio: 6.2, colour: "red" }],
+    };
+    const { el } = await mount((y, m) => month(y, m, october), { month: "2026-10" });
+    expect(lines(el)).toEqual([{ text: "Claude: month total 20 %", colour: "red" }]);
+  });
+
+  it("shows nothing for a future month, without data or with a budget of 0", async () => {
+    const future = await mount((y, m) => month(y, m, CLAUDE), { month: "2026-12" });
+    expect(lines(future.el)).toEqual([]);
+    TestBed.resetTestingModule();
+    const none = await mount((y, m) => month(y, m, { ...CLAUDE, days: [] }));
+    expect(lines(none.el)).toEqual([]);
+    TestBed.resetTestingModule();
+    const zero: ProviderMonth = {
+      ...CLAUDE,
+      days: [{ date: "2026-11-01", usage: 2, budget: 0, colour: "green" }],
+    };
+    const noBudget = await mount((y, m) => month(y, m, zero));
+    expect(lines(noBudget.el)).toEqual([]);
+  });
+});

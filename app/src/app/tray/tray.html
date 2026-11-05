@@ -45,6 +45,27 @@
                 ></div>
               </div>
             }
+            @if (projection(w); as month) {
+              <div class="row today-row">
+                <span class="label">Month (projected)</span>
+                <span class="today-percent" data-testid="projection">{{ month.percent }}%</span>
+              </div>
+              <div
+                class="track today-track"
+                role="progressbar"
+                aria-label="Month (projected)"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                [attr.aria-valuenow]="projectionWidth(w)"
+              >
+                <div
+                  class="bar"
+                  data-testid="projection-bar"
+                  [class]="'bar colour-' + w.colour"
+                  [style.width.%]="projectionWidth(w)"
+                ></div>
+              </div>
+            }
             <div class="detail">
               <span data-testid="used">{{ usedOfText(w) }}</span>
               <span data-testid="resets">{{ resets(w.resets_at) }}</span>

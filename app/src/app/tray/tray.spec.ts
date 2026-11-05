@@ -2,16 +2,26 @@
 import { readFileSync } from "node:fs";
 import { TestBed, getTestBed } from "@angular/core/testing";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Ipc, type Unlisten } from "../core/ipc";
 import { STORE_CHANGED } from "../core/store-events";
 import type { ProviderReport, Report, WindowReport } from "../core/report";
-import { Tray, barWidth, providerNote, todayBarWidth, shownProviders } from "./tray";
+import {
+  Tray,
+  barWidth,
+  providerNote,
+  todayBarWidth,
+  shownProviders,
+  projectionBarWidth,
+} from "./tray";
 
 beforeAll(() => {
   getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
 });
-afterEach(() => TestBed.resetTestingModule());
+afterEach(() => {
+  TestBed.resetTestingModule();
+  vi.useRealTimers();
+});
 
 /** An `Ipc` whose `today` answers `answer`; records the popup commands; `emit` fires events. */
 class StubIpc extends Ipc {
@@ -251,5 +261,40 @@ describe("tray helpers", () => {
   it("falls back to all providers when none is set up", () => {
     const off: ProviderReport = { provider: "claude", status: "unavailable", windows: [] };
     expect(shownProviders(report(off))).toHaveLength(1);
+  });
+});
+
+describe("Tray month projection", () => {
+  const claude = (extra: Partial<WindowReport>): ProviderReport => ({
+    ...CLAUDE,
+    windows: [{ ...CLAUDE.windows[0], ...extra }],
+  });
+
+  it("shows the projected month in the budget colour, like the Today row", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 3, 10, 0));
+    // 3 days used 15 of a daily 10: 15 / 3 * 30 = 150 of 300 = 50 %.
+    const { el } = await mount(() =>
+      report(claude({ today_usage: 4, budget: 10, ratio: 0.4, month_usage: 15 })),
+    );
+    const row = el.querySelector("[data-window=seven_day]")!;
+    expect(row.textContent).toContain("Month (projected)");
+    expect(text(row.querySelector("[data-testid=projection]"))).toBe("50%");
+    const bar = row.querySelector<HTMLElement>("[data-testid=projection-bar]")!;
+    expect(bar.classList).toContain("colour-yellow");
+    expect(bar.style.width).toBe("50%");
+    expect(row.querySelectorAll(".today-row").length).toBe(2);
+    expect(row.querySelectorAll(".today-track").length).toBe(2);
+  });
+
+  it("has no projection row without a budget or without month usage", async () => {
+    const { el } = await mount(() => report(claude({ month_usage: 15 }), COPILOT));
+    expect(el.querySelector("[data-testid=projection]")).toBeNull();
+  });
+
+  it("caps the bar at the full track", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const w = { ...CLAUDE.windows[0], budget: 1, month_usage: 30 };
+    expect(projectionBarWidth(w, new Date(2026, 10, 1))).toBe(100);
   });
 });
