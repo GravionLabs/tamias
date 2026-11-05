@@ -21,7 +21,8 @@ h1 {
 
 .nav {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 2px;
 }
 
 .muted {
