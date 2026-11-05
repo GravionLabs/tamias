@@ -101,6 +101,10 @@
         data-testid="cell"
         [attr.data-date]="cell.date"
         [class.today]="cell.today"
+        [class.future]="cell.future"
+        [class.weekend]="cell.weekend"
+        [class.nodata]="!cell.future && !cell.chips.some((c) => c.colour !== 'neutral')"
+        [attr.aria-current]="cell.today ? 'date' : null"
       >
         @if (cell.open) {
           <a
@@ -122,7 +126,7 @@
               [attr.data-provider]="c.provider"
               [attr.data-colour]="c.colour"
               [attr.title]="c.title"
-              >{{ c.letters }}</span
+              >{{ c.label }}</span
             >
           }
         </span>
