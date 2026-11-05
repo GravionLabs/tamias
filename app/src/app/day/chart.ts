@@ -1,8 +1,11 @@
 import { amount, staleText, type CurvePoint, type ProviderDay, type Unit } from "../core/report";
 
-/** Size of the SVG (its `viewBox`); the plot lies inside the margins. */
+/** Default size of the SVG (its `viewBox`) until the box is measured; the plot lies inside the margins. */
 export const WIDTH = 480;
 export const HEIGHT = 260;
+/** Smallest size the plot is laid out in, so a tiny box never gives a negative plot. */
+const MIN_WIDTH = 160;
+const MIN_HEIGHT = 100;
 const LEFT = 48;
 const RIGHT = 12;
 const TOP = 12;
@@ -60,10 +63,11 @@ export function buildChart(
   budget: number,
   unit: Unit,
   until?: number,
+  size: { width: number; height: number } = { width: WIDTH, height: HEIGHT },
 ): Chart {
   const { start, end } = dayBounds(date);
-  const right = WIDTH - RIGHT;
-  const bottom = HEIGHT - BOTTOM;
+  const right = Math.max(size.width, MIN_WIDTH) - RIGHT;
+  const bottom = Math.max(size.height, MIN_HEIGHT) - BOTTOM;
   const top = TOP;
   const high = points.reduce((m, p) => Math.max(m, p.usage), 0);
   const max = niceMax(Math.max(budget, high));
