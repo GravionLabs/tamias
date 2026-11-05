@@ -49,46 +49,102 @@ h1 {
 }
 
 .cell {
-  min-height: 72px;
-  padding: 6px;
-  border: 1px solid var(--h-surface-300);
-  border-radius: 6px;
+  position: relative;
+  min-height: 80px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--h-content-border-color), transparent 55%);
+  border-radius: 10px;
+  background: var(--h-content-background);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--h-surface-950), transparent 90%);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .cell.blank {
   border: none;
+  background: none;
+  box-shadow: none;
 }
 
-.cell.today {
-  border-color: var(--h-primary-color, var(--h-text-color));
-  border-width: 2px;
+/* Weekends: a light tint of the primary colour over the surface. */
+.cell.weekend {
+  background: color-mix(in srgb, var(--h-primary-color) 6%, var(--h-content-background));
 }
 
-.day {
-  font-size: 0.85rem;
+/* Future days and days without data: quieter fill, no shadow, muted number. */
+.cell.future,
+.cell.nodata {
+  box-shadow: none;
+  background: color-mix(in srgb, var(--h-content-background), transparent 55%);
+}
+
+/* Weekend and quiet: keep the weekend tint, but stay quieter than a weekend with data. */
+.cell.weekend.future,
+.cell.weekend.nodata {
+  background: color-mix(
+    in srgb,
+    var(--h-primary-color) 6%,
+    color-mix(in srgb, var(--h-content-background), transparent 55%)
+  );
+}
+
+.cell.future .day,
+.cell.nodata .day {
   color: var(--h-text-muted-color);
 }
 
-/* The day number links to the day view; its hit area covers the whole cell. */
-.cell {
-  position: relative;
+.day {
+  align-self: flex-start;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--h-text-color);
 }
 
+/* Today: a filled badge on the number (a shape, not only a colour). */
+.cell.today .day {
+  background: var(--h-primary-color);
+  color: var(--h-primary-contrast-color);
+}
+
+/* The day number links to the day view; its hit area covers the whole cell. */
 .day.open {
   text-decoration: none;
+  outline: none;
 }
 
 .day.open::after {
   content: "";
   position: absolute;
   inset: 0;
+  border-radius: inherit;
+}
+
+.cell:has(.open) {
+  cursor: pointer;
 }
 
 .cell:has(.open):hover {
-  background: var(--h-surface-100);
+  background: var(--h-content-hover-background);
+  border-color: var(--h-content-border-color);
+}
+
+.cell:has(.open):hover .day:not(.today) {
+  text-decoration: underline;
+}
+
+/* Keyboard focus: a ring around the whole cell. */
+.cell:has(.open:focus-visible) {
+  outline: 2px solid var(--h-focus-ring-color);
+  outline-offset: 2px;
+  background: var(--h-content-hover-background);
 }
 
 /* Above the overlay, so the chips keep their title tooltips. */
@@ -96,17 +152,20 @@ h1 {
   position: relative;
   z-index: 1;
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
+/* Status pills; the text sits on the colour in the darkest surface, readable in both themes. */
 .chip {
   flex: 1;
+  white-space: nowrap;
   text-align: center;
   font-size: 0.75rem;
-  font-weight: 600;
-  border-radius: 4px;
-  padding: 2px 0;
-  color: var(--h-text-color);
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--h-surface-950);
 }
 
 .colour-green {
@@ -125,12 +184,17 @@ h1 {
   background: var(--h-surface-400);
 }
 
+/* No data: an outline pill with muted text, quieter than any data chip in both themes. */
 .colour-neutral {
-  background: var(--h-surface-100);
+  background: transparent;
+  border: 1px dashed var(--h-content-border-color);
+  padding: 1px 5px;
+  font-weight: 500;
   color: var(--h-text-muted-color);
 }
 
 .stale {
+  font-style: italic;
   font-size: 0.7rem;
   color: var(--h-text-muted-color);
 }

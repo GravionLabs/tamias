@@ -42,7 +42,7 @@ Every call of the CLI is limited to 10 seconds; a call that fails or does not an
 
 ## Calendar
 
-The calendar opens on the current month. Previous, Today and Next move between months. Claude (`C`) and Copilot (`CP`) are shown side by side in each day's cell. A chip's colour is the colour of that day against the daily budget. The limits are the defaults of `yellow_at` (0.8) and `red_at` (1.0) in `config.toml`; green is below `yellow_at`, yellow up to and including `red_at`, red above:
+The calendar opens on the current month. Previous, Today and Next move between months. Claude (`C`) and Copilot (`CP`) are shown side by side in each day's cell as status pills with the usage of the day against the budget, for example `C 64 %`. Today's number sits on a filled badge, future days and days without data are quieter (dashed outline pills), weekends are lightly tinted, and clickable days show a hover and keyboard focus state. A chip's colour is the colour of that day against the daily budget. The limits are the defaults of `yellow_at` (0.8) and `red_at` (1.0) in `config.toml`; green is below `yellow_at`, yellow up to and including `red_at`, red above:
 
 | Colour | Meaning |
 | --- | --- |
