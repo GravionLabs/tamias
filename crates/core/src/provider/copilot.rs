@@ -18,6 +18,7 @@ use std::time::{Duration, Instant};
 use jiff::Timestamp;
 use serde::Deserialize;
 
+use crate::config::Config;
 use crate::snapshot::{Provider, Snapshot, Source, Unit, Window};
 
 /// User endpoint of GitHub Copilot.
@@ -90,6 +91,15 @@ impl NoQuota {
             NoQuota::NoPremiumQuota => "no premium quota",
             NoQuota::Unlimited => "unlimited",
         }
+    }
+
+    /// The variant whose [`reason`](Self::reason) is `reason`; `None` for a text this version
+    /// does not know.
+    #[must_use]
+    pub fn from_reason(reason: &str) -> Option<Self> {
+        [NoQuota::NoPremiumQuota, NoQuota::Unlimited]
+            .into_iter()
+            .find(|no_quota| no_quota.reason() == reason)
     }
 }
 
@@ -218,6 +228,20 @@ pub trait TokenSource: fmt::Debug {
     /// [`Error::NoCredentials`] when there is no token, [`Error::Timeout`] when reading it took
     /// too long.
     fn gh_token(&self) -> Result<GhToken>;
+}
+
+/// Test-only override of the `gh` executable; wins over `gh_path` of the config.
+pub const GH_ENV: &str = "TAMIAS_GH";
+
+/// The `gh` token source of this machine: `TAMIAS_GH`, else `gh_path` of the config, else `PATH`
+/// and the known install locations.
+#[must_use]
+pub fn gh_source(config: &Config) -> GhTokenSource {
+    let explicit = std::env::var_os(GH_ENV)
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| config.gh_path.clone());
+    GhTokenSource::new(explicit)
 }
 
 /// Install locations of `gh` tried after `PATH`.

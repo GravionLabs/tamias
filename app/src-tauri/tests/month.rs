@@ -3,7 +3,7 @@
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use tamias_app_lib::month;
-use tamias_core::config::Config;
+use tamias_core::config::{self, Config};
 use tamias_core::paths::DATABASE_FILE;
 use tamias_core::report::Status;
 use tamias_core::snapshot::{Provider, Snapshot, Source, Unit, Window};
@@ -28,6 +28,11 @@ fn snap(used: f64, observed_at: &str) -> Snapshot {
 
 const NOW: &str = "2026-11-03T10:05:00Z";
 
+/// No `gh` whatever this machine has, so Copilot `auto` is unavailable (not set up).
+fn no_gh() -> Config {
+    config::parse("gh_path = \"/nonexistent/tamias-test/gh\"\n").unwrap()
+}
+
 #[test]
 fn month_returns_both_providers_with_copilot_unavailable() {
     let dir = tempfile::tempdir().unwrap();
@@ -43,15 +48,7 @@ fn month_returns_both_providers_with_copilot_unavailable() {
             ts("2026-11-03T10:00:00Z"),
         )
         .unwrap();
-    let report = month::read(
-        &database,
-        &Config::default(),
-        2026,
-        11,
-        ts(NOW),
-        &TimeZone::UTC,
-    )
-    .unwrap();
+    let report = month::read(&database, &no_gh(), 2026, 11, ts(NOW), &TimeZone::UTC).unwrap();
 
     assert_eq!((report.year, report.month), (2026, 11));
     let [claude, copilot] = report.providers.as_slice() else {

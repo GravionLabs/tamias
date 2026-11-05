@@ -80,11 +80,15 @@ Grey wins over red: a stale provider's numbers may be outdated.
 
 If the tray icon cannot be created (for example on Linux without an AppIndicator library), the window is shown even when the app was started hidden, and closing the window closes the app, because there would be no other way to open it again.
 
+## Unavailable providers
+
+The app shows the same document as `tamias today --json`. A provider that is `unavailable` has no windows, no calendar chips and a grey tray (when all are unavailable). For Copilot that is: `copilot = false` in `config.toml` (old data is ignored), `auto` without a `gh` executable (not set up), and a seat without a countable monthly quota (`no premium quota` for a free seat, `unlimited`), as recorded by the last `tamias collect`. An error recorded after that makes it `stale` instead. With `gh` installed but logged out, Copilot is `stale` (never collected), not unavailable. See [Copilot](./installation.md#copilot).
+
 ## Start at login
 
 Settings has "Start tamias at login". The setting is the state of the operating system's autostart entry, so it is off until you turn it on. The entry starts the app with `--hidden`: only the tray icon appears, and the window opens with "Open tamias" in the tray menu, or on Windows and macOS with a left click on the icon.
 
-Removing the app does not remove the autostart entry; turn it off in Settings first.
+Removing the app does not remove the autostart entry; turn it off in Settings first. In a dev build (`pnpm tauri dev`) the switch is disabled with a hint, because a dev executable cannot run on its own after a reboot.
 
 ## The CLI is still the collector
 
