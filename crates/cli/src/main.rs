@@ -5,6 +5,7 @@ mod collect;
 mod collect_log;
 mod copilot;
 mod exit;
+mod ingest;
 mod service;
 mod short;
 mod today;
@@ -54,6 +55,10 @@ enum Command {
     /// Show today's usage against today's budget.
     #[command(after_help = EXIT_CODES)]
     Today(TodayArgs),
+    /// The `statusLine` command of Claude Code: store the rate limits from stdin, print the short line.
+    ///
+    /// Never fails: errors are logged with `-v` and the exit code is 0.
+    IngestStatusline(IngestArgs),
     /// Run the collector in the background (install, uninstall, status).
     #[command(subcommand)]
     Service(service::Action),
@@ -71,6 +76,13 @@ struct TodayArgs {
     /// When to colour the output; `auto` colours only a terminal without `NO_COLOR`
     /// (ignored with `--json`).
     #[arg(long, value_enum, value_name = "WHEN", default_value_t = ColorChoice::Auto)]
+    color: ColorChoice,
+}
+
+#[derive(Debug, Args)]
+struct IngestArgs {
+    /// When to colour the line; Claude Code renders ANSI but stdout is no terminal there.
+    #[arg(long, value_enum, value_name = "WHEN", default_value_t = ColorChoice::Always)]
     color: ColorChoice,
 }
 
@@ -111,13 +123,23 @@ fn run(cli: &Cli) -> Result<ExitCode, Box<dyn std::error::Error>> {
             collect::Outcome::ProviderFailed => ExitCode::from(EXIT_STALE),
         });
     }
+    if let Command::IngestStatusline(ref args) = cli.command {
+        let stdout = std::io::stdout();
+        let colour = args.color.enabled(stdout.is_terminal(), no_color());
+        let line = ingest::run(cli.config.as_deref(), colour);
+        // A closed pipe must not break the status line either.
+        let _ = stdout.lock().write_all(line.as_bytes());
+        return Ok(ExitCode::SUCCESS);
+    }
     let config = tamias_core::config::load(cli.config.as_deref())?;
     let data_dir = paths::data_dir()?;
     let database = data_dir.join(paths::DATABASE_FILE);
     tracing::debug!("database {}", database.display());
     let log = collect_log::CollectLog::in_data_dir(&data_dir);
     match cli.command {
-        Command::Collect => unreachable!("handled before the config is loaded"),
+        Command::Collect | Command::IngestStatusline(_) => {
+            unreachable!("handled before the config is loaded")
+        }
         Command::Today(ref args) => {
             // Whole seconds: `generated_at` of the JSON is RFC 3339 without a fraction.
             let now = Timestamp::from_second(Timestamp::now().as_second())?;
