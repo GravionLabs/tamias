@@ -73,7 +73,7 @@ tamias collect    # poll Claude and Copilot once and store the snapshots
 tamias today      # today's usage against the daily budget
 ```
 
-To poll every 5 minutes without running `collect` by hand, see [Scheduled collection](#scheduled-collection).
+To poll every 5 minutes without running `collect` by hand, see [Scheduled collection](#scheduled-collection). To show the usage in the Claude Code status line, see [Claude Code status line](./statusline.md).
 
 ## Copilot
 
