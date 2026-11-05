@@ -5,6 +5,40 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.0] — 2026-11-05
+
+### Bug Fixes
+- Gate fake gh helper by platform and expect schema version 2 in app test (#92)
+- Autostart enabled in a dev build registers the debug executable (#130) (#133)
+- **app**: Refuse autostart in a dev build, which cannot run on its own after a reboot
+- **app**: Satisfy clippy for autostart command (#130)
+- **app**: Keep the weekend tint on future and no-data cells (#126)
+- App today/month/tray use the shared Copilot availability of the CLI (#135) (#136)
+
+
+### Documentation
+- Copilot as a polled provider (#94) (#121)
+- Copilot as a polled provider (#94)
+- Fix review findings of Copilot docs; service status shows Copilot's last run (#94)
+- Correct logged-out gh behaviour under copilot=auto; test service status copilot run (#94)
+- Claude Code status line page (#97) (#129)
+- Add Claude Code status line page (#97)
+- Statusline Claude part needs OAuth credentials, Windows note (#97)
+
+
+### Features
+- **core**: Copilot provider with the gh token source (#91) (#116)
+- **cli**: Collect polls Copilot, unavailable reason in the store (#92) (#118)
+- **cli**: Collect polls Copilot, unavailable reason in the store
+- **cli**: Today shows Copilot and why it is unavailable (#120)
+- Tamias ingest-statusline stores Claude rate limits from the status line (#96) (#122)
+- Month_usage on the binding windows of today --json (#119) (#123)
+- **app**: Compact month navigation in the calendar header (#125) (#132)
+- **app**: Redesigned day cells in the month calendar (#126) (#134)
+- **app**: Redesigned day cells in the month calendar
+- **app**: App icon for window, bundles and tray (#137)
+
+
 ## [0.2.0] — 2026-11-04
 
 ### Bug Fixes
@@ -22,6 +56,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Update CHANGELOG.md for v0.1.0 [skip ci]
 - Update CHANGELOG.md for v0.1.1 [skip ci]
 - Update CHANGELOG.md for v0.1.2 [skip ci]
+- Update CHANGELOG.md for v0.2.0 [skip ci]
 
 
 ### Features
