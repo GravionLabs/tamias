@@ -17,6 +17,7 @@ import {
   localTime,
   providerLabel,
   staleText,
+  todayPercent,
   usedOfText,
   usedPercent,
   windowLabel,
@@ -42,6 +43,11 @@ export function shownProviders(report: Report): ProviderReport[] {
 /** Fill of the bar in percent: the share used, at most the full track. */
 export function barWidth(w: WindowReport): number {
   return Math.min(100, Math.max(0, usedPercent(w)));
+}
+
+/** Fill of the today bar in percent: today's share of the budget, at most the full track. */
+export function todayBarWidth(w: WindowReport): number {
+  return Math.min(100, Math.max(0, todayPercent(w) ?? 0));
 }
 
 /**
@@ -70,6 +76,8 @@ export class Tray {
   protected readonly usedOfText = usedOfText;
   protected readonly percent = usedPercent;
   protected readonly width = barWidth;
+  protected readonly today = todayPercent;
+  protected readonly todayWidth = todayBarWidth;
   protected readonly note = providerNote;
   protected readonly shown = shownProviders;
   protected readonly resets = (at: string) => `resets ${localTime(at)}`;

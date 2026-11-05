@@ -88,7 +88,7 @@ The tray icon shows the worst colour of the binding windows of the set-up provid
 
 Grey wins over red: a stale provider's numbers may be outdated.
 
-- Hovering the icon (Windows and macOS) shows a small usage card next to it: per provider the binding window, its usage and the reset. It hides when the pointer leaves the icon and the card, on Escape and when it loses focus. Its "Open tamias" button opens the window.
+- Hovering the icon (Windows and macOS) shows a small usage card next to it: per provider the binding window, its usage and the reset. A window with a daily budget also shows "Today": today's usage in percent of today's budget, with its own bar in the budget colour. It hides when the pointer leaves the icon and the card, on Escape and when it loses focus. Its "Open tamias" button opens the window.
 - A left click on the icon (Windows and macOS) opens the window on the calendar and hides the card.
 - A right click opens the menu: the summary, "Open tamias", "Show usage" and "Quit". "Open tamias" shows and focuses the window on the calendar. "Show usage" opens the card; on Linux, which sends no hover or click events, it is the only way to open the card, and "Open tamias" the only way to open the window.
 - Closing the window hides it to the tray; the app keeps running and collection is not affected.

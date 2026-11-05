@@ -4,6 +4,7 @@ import {
   localTime,
   providerLabel,
   staleText,
+  todayPercent,
   todayText,
   usedOfText,
   usedPercent,
@@ -113,6 +114,24 @@ describe("usedPercent and usedOfText", () => {
       "1,234,567 of 2,000,000 requests",
     );
     expect(usedOfText(SEVEN_DAY)).toBe("54% of 100% used");
+  });
+});
+
+describe("todayPercent", () => {
+  it("is the ratio of today's usage to the budget in percent", () => {
+    expect(todayPercent(SEVEN_DAY)).toBe(40);
+    expect(todayPercent({ ...SEVEN_DAY, unit: "requests", ratio: 0.2134 })).toBe(21);
+  });
+
+  it("shows the real percent above the budget", () => {
+    expect(todayPercent({ ...SEVEN_DAY, ratio: 1.8 })).toBe(180);
+  });
+
+  it("is null without a budget or with a budget of 0", () => {
+    expect(
+      todayPercent({ ...SEVEN_DAY, today_usage: undefined, budget: undefined, ratio: undefined }),
+    ).toBeNull();
+    expect(todayPercent({ ...SEVEN_DAY, budget: 0, ratio: undefined })).toBeNull();
   });
 });
 

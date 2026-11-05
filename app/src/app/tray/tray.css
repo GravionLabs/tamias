@@ -49,6 +49,12 @@ h2 {
   line-height: 1;
 }
 
+.today-percent {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .track {
   height: 6px;
   border-radius: 3px;
@@ -56,7 +62,11 @@ h2 {
   background: var(--h-surface-200);
 }
 
-:root.app-dark .track {
+.today-track {
+  height: 4px;
+}
+
+:host-context(.app-dark) .track {
   background: var(--h-surface-700);
 }
 
@@ -101,22 +111,41 @@ h2 {
 }
 
 .open {
-  justify-self: start;
-  padding: 4px 0;
-  border: 0;
-  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--h-content-border-color);
+  border-radius: 8px;
+  /* content-hover-background flips with the theme, so one rule serves light and dark. */
+  background: var(--h-content-hover-background);
   font: inherit;
   font-size: 0.8125rem;
-  color: var(--h-primary-color);
+  font-weight: 500;
+  color: var(--h-text-color);
   cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.open svg {
+  flex: none;
+  color: var(--h-text-muted-color);
 }
 
 .open:hover {
-  text-decoration: underline;
+  background: color-mix(in srgb, var(--h-text-color) 8%, var(--h-content-hover-background));
+  border-color: color-mix(in srgb, var(--h-text-color) 25%, var(--h-content-border-color));
+}
+
+.open:active {
+  background: color-mix(in srgb, var(--h-text-color) 14%, var(--h-content-hover-background));
 }
 
 .open:focus-visible {
   outline: 2px solid var(--h-focus-ring-color);
   outline-offset: 2px;
-  border-radius: 4px;
 }

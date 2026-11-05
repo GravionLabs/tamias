@@ -182,6 +182,12 @@ export function usedPercent(w: WindowReport): number {
   return Math.round((w.used / w.limit) * 100);
 }
 
+/** Today's usage in percent of today's budget (`ratio`), whole number; `null` without a budget or with a budget of 0. */
+export function todayPercent(w: WindowReport): number | null {
+  if (w.budget === undefined || w.ratio === undefined) return null;
+  return Math.round(w.ratio * 100);
+}
+
 /** The absolute numbers of `w`: `54% of 100% used`, or `489 of 2,380 requests`. */
 export function usedOfText(w: WindowReport): string {
   return w.unit === "percent"

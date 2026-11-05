@@ -6,7 +6,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Ipc, type Unlisten } from "../core/ipc";
 import { STORE_CHANGED } from "../core/store-events";
 import type { ProviderReport, Report, WindowReport } from "../core/report";
-import { Tray, barWidth, providerNote, shownProviders } from "./tray";
+import { Tray, barWidth, providerNote, todayBarWidth, shownProviders } from "./tray";
 
 beforeAll(() => {
   getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
@@ -132,6 +132,30 @@ describe("Tray", () => {
     expect(el.querySelectorAll(".window").length).toBe(3);
   });
 
+  it("shows today against the budget with its own bar, only for windows with a budget", async () => {
+    const claude: ProviderReport = {
+      ...CLAUDE,
+      windows: [
+        { ...CLAUDE.windows[0], today_usage: 4, budget: 10, ratio: 0.4 },
+        CLAUDE.windows[1],
+      ],
+    };
+    const copilot: ProviderReport = {
+      ...COPILOT,
+      windows: [{ ...COPILOT.windows[0], today_usage: 90, budget: 50, ratio: 1.8 }],
+    };
+    const { el } = await mount(() => report(claude, copilot));
+    const sevenDay = el.querySelector("[data-window=seven_day]")!;
+    expect(text(sevenDay.querySelector("[data-testid=today]"))).toBe("40%");
+    expect(sevenDay.querySelector<HTMLElement>("[data-testid=today-bar]")?.style.width).toBe("40%");
+    expect(sevenDay.querySelector("[data-testid=today-bar]")?.classList).toContain("colour-yellow");
+    expect(text(sevenDay.querySelectorAll(".row .label")[1])).toBe("Today");
+    const monthly = el.querySelector("[data-window=monthly]")!;
+    expect(text(monthly.querySelector("[data-testid=today]"))).toBe("180%");
+    expect(monthly.querySelector<HTMLElement>("[data-testid=today-bar]")?.style.width).toBe("100%");
+    expect(el.querySelector("[data-window=five_hour] [data-testid=today]")).toBeNull();
+  });
+
   it("shows the stale reason and the grey bar of a stale provider", async () => {
     const stale: ProviderReport = {
       ...COPILOT,
@@ -210,6 +234,13 @@ describe("tray helpers", () => {
     expect(barWidth(w({ used: 130 }))).toBe(100);
     expect(barWidth(w({ used: 0 }))).toBe(0);
     expect(barWidth(w({ limit: 0 }))).toBe(0);
+  });
+
+  it("caps the today bar at the full track and is empty without a budget", () => {
+    expect(todayBarWidth(w({ budget: 10, ratio: 1.8 }))).toBe(100);
+    expect(todayBarWidth(w({ budget: 10, ratio: 0.21 }))).toBe(21);
+    expect(todayBarWidth(w({ budget: 0, ratio: undefined }))).toBe(0);
+    expect(todayBarWidth(w({}))).toBe(0);
   });
 
   it("explains stale providers and has no note for healthy ones", () => {
