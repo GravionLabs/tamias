@@ -5,6 +5,21 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.5.0] — 2026-11-05
+
+### Bug Fixes
+- **app**: Tray card stays hidden after a click, show-calendar event, docs (#149)
+- Windows: setup prompt missing in the calendar view after start (#148) (#152)
+- **app**: Show the service status error in the calendar instead of an empty view
+- **app**: Never leave the calendar silently empty without data (#148)
+
+
+### Features
+- **app**: Tray hover shows a compact usage card (#149) (#150)
+- **app**: Hovering the tray icon shows a compact usage card (#149)
+- **app**: Today row and restyled open button on the tray card (#149)
+
+
 ## [0.4.0] — 2026-11-05
 
 ### Bug Fixes
@@ -13,6 +28,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 - **site**: Drop roadmap and ADR links, add icon, calendar screenshots and CLI page (#142) (#146)
+- Update CHANGELOG.md for v0.4.0 [skip ci]
 
 
 ### Features
