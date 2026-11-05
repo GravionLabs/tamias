@@ -5,6 +5,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.1] — 2026-11-05
+
+### Bug Fixes
+- Release build of the app loads no component styles (#138) (#139)
+- **app**: Release build lost component styles because critical CSS inlining made the CSP ignore 'unsafe-inline'
+
+
 ## [0.3.0] — 2026-11-05
 
 ### Bug Fixes
@@ -24,6 +31,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Claude Code status line page (#97) (#129)
 - Add Claude Code status line page (#97)
 - Statusline Claude part needs OAuth credentials, Windows note (#97)
+- Update CHANGELOG.md for v0.3.0 [skip ci]
 
 
 ### Features
