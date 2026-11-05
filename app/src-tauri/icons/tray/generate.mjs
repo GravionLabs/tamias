@@ -2,10 +2,11 @@
 //
 //   node app/src-tauri/icons/tray/generate.mjs
 //
-// A traffic-light disc, 64x64 RGBA, anti-aliased by 8x8 supersampling, with a darker rim so it
-// stays visible on light and dark menu bars and taskbars at 16-32 px. `neutral` (no provider
-// set up) is a hollow ring, so it is not mistaken for `grey` (a stale provider). The icons are
-// not macOS template images: the colour is the information.
+// A budget gauge (open arc, needle and hub, like the app icon) in the state colour, 64x64 RGBA,
+// anti-aliased by 8x8 supersampling, with a darker rim so it stays visible on light and dark
+// menu bars and taskbars at 16-32 px. `neutral` (no provider set up) is the hollow outline of
+// the gauge, so it is not mistaken for `grey` (a stale provider). The icons are not macOS
+// template images: the colour is the information.
 //
 // No dependencies: Node's zlib and a hand-written PNG encoder, so the output depends on the
 // constants below only.
@@ -18,12 +19,21 @@ import { deflateSync } from "node:zlib";
 const SIZE = 64;
 const SAMPLES = 8;
 const CENTRE = SIZE / 2;
-/** Outer radius of the disc, leaving a 4 px margin like other tray icons. */
-const RADIUS = 28;
-/** Width of the darker rim of a filled disc. */
-const RIM = 4;
-/** Width of the ring of `neutral`. */
-const RING = 7;
+/** Centre of the gauge, slightly below the middle because the arc is open at the bottom. */
+const GAUGE_Y = 34;
+/** Radius of the arc centre line, and its stroke width. */
+const ARC_RADIUS = 21;
+const ARC_WIDTH = 13;
+/** The arc covers 270 degrees, the gap at the bottom is centred on 90 degrees (y points down). */
+const GAP_HALF = Math.PI / 4;
+/** Needle length from the centre, stroke width, and angle (up right), and the hub radius. */
+const NEEDLE_LENGTH = 15;
+const NEEDLE_WIDTH = 10;
+const NEEDLE_ANGLE = -Math.PI / 4;
+const HUB_RADIUS = 8;
+/** Width of the darker rim of a filled gauge, and of the outline of `neutral`. */
+const RIM = 2.5;
+const OUTLINE = 3.5;
 
 /** Fill and rim colours, RGB. */
 const ICONS = {
@@ -34,6 +44,39 @@ const ICONS = {
   neutral: { fill: null, rim: [0x80, 0x86, 0x8c] },
 };
 
+/** Distance from (x, y) to the segment (0,0)-(ex,ey). */
+function segmentDistance(x, y, ex, ey) {
+  const t = Math.max(0, Math.min(1, (x * ex + y * ey) / (ex * ex + ey * ey)));
+  return Math.hypot(x - t * ex, y - t * ey);
+}
+
+/** Signed distance to the gauge shape: negative inside. */
+function gauge(x, y) {
+  const dx = x - CENTRE;
+  const dy = y - GAUGE_Y;
+  const angle = Math.atan2(dy, dx);
+  const inGap = Math.abs(angle - Math.PI / 2) < GAP_HALF;
+  let arc;
+  if (inGap) {
+    const ends = [Math.PI / 2 - GAP_HALF, Math.PI / 2 + GAP_HALF].map((a) =>
+      Math.hypot(dx - ARC_RADIUS * Math.cos(a), dy - ARC_RADIUS * Math.sin(a)),
+    );
+    arc = Math.min(...ends) - ARC_WIDTH / 2;
+  } else {
+    arc = Math.abs(Math.hypot(dx, dy) - ARC_RADIUS) - ARC_WIDTH / 2;
+  }
+  const needle =
+    segmentDistance(
+      dx,
+      dy,
+      NEEDLE_LENGTH * Math.cos(NEEDLE_ANGLE),
+      NEEDLE_LENGTH * Math.sin(NEEDLE_ANGLE),
+    ) -
+    NEEDLE_WIDTH / 2;
+  const hub = Math.hypot(dx, dy) - HUB_RADIUS;
+  return Math.min(arc, needle, hub);
+}
+
 /** RGBA of the pixel (x, y) of an icon: the average of its subsamples. */
 function pixel(icon, x, y) {
   let r = 0;
@@ -42,13 +85,11 @@ function pixel(icon, x, y) {
   let a = 0;
   for (let sy = 0; sy < SAMPLES; sy++) {
     for (let sx = 0; sx < SAMPLES; sx++) {
-      const dx = x + (sx + 0.5) / SAMPLES - CENTRE;
-      const dy = y + (sy + 0.5) / SAMPLES - CENTRE;
-      const d = Math.hypot(dx, dy);
-      if (d > RADIUS) continue;
-      const inner = icon.fill === null ? RADIUS - RING : RADIUS - RIM;
+      const d = gauge(x + (sx + 0.5) / SAMPLES, y + (sy + 0.5) / SAMPLES);
+      if (d > 0) continue;
+      const inner = icon.fill === null ? OUTLINE : RIM;
       let colour;
-      if (d > inner) colour = icon.rim;
+      if (d > -inner) colour = icon.rim;
       else if (icon.fill !== null) colour = icon.fill;
       else continue;
       r += colour[0];

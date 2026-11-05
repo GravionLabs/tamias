@@ -68,9 +68,9 @@ The tray icon shows the worst colour of the binding windows of the set-up provid
 
 | Icon | When |
 | --- | --- |
-| Hollow ring | no provider is set up |
-| Green, yellow, red disc | the worst binding window is green, yellow or red |
-| Grey disc | a set-up provider is stale or has no data, or the last read failed |
+| Hollow gauge outline | no provider is set up |
+| Green, yellow, red gauge | the worst binding window is green, yellow or red |
+| Grey gauge | a set-up provider is stale or has no data, or the last read failed |
 
 Grey wins over red: a stale provider's numbers may be outdated.
 
