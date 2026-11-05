@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { TestBed, getTestBed } from "@angular/core/testing";
-import { ActivatedRoute, convertToParamMap, provideRouter } from "@angular/router";
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from "@angular/router";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Ipc, type ServiceStatus, type Unlisten } from "../core/ipc";
 import { STORE_CHANGED } from "../core/store-events";
 import type { MonthReport, ProviderMonth } from "../core/report";
@@ -346,6 +346,19 @@ describe("Calendar", () => {
     expect(link?.getAttribute("href")).toBe("/day/2026-11-03?month=2026-11");
     expect(cell(el, "2026-11-01").querySelector("[data-testid=open-day]")).not.toBeNull();
     expect(cell(el, "2026-11-04").querySelector("[data-testid=open-day]")).toBeNull();
+  });
+
+  it("opens the day view when a chip of the card is clicked", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE));
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, "navigate").mockResolvedValue(true);
+    chip(el, "2026-11-03", "claude").click();
+    expect(navigate).toHaveBeenCalledWith(["/day", "2026-11-03"], {
+      queryParams: { month: "2026-11" },
+    });
+    navigate.mockClear();
+    chip(el, "2026-11-04", "claude")?.click();
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it("opens on the month of the query, e.g. when coming back from a day", async () => {

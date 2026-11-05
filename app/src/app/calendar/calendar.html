@@ -108,6 +108,8 @@
       <div class="cell blank" aria-hidden="true"></div>
     }
     @for (cell of cells(); track cell.date) {
+      <!-- The day number link inside is the keyboard and screen reader path; the click only widens the hit area. -->
+      <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
       <div
         class="cell"
         role="gridcell"
@@ -118,6 +120,7 @@
         [class.weekend]="cell.weekend"
         [class.nodata]="!cell.future && !cell.chips.some((c) => c.colour !== 'neutral')"
         [attr.aria-current]="cell.today ? 'date' : null"
+        (click)="openDay($event, cell)"
       >
         @if (cell.open) {
           <a

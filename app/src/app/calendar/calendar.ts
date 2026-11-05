@@ -8,7 +8,7 @@ import {
   signal,
   untracked,
 } from "@angular/core";
-import { ActivatedRoute, RouterLink } from "@angular/router";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { HxButton, HxMessage, HxProgressSpinner } from "@gravionlabs/helix-ui";
 import { Collection, hasNoData } from "../core/collection";
 import { Ipc, errorText, isBusy } from "../core/ipc";
@@ -72,6 +72,7 @@ const LETTERS: Record<ProviderName, string> = { claude: "C", copilot: "CP" };
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Calendar {
+  private readonly router = inject(Router);
   private readonly ipc = inject(Ipc);
   private readonly now = inject(NOW);
   private readonly firstDay = inject(FIRST_DAY);
@@ -182,6 +183,17 @@ export class Calendar {
       const year = this.year();
       const month = this.month();
       untracked(() => void this.load(year, month));
+    });
+  }
+
+  /**
+   * A click anywhere on a day card opens its day view. The number's link covers the card already; this
+   * catches the chips above it. A click on the link itself is left to the router.
+   */
+  protected openDay(event: Event, cell: Cell): void {
+    if (!cell.open || (event.target as Element | null)?.closest("a")) return;
+    void this.router.navigate(["/day", cell.date], {
+      queryParams: { month: cell.date.slice(0, 7) },
     });
   }
 
