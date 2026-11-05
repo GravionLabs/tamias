@@ -107,6 +107,22 @@ copilot = "auto"             # "auto" (default), true or false
 
 A seat without a countable monthly quota is not an error. A free seat shows as `unavailable (no premium quota)`, a seat with unlimited premium requests as `unavailable (unlimited)`. Neither has a daily budget, and neither turns the exit code to 3.
 
+## Configuration
+
+All settings are optional and live in `config.toml` in the config directory; a missing file means the defaults. An invalid value or an unknown key is an error that names the key. Example with every key:
+
+```toml
+yellow_at = 0.8       # ratio of today's usage to today's budget from which a day is yellow
+red_at = 1.0          # ratio above which a day is red
+stale_after = "15m"   # age of the last successful collect after which data is stale
+week_start = "monday" # first day of the app's calendar week
+
+[providers]
+claude = "auto"       # "auto" (on when credentials exist), true or false
+```
+
+`week_start` is `"monday"` (default), `"sunday"`, `"saturday"` or `"locale"` (the first day of the system locale). It only changes how the desktop app's month calendar is laid out, not how the CLI reports days or budgets.
+
 ## Scheduled collection
 
 tamias reads Claude and Copilot usage by polling every 5 minutes. `tamias service` registers that poll with the scheduler of your operating system. It runs in your user account on all three platforms: no administrator rights, no `sudo`, no stored password.

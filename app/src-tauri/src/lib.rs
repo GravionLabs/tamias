@@ -15,6 +15,7 @@ pub mod watch;
 
 use std::sync::{Mutex, PoisonError};
 
+use tamias_core::config;
 use tamias_core::paths;
 use tamias_core::report::Report;
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
@@ -90,6 +91,15 @@ async fn month(year: i16, month: i8) -> Result<month::MonthReport, CommandError>
             message: e.to_string(),
             busy: false,
         })?
+        .map_err(CommandError::from)
+}
+
+/// The first day of the calendar week from `config.toml`: `monday`, `sunday`, `saturday` or
+/// `locale`. An invalid config rejects, like for the other commands.
+#[tauri::command]
+fn week_start() -> Result<&'static str, CommandError> {
+    month::week_start()
+        .map(config::WeekStart::as_str)
         .map_err(CommandError::from)
 }
 
@@ -276,6 +286,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             today,
             month,
+            week_start,
             day,
             service_status,
             service_install,

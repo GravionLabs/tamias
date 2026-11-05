@@ -3,6 +3,7 @@ import { RouterLink } from "@angular/router";
 import { HxButton, HxMessage, HxSwitch } from "@gravionlabs/helix-ui";
 import { Collection } from "../core/collection";
 import { Ipc, errorText } from "../core/ipc";
+import { WeekStart } from "../core/week-start";
 
 /**
  * The settings view: autostart, and the collection status with "Set up" / "Remove". The OS is the
@@ -19,6 +20,8 @@ import { Ipc, errorText } from "../core/ipc";
 export class Settings {
   private readonly ipc = inject(Ipc);
   protected readonly collection = inject(Collection);
+  /** The active week start, from `config.toml` (read only). */
+  protected readonly weekStart = inject(WeekStart).setting;
 
   /** Off until the OS answered: never shown as enabled without knowing. */
   protected readonly autostart = signal(false);
