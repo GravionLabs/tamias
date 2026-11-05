@@ -15,6 +15,8 @@ import { Ipc, errorText, isBusy } from "../core/ipc";
 import { StoreEvents } from "../core/store-events";
 import {
   amount,
+  monthProjection,
+  projectionColour,
   providerLabel,
   staleText,
   type Colour,
@@ -56,6 +58,15 @@ interface Cell {
   chips: Chip[];
   /** "stale since 09:00" on today's cell when a provider is stale. */
   stale: string | null;
+}
+
+/** A provider's month line below the header: the projection of the current month, the final usage of a past one. */
+interface MonthLine {
+  provider: ProviderName;
+  /** "Claude: projected 62 %" / "Claude: month total 48 %". */
+  label: string;
+  colour: Colour;
+  title: string;
 }
 
 const LETTERS: Record<ProviderName, string> = { claude: "C", copilot: "CP" };
@@ -130,6 +141,42 @@ export class Calendar {
         stale: stale ? staleText(stale.stale_since, now) : null,
       };
     });
+  });
+
+  /**
+   * Per provider with a budget the projection of the current month (usage so far / elapsed days x days
+   * in the month, against the daily budget x days in the month); a past month shows its final usage
+   * the same way, a future month nothing. The colour is that of the projection ratio (grey while the provider is stale).
+   */
+  protected readonly monthLines = computed<MonthLine[]>(() => {
+    const year = this.year();
+    const month = this.month();
+    const report = this.report();
+    const now = this.now();
+    if (!report || report.year !== year || report.month !== month) return [];
+    const days = daysInMonth(year, month);
+    const current = this.isCurrentMonth();
+    if (!current && isoDate(year, month, 1) > isoDate(now.getFullYear(), now.getMonth() + 1, 1)) {
+      return [];
+    }
+    const lines: MonthLine[] = [];
+    for (const p of report.providers) {
+      const last = p.days[p.days.length - 1];
+      if (p.status === "unavailable" || !last) continue;
+      const usage = p.days.reduce((sum, d) => sum + d.usage, 0);
+      const result = monthProjection(usage, last.budget, current ? now.getDate() : days, days);
+      if (!result) continue;
+      const name = providerLabel(p.provider);
+      lines.push({
+        provider: p.provider,
+        label: `${name}: ${current ? "projected" : "month total"} ${result.percent} %`,
+        colour: projectionColour(result, last.colour),
+        title:
+          `${name}: ${amount(Math.round(result.projected * 10) / 10, p.unit)} of ` +
+          `${amount(result.budget, p.unit)} monthly budget`,
+      });
+    }
+    return lines;
   });
 
   /**

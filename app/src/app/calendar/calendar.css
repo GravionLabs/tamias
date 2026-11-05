@@ -227,3 +227,10 @@ h1 {
   gap: 8px;
   margin-top: 8px;
 }
+
+.month-lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}

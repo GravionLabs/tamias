@@ -20,6 +20,8 @@ import {
   todayPercent,
   usedOfText,
   usedPercent,
+  projectionColour,
+  windowProjection,
   windowLabel,
   type ProviderReport,
   type Report,
@@ -50,6 +52,11 @@ export function todayBarWidth(w: WindowReport): number {
   return Math.min(100, Math.max(0, todayPercent(w) ?? 0));
 }
 
+/** Fill of the projection bar in percent: the projected share of the monthly budget, at most the full track. */
+export function projectionBarWidth(w: WindowReport, now: Date = new Date()): number {
+  return Math.min(100, Math.max(0, windowProjection(w, now)?.percent ?? 0));
+}
+
 /**
  * The compact usage card of the tray popup (`/tray`): per set-up provider the windows of today's
  * report with percentage, bar in the budget colour and absolute numbers. Loads like the overview
@@ -78,6 +85,9 @@ export class Tray {
   protected readonly width = barWidth;
   protected readonly today = todayPercent;
   protected readonly todayWidth = todayBarWidth;
+  protected readonly projection = (w: WindowReport) => windowProjection(w);
+  protected readonly projectionColour = projectionColour;
+  protected readonly projectionWidth = (w: WindowReport) => projectionBarWidth(w);
   protected readonly note = providerNote;
   protected readonly shown = shownProviders;
   protected readonly resets = (at: string) => `resets ${localTime(at)}`;
