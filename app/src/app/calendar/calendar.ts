@@ -143,6 +143,29 @@ export class Calendar {
     return status.state === "not_installed" || this.collection.actionError() !== null;
   });
 
+  /**
+   * The CLI could not tell whether collection is set up (sidecar missing, timeout, non-zero
+   * exit, unexpected output) and there is no data: shown instead of an empty calendar with no
+   * explanation, with the message of the failure.
+   */
+  protected readonly statusError = computed(() => {
+    const report = this.report();
+    const status = this.collection.status();
+    if (!report || !hasNoData(report) || status?.state !== "error") return null;
+    return status.message ?? "unknown error";
+  });
+
+  /** No data and the status is not known yet: a hint instead of an empty calendar. */
+  protected readonly statusPending = computed(() => {
+    const report = this.report();
+    return !!report && hasNoData(report) && this.collection.status() === null;
+  });
+
+  /** Reads the collection status again, after "Retry" in the status error. */
+  protected retryStatus(): Promise<void> {
+    return this.collection.refresh();
+  }
+
   /** Set up from the prompt and the CLI now reports the collector: the first data is on its way. */
   protected readonly setupDone = signal(false);
 
@@ -198,7 +221,7 @@ export class Calendar {
       this.report.set(report);
       this.error.set(null);
       // Only without data: the status runs the CLI, which a filled calendar does not need.
-      if (hasNoData(report) && this.collection.status() === null) void this.collection.refresh();
+      if (hasNoData(report) && this.collection.status() === null) void this.collection.check();
     } catch (error) {
       if (load !== this.loads || isBusy(error)) return;
       this.error.set(errorText(error));
