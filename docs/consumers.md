@@ -69,6 +69,8 @@ C 62% · CP 41%
 
 `C` is Claude (seven-day used %), `CP` is Copilot (monthly used %). A stale provider shows `?` (`C ?`); an unavailable provider is left out. `--color` controls ANSI colours; the default colours only a terminal without `NO_COLOR`. `--short` and `--json` cannot be combined.
 
+To show this line in the status line of Claude Code, see [Claude Code status line](./statusline.md).
+
 ## Exit codes
 
 | Code | Meaning (`tamias collect`, `tamiasw` and `tamias today`) |
