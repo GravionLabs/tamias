@@ -1,0 +1,149 @@
+:host {
+  display: block;
+  padding: 1px;
+}
+
+.card {
+  display: grid;
+  gap: 20px;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--h-content-border-color);
+  background: var(--h-content-background);
+  color: var(--h-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.provider {
+  display: grid;
+  gap: 14px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--h-text-muted-color);
+}
+
+.window {
+  display: grid;
+  gap: 8px;
+}
+
+/* One baseline for the label and the percentage, in every block. */
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.label {
+  font-size: 0.9375rem;
+}
+
+.percent {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.today-percent {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.track {
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--h-surface-200);
+}
+
+.today-track {
+  height: 4px;
+}
+
+:host-context(.app-dark) .track {
+  background: var(--h-surface-700);
+}
+
+.bar {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.colour-green {
+  background: var(--h-green-500);
+}
+
+.colour-yellow {
+  background: var(--h-yellow-500);
+}
+
+.colour-red {
+  background: var(--h-red-500);
+}
+
+.colour-grey {
+  background: var(--h-surface-400);
+}
+
+.detail {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  font-size: 0.75rem;
+  color: var(--h-text-muted-color);
+}
+
+.detail span {
+  white-space: nowrap;
+}
+
+.note {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--h-text-muted-color);
+}
+
+/* A text link in the card footer: an action, so a button element styled as a link. */
+.open {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--h-primary-color);
+  text-decoration: none;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.open svg {
+  flex: none;
+  transition: transform 120ms ease;
+}
+
+.open:hover {
+  text-decoration: underline;
+}
+
+.open:hover svg {
+  transform: translate(1px, -1px);
+}
+
+.open:focus-visible {
+  outline: 2px solid var(--h-focus-ring-color);
+  outline-offset: 2px;
+  text-decoration: underline;
+}

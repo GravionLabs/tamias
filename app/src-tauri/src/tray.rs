@@ -5,7 +5,9 @@
 //!   ([`tray_state`]); the summary is the line of `tamias today --short` (`C 62% · CP 41%`).
 //! - The summary is the tooltip (Windows, macOS) and the first, disabled menu item, because
 //!   Linux (libappindicator) shows no tooltips. The menu: summary, "Open tamias", "Quit".
-//! - A left click (Windows, macOS) or "Open tamias" shows and focuses the window; closing the
+//! - Hovering the icon (Windows, macOS) shows the usage card ([`popup`]); a left click shows and
+//!   focuses the window on the calendar, as does "Open tamias"; the right click opens the menu
+//!   (on Linux, which has no hover, "Show usage" opens the card); closing the
 //!   window hides it ([`hide_window`]); "Quit" exits the app. On macOS the dock icon is hidden
 //!   with the window (`ActivationPolicy::Accessory`).
 //! - [`refresh`] reads the report on start and on every `store-changed`. Only a complete report
@@ -19,12 +21,15 @@ use tamias_core::report::{Report, Status, short};
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
-use crate::{CommandError, today};
+use crate::{CommandError, popup, today};
 
 /// Label of the main window (`tauri.conf.json`).
 pub const MAIN_WINDOW: &str = "main";
+
+/// Event that routes the main window to the calendar (`app.ts`).
+const SHOW_CALENDAR: &str = "show-calendar";
 
 /// Summary when no provider is set up.
 pub const NOTHING_SET_UP: &str = "No provider set up";
@@ -34,6 +39,8 @@ pub const STARTING: &str = "Reading usage…";
 
 /// Id of the "Open tamias" menu item.
 const OPEN: &str = "open";
+/// Id of the "Show usage" menu item.
+const USAGE: &str = "usage";
 /// Id of the "Quit" menu item.
 const QUIT: &str = "quit";
 
@@ -192,7 +199,9 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, OPEN, "Open tamias", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, QUIT, "Quit", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&summary, &separator, &open, &quit])?;
+    // Linux (libappindicator) has no hover or click events: the card opens from the menu.
+    let usage = MenuItem::with_id(app, USAGE, "Show usage", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&summary, &separator, &usage, &open, &quit])?;
     let icon = TrayIconBuilder::with_id("tamias")
         .icon(Image::from_bytes(state.colour.png())?)
         .icon_as_template(false)
@@ -200,18 +209,41 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
-            OPEN => show_window(app),
+            OPEN => {
+                popup::dismiss(app);
+                show_window(app);
+                show_calendar(app);
+            }
+            USAGE => popup::show(app, None, true),
             QUIT => app.exit(0),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                show_window(tray.app_handle());
+            let app = tray.app_handle();
+            match event {
+                // Hovering shows the usage card, leaving hides it (Windows, macOS).
+                TrayIconEvent::Enter { rect, .. } | TrayIconEvent::Move { rect, .. } => {
+                    popup::pointer_over_icon(app, icon_rect(app, &rect));
+                }
+                TrayIconEvent::Leave { .. } => popup::pointer_left_icon(app),
+                // A left click opens the main window on the calendar; the right click opens
+                // the menu (`show_menu_on_left_click(false)`).
+                TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } => {
+                    popup::dismiss(app);
+                    show_window(app);
+                    show_calendar(app);
+                }
+                // The menu opens over the card.
+                TrayIconEvent::Click {
+                    button: MouseButton::Right,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } => popup::dismiss(app),
+                _ => {}
             }
         })
         .build(app)?;
@@ -258,6 +290,40 @@ fn apply(tray: &Tray, current: &TrayState, next: &TrayState) -> tauri::Result<()
     let text = next.text();
     tray.icon.set_tooltip(Some(&text))?;
     tray.summary.set_text(&text)
+}
+
+/// The tray icon's rectangle in physical pixels: the event reports physical ones on Windows and
+/// macOS; logical ones are scaled by the primary monitor's factor.
+fn icon_rect(app: &AppHandle, rect: &tauri::Rect) -> popup::Rect {
+    let scale = || {
+        app.primary_monitor()
+            .ok()
+            .flatten()
+            .map_or(1.0, |m| m.scale_factor())
+    };
+    let (x, y) = match rect.position {
+        tauri::Position::Physical(p) => (f64::from(p.x), f64::from(p.y)),
+        tauri::Position::Logical(p) => (p.x * scale(), p.y * scale()),
+    };
+    let (width, height) = match rect.size {
+        tauri::Size::Physical(s) => (f64::from(s.width), f64::from(s.height)),
+        tauri::Size::Logical(s) => (s.width * scale(), s.height * scale()),
+    };
+    popup::Rect {
+        x,
+        y,
+        width,
+        height,
+    }
+}
+
+/// Routes the main window to the calendar, its start route: an event the app shell handles with
+/// the router, so it works while the window is hidden or still loading (the listener is set
+/// when the shell is created).
+fn show_calendar(app: &AppHandle) {
+    if let Err(error) = app.emit_to(MAIN_WINDOW, SHOW_CALENDAR, ()) {
+        eprintln!("tamias-app: cannot show the calendar: {error}");
+    }
 }
 
 /// Shows and focuses the main window; on macOS the dock icon comes back with it.

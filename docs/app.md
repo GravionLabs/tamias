@@ -36,7 +36,7 @@ On the first start without data and without a collector, the calendar asks "Coll
 
 "Not now" hides the prompt only until the app is closed; it returns on the next start. Settings shows the collection status at any time, with "Set up" and "Remove". A collector you registered with a CLI from the archives keeps working: the app shows it as set up and does not replace it.
 
-Every call of the CLI is limited to 10 seconds; a call that fails or does not answer is shown as an error with its message.
+Every call of the CLI is limited to 10 seconds; a call that fails or does not answer is shown as an error with its message. In the calendar, without data, an unreadable status shows that message with a Retry button instead of an empty calendar. The status error shows only when there is no data; a calendar with data never shows it. A first failed status read is retried once automatically before the error appears, a status call that does not answer within 15 seconds ends as an error, and while the status is being read the calendar says so. A report whose providers are all unavailable, stale without a first success, or ok without a single day counts as no data.
 
 "Remove" in Settings (or `tamias service uninstall`) removes the registration; it keeps the data and the log. Remove the registration before you delete the app, otherwise the scheduler keeps running a missing executable.
 
@@ -88,7 +88,9 @@ The tray icon shows the worst colour of the binding windows of the set-up provid
 
 Grey wins over red: a stale provider's numbers may be outdated.
 
-- A left click on the icon (Windows and macOS only), or "Open tamias" in its menu, shows and focuses the window. On Linux only the menu entry "Open tamias" opens it.
+- Hovering the icon (Windows and macOS) shows a small usage card next to it: per provider the binding window, its usage and the reset. A window with a daily budget also shows "Today": today's usage in percent of today's budget, with its own bar in the budget colour. It hides when the pointer leaves the icon and the card, on Escape and when it loses focus. Its "Open tamias" link opens the window.
+- A left click on the icon (Windows and macOS) opens the window on the calendar and hides the card.
+- A right click opens the menu: the summary, "Open tamias", "Show usage" and "Quit". "Open tamias" shows and focuses the window on the calendar. "Show usage" opens the card; on Linux, which sends no hover or click events, it is the only way to open the card, and "Open tamias" the only way to open the window.
 - Closing the window hides it to the tray; the app keeps running and collection is not affected.
 - "Quit" in the tray menu exits the app. On macOS the dock icon is hidden while the window is hidden.
 
@@ -100,7 +102,7 @@ The app shows the same document as `tamias today --json`. A provider that is `un
 
 ## Start at login
 
-Settings has "Start tamias at login". The setting is the state of the operating system's autostart entry, so it is off until you turn it on. The entry starts the app with `--hidden`: only the tray icon appears, and the window opens with "Open tamias" in the tray menu, or on Windows and macOS with a left click on the icon.
+Settings has "Start tamias at login". The setting is the state of the operating system's autostart entry, so it is off until you turn it on. The entry starts the app with `--hidden`: only the tray icon appears, and the window opens with "Open tamias" in the tray menu, or on Windows and macOS with a left click on the icon (or the card's "Open tamias" link on hover).
 
 Removing the app does not remove the autostart entry; turn it off in Settings first. In a dev build (`pnpm tauri dev`) the switch is disabled with a hint, because a dev executable cannot run on its own after a reboot.
 

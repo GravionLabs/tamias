@@ -21,3 +21,10 @@ body {
 :root.app-dark body {
   background: var(--h-surface-950);
 }
+
+/* The tray popup (route /tray) is a card on a transparent window. */
+html.tray-popup,
+html.tray-popup body,
+:root.app-dark.tray-popup body {
+  background: transparent;
+}

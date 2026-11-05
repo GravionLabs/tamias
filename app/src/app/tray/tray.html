@@ -1,0 +1,72 @@
+<main class="card">
+  @if (error(); as message) {
+    <p class="note" role="alert" data-testid="error">Cannot read today's usage: {{ message }}</p>
+  } @else if (report(); as r) {
+    @for (p of shown(r); track p.provider) {
+      <section class="provider" [attr.data-provider]="p.provider" [attr.data-status]="p.status">
+        <h2>{{ providerLabel(p.provider) }} Usage</h2>
+        @if (note(p); as text) {
+          <p class="note" data-testid="note">{{ text }}</p>
+        }
+        @for (w of p.windows; track w.window) {
+          <div class="window" [attr.data-window]="w.window" [attr.data-colour]="w.colour">
+            <div class="row">
+              <span class="label">{{ windowLabel(w.window) }}</span>
+              <span class="percent" data-testid="percent">{{ percent(w) }}%</span>
+            </div>
+            <div
+              class="track"
+              role="progressbar"
+              [attr.aria-label]="windowLabel(w.window)"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              [attr.aria-valuenow]="width(w)"
+            >
+              <div class="bar" [class]="'bar colour-' + w.colour" [style.width.%]="width(w)"></div>
+            </div>
+            @if (today(w) !== null) {
+              <div class="row today-row">
+                <span class="label">Today</span>
+                <span class="today-percent" data-testid="today">{{ today(w) }}%</span>
+              </div>
+              <div
+                class="track today-track"
+                role="progressbar"
+                aria-label="Today"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                [attr.aria-valuenow]="todayWidth(w)"
+              >
+                <div
+                  class="bar"
+                  data-testid="today-bar"
+                  [class]="'bar colour-' + w.colour"
+                  [style.width.%]="todayWidth(w)"
+                ></div>
+              </div>
+            }
+            <div class="detail">
+              <span data-testid="used">{{ usedOfText(w) }}</span>
+              <span data-testid="resets">{{ resets(w.resets_at) }}</span>
+            </div>
+          </div>
+        }
+      </section>
+    }
+  } @else {
+    <p class="note" role="status">Reading usage…</p>
+  }
+  <button type="button" class="open" (click)="open()">
+    <span>Open tamias</span>
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+      <path
+        d="M6 3.5h6.5V10M12.5 3.5 4 12"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  </button>
+</main>

@@ -19,8 +19,27 @@
         "minWidth": 480,
         "minHeight": 360,
         "visible": false
+      },
+      {
+        "label": "tray",
+        "title": "tamias usage",
+        "url": "index.html#/tray",
+        "width": 320,
+        "height": 200,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "skipTaskbar": true,
+        "alwaysOnTop": true,
+        "focus": false,
+        "visibleOnAllWorkspaces": true
       }
     ],
+    "macOSPrivateApi": true,
     "security": {
       "csp": {
         "default-src": "'self'",
