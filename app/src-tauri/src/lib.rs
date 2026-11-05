@@ -4,6 +4,7 @@
 //! The [`tray`] icon shows the traffic light; closing the window hides it to the tray.
 //! The [`service`] commands set up collection with the bundled `tamias` CLI.
 
+pub mod autostart;
 pub mod day;
 pub mod launch;
 pub mod month;
@@ -17,6 +18,7 @@ use std::sync::{Mutex, PoisonError};
 use tamias_core::paths;
 use tamias_core::report::Report;
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
+use tauri_plugin_autostart::ManagerExt;
 
 /// Error of a command as the frontend receives it.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -207,6 +209,25 @@ fn stop_live_refresh(app: &tauri::AppHandle) {
     }
 }
 
+/// Whether autostart can be enabled: false in a dev build, whose executable cannot run on its own.
+#[tauri::command]
+fn autostart_available() -> bool {
+    autostart::available()
+}
+
+/// Creates the autostart entry; refused in a dev build.
+#[tauri::command]
+fn autostart_enable(app: tauri::AppHandle) -> Result<(), CommandError> {
+    autostart::check_enable(!autostart::available()).map_err(|message| CommandError {
+        message: message.to_owned(),
+        busy: false,
+    })?;
+    app.autolaunch().enable().map_err(|e| CommandError {
+        message: e.to_string(),
+        busy: false,
+    })
+}
+
 /// Starts the app.
 ///
 /// # Panics
@@ -254,7 +275,9 @@ pub fn run() {
             day,
             service_status,
             service_install,
-            service_uninstall
+            service_uninstall,
+            autostart_available,
+            autostart_enable
         ])
         .build(tauri::generate_context!())
         .expect("error while running the tamias app")
