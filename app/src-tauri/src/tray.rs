@@ -41,11 +41,11 @@ const QUIT: &str = "quit";
 ///
 /// | State                                     | Colour     | Icon          |
 /// |-------------------------------------------|------------|---------------|
-/// | no provider set up                        | `Neutral`  | hollow ring   |
-/// | all binding windows green                 | `Green`    | green disc    |
-/// | worst binding window yellow               | `Yellow`   | yellow disc   |
-/// | worst binding window red                  | `Red`      | red disc      |
-/// | a provider stale, without data, or failed | `Grey`     | grey disc     |
+/// | no provider set up                        | `Neutral`  | hollow gauge  |
+/// | all binding windows green                 | `Green`    | green gauge   |
+/// | worst binding window yellow               | `Yellow`   | yellow gauge  |
+/// | worst binding window red                  | `Red`      | red gauge     |
+/// | a provider stale, without data, or failed | `Grey`     | grey gauge    |
 ///
 /// Grey wins over red: a stale provider's numbers may be outdated, so the light is not trusted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
