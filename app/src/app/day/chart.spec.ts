@@ -9,6 +9,29 @@ function at(hour: number, minute = 0): string {
 
 const DATE = "2026-11-03";
 
+describe("buildChart size", () => {
+  const pts = [{ at: at(12), usage: 5 }];
+
+  it("lays the plot out in the given size, keeping the margins fixed", () => {
+    const chart = buildChart(DATE, pts, 10, "percent", undefined, { width: 960, height: 400 });
+    expect(chart.right).toBe(948);
+    expect(chart.bottom).toBe(372);
+    expect(chart.top).toBe(12);
+    expect(chart.left).toBe(48);
+    expect(chart.path).toBe("M498 192");
+  });
+
+  it("falls back to the default size without one", () => {
+    expect(buildChart(DATE, pts, 10, "percent").right).toBe(468);
+  });
+
+  it("never gets a plot smaller than the minimum size", () => {
+    const chart = buildChart(DATE, pts, 10, "percent", undefined, { width: 10, height: 10 });
+    expect(chart.right).toBeGreaterThan(chart.left);
+    expect(chart.bottom).toBeGreaterThan(chart.top);
+  });
+});
+
 describe("buildChart", () => {
   const points = [
     { at: at(0), usage: 0 },

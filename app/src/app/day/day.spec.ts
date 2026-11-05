@@ -4,7 +4,7 @@ import { TestBed, getTestBed } from "@angular/core/testing";
 import { ActivatedRoute, convertToParamMap, provideRouter } from "@angular/router";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
 import { of } from "rxjs";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { NOW } from "../calendar/calendar";
 import { Ipc, type Unlisten } from "../core/ipc";
 import { STORE_CHANGED } from "../core/store-events";
@@ -206,5 +206,44 @@ describe("Day", () => {
     ipc.emit(STORE_CHANGED);
     await settle();
     expect(ipc.requests).toHaveLength(2);
+  });
+
+  it("is not bound by a fixed maximum width", () => {
+    const css = readFileSync("src/app/day/day.css", "utf8");
+    expect(css).not.toMatch(/max-width\s*:\s*\d+px/);
+  });
+
+  it("draws the chart in the measured size of its box, so text is not stretched", async () => {
+    const observers: { cb: ResizeObserverCallback; el: Element }[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(private cb: ResizeObserverCallback) {}
+        observe(el: Element) {
+          observers.push({ cb: this.cb, el });
+        }
+        disconnect() {}
+        unobserve() {}
+      },
+    );
+    try {
+      const { el, settle } = await mount((d) => day(d, CLAUDE));
+      const resize = async (width: number, height: number) => {
+        for (const o of observers) {
+          o.cb(
+            [{ target: o.el, contentRect: { width, height } } as unknown as ResizeObserverEntry],
+            {} as ResizeObserver,
+          );
+        }
+        await settle();
+      };
+      const svg = () => el.querySelector("[data-testid=chart]")!;
+      await resize(960, 400);
+      expect(svg().getAttribute("viewBox")).toBe("0 0 960 400");
+      await resize(500, 260);
+      expect(svg().getAttribute("viewBox")).toBe("0 0 500 260");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
