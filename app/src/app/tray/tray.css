@@ -49,9 +49,10 @@ h2 {
   line-height: 1;
 }
 
+/* The Today row is set like the window row above it: same label, number and bar size. */
 .today-percent {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.75rem;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -60,10 +61,6 @@ h2 {
   border-radius: 3px;
   overflow: hidden;
   background: var(--h-surface-200);
-}
-
-.today-track {
-  height: 4px;
 }
 
 :host-context(.app-dark) .track {
@@ -142,8 +139,12 @@ h2 {
   transform: translate(1px, -1px);
 }
 
+/* No frame: the popup takes focus when it is clicked; the underline marks keyboard focus. */
+.open:focus,
 .open:focus-visible {
-  outline: 2px solid var(--h-focus-ring-color);
-  outline-offset: 2px;
+  outline: none;
+}
+
+.open:focus-visible {
   text-decoration: underline;
 }
