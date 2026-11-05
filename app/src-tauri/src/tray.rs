@@ -21,12 +21,15 @@ use tamias_core::report::{Report, Status, short};
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::{CommandError, popup, today};
 
 /// Label of the main window (`tauri.conf.json`).
 pub const MAIN_WINDOW: &str = "main";
+
+/// Event that routes the main window to the calendar (`app.ts`).
+const SHOW_CALENDAR: &str = "show-calendar";
 
 /// Summary when no provider is set up.
 pub const NOTHING_SET_UP: &str = "No provider set up";
@@ -206,7 +209,11 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
-            OPEN => show_window(app),
+            OPEN => {
+                popup::dismiss(app);
+                show_window(app);
+                show_calendar(app);
+            }
             USAGE => popup::show(app, None, true),
             QUIT => app.exit(0),
             _ => {}
@@ -216,7 +223,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             match event {
                 // Hovering shows the usage card, leaving hides it (Windows, macOS).
                 TrayIconEvent::Enter { rect, .. } | TrayIconEvent::Move { rect, .. } => {
-                    popup::pointer_over_icon(app, icon_rect(&rect));
+                    popup::pointer_over_icon(app, icon_rect(app, &rect));
                 }
                 TrayIconEvent::Leave { .. } => popup::pointer_left_icon(app),
                 // A left click opens the main window on the calendar; the right click opens
@@ -226,10 +233,16 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
                     button_state: MouseButtonState::Up,
                     ..
                 } => {
-                    popup::hide(app);
+                    popup::dismiss(app);
                     show_window(app);
                     show_calendar(app);
                 }
+                // The menu opens over the card.
+                TrayIconEvent::Click {
+                    button: MouseButton::Right,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } => popup::dismiss(app),
                 _ => {}
             }
         })
@@ -279,24 +292,36 @@ fn apply(tray: &Tray, current: &TrayState, next: &TrayState) -> tauri::Result<()
     tray.summary.set_text(&text)
 }
 
-/// The tray icon's rectangle in physical pixels (the event reports physical ones on Windows and
-/// macOS).
-fn icon_rect(rect: &tauri::Rect) -> popup::Rect {
-    let position = rect.position.to_physical::<f64>(1.0);
-    let size = rect.size.to_physical::<f64>(1.0);
+/// The tray icon's rectangle in physical pixels: the event reports physical ones on Windows and
+/// macOS; logical ones are scaled by the primary monitor's factor.
+fn icon_rect(app: &AppHandle, rect: &tauri::Rect) -> popup::Rect {
+    let scale = || {
+        app.primary_monitor()
+            .ok()
+            .flatten()
+            .map_or(1.0, |m| m.scale_factor())
+    };
+    let (x, y) = match rect.position {
+        tauri::Position::Physical(p) => (f64::from(p.x), f64::from(p.y)),
+        tauri::Position::Logical(p) => (p.x * scale(), p.y * scale()),
+    };
+    let (width, height) = match rect.size {
+        tauri::Size::Physical(s) => (f64::from(s.width), f64::from(s.height)),
+        tauri::Size::Logical(s) => (s.width * scale(), s.height * scale()),
+    };
     popup::Rect {
-        x: position.x,
-        y: position.y,
-        width: size.width,
-        height: size.height,
+        x,
+        y,
+        width,
+        height,
     }
 }
 
-/// Routes the main window to the calendar, its start route (hash location).
+/// Routes the main window to the calendar, its start route: an event the app shell handles with
+/// the router, so it works while the window is hidden or still loading (the listener is set
+/// when the shell is created).
 fn show_calendar(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(MAIN_WINDOW)
-        && let Err(error) = window.eval("window.location.hash = '#/'")
-    {
+    if let Err(error) = app.emit_to(MAIN_WINDOW, SHOW_CALENDAR, ()) {
         eprintln!("tamias-app: cannot show the calendar: {error}");
     }
 }

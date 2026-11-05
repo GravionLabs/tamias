@@ -119,17 +119,51 @@ struct PopupState {
     generation: u64,
 }
 
-/// Registers the popup state; the window itself is created by `tauri.conf.json`.
-pub fn init(app: &AppHandle) {
-    app.manage(Popup {
-        state: Mutex::new(PopupState {
+impl PopupState {
+    fn new() -> Self {
+        Self {
             anchor: None,
             height: INITIAL_HEIGHT,
             over_icon: false,
             over_card: false,
             dismissed: false,
             generation: 0,
-        }),
+        }
+    }
+
+    /// An enter or move event of the icon: whether the popup is to be shown now (it is hidden
+    /// and not dismissed). Cancels a pending hide.
+    fn pointer_over(&mut self, visible: bool) -> bool {
+        self.over_icon = true;
+        self.generation += 1;
+        !self.dismissed && !visible
+    }
+
+    /// The pointer left the icon: a dismissed popup may show again on the next enter.
+    fn pointer_left(&mut self) {
+        self.over_icon = false;
+        self.dismissed = false;
+    }
+
+    /// Whether the card is wanted after the hide scheduled as number `scheduled` ran: something
+    /// happened since, and the pointer is on the icon or the card without a dismissal.
+    fn wants_card(&self, scheduled: u64) -> bool {
+        self.generation != scheduled && !self.dismissed && (self.over_icon || self.over_card)
+    }
+
+    /// The popup is hidden on purpose (Escape, focus loss, click on the icon, menu): it stays
+    /// hidden until the pointer has left the icon.
+    fn dismiss(&mut self) {
+        self.dismissed = true;
+        self.over_card = false;
+        self.generation += 1;
+    }
+}
+
+/// Registers the popup state; the window itself is created by `tauri.conf.json`.
+pub fn init(app: &AppHandle) {
+    app.manage(Popup {
+        state: Mutex::new(PopupState::new()),
     });
 }
 
@@ -165,12 +199,8 @@ pub fn pointer_over_icon(app: &AppHandle, anchor: Rect) {
     let Some(popup) = app.try_state::<Popup>() else {
         return;
     };
-    let show_now = {
-        let mut state = lock(&popup);
-        state.over_icon = true;
-        state.generation += 1;
-        !state.dismissed && !window(app).is_some_and(|w| w.is_visible().unwrap_or(false))
-    };
+    let visible = window(app).is_some_and(|w| w.is_visible().unwrap_or(false));
+    let show_now = lock(&popup).pointer_over(visible);
     if show_now {
         show(app, Some(anchor), false);
     }
@@ -182,11 +212,7 @@ pub fn pointer_left_icon(app: &AppHandle) {
     let Some(popup) = app.try_state::<Popup>() else {
         return;
     };
-    {
-        let mut state = lock(&popup);
-        state.over_icon = false;
-        state.dismissed = false;
-    }
+    lock(&popup).pointer_left();
     schedule_hide(app);
 }
 
@@ -214,8 +240,19 @@ fn schedule_hide(app: &AppHandle) {
                 state.over_card,
             )
         };
-        if due {
-            hide(&handle);
+        if !due {
+            return;
+        }
+        // The lock must not be held over `hide`: the window's focus-loss handler takes it on the
+        // main thread. So an enter or move in between is caught afterwards: the card is shown
+        // again when the pointer came back.
+        hide(&handle);
+        let back = {
+            let state = lock(&popup);
+            state.wants_card(scheduled).then_some(state.anchor)
+        };
+        if let Some(anchor) = back {
+            show(&handle, anchor, false);
         }
     });
 }
@@ -292,12 +329,11 @@ pub fn on_focus_lost(app: &AppHandle) {
     dismiss(app);
 }
 
-fn dismiss(app: &AppHandle) {
+/// Hides the popup on purpose and keeps it hidden until the pointer left the icon: the pointer
+/// is still on the icon after a click, and the move events that follow must not show it again.
+pub fn dismiss(app: &AppHandle) {
     if let Some(popup) = app.try_state::<Popup>() {
-        let mut state = lock(&popup);
-        state.dismissed = true;
-        state.over_card = false;
-        state.generation += 1;
+        lock(&popup).dismiss();
     }
     hide(app);
 }
@@ -340,7 +376,7 @@ pub fn tray_popup_hover(app: AppHandle, over: bool) {
     reason = "tauri injects `AppHandle` by value"
 )]
 pub fn tray_popup_open_main(app: AppHandle) {
-    hide(&app);
+    dismiss(&app);
     crate::tray::show_window(&app);
 }
 
@@ -451,6 +487,48 @@ mod tests {
         };
         let (x, y) = position(icon(3800.0, 2100.0), monitor, (640.0, 800.0));
         assert_eq!((x, y), (3840.0 - 640.0 - 8.0, 2100.0 - 800.0 - 8.0));
+    }
+
+    #[test]
+    fn a_click_dismisses_the_card_until_the_pointer_leaves_the_icon() {
+        let mut state = PopupState::new();
+        assert!(state.pointer_over(false), "hover shows the card");
+        state.dismiss();
+        assert!(!state.pointer_over(false), "move events after the click");
+        assert!(!state.pointer_over(false));
+        state.pointer_left();
+        assert!(
+            state.pointer_over(false),
+            "enter after leave shows it again"
+        );
+    }
+
+    #[test]
+    fn a_visible_card_is_not_shown_again() {
+        let mut state = PopupState::new();
+        assert!(!state.pointer_over(true));
+        assert!(state.over_icon);
+    }
+
+    #[test]
+    fn dismiss_cancels_a_pending_hide_and_clears_the_card_hover() {
+        let mut state = PopupState::new();
+        state.over_card = true;
+        let scheduled = state.generation;
+        state.dismiss();
+        assert!(!state.over_card);
+        assert!(!hide_due(scheduled, state.generation, false, false));
+    }
+
+    #[test]
+    fn the_card_is_wanted_again_when_the_pointer_came_back_during_the_hide() {
+        let mut state = PopupState::new();
+        let scheduled = state.generation;
+        assert!(!state.wants_card(scheduled), "nothing happened");
+        state.pointer_over(false);
+        assert!(state.wants_card(scheduled));
+        state.dismiss();
+        assert!(!state.wants_card(scheduled), "dismissed meanwhile");
     }
 
     #[test]
