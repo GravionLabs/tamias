@@ -4,6 +4,8 @@
 //! yellow_at = 0.8       # ratio of today's usage to today's budget from which a day is yellow
 //! red_at = 1.0          # ratio above which a day is red
 //! stale_after = "15m"   # age of the last successful collect after which data is stale
+//! week_start = "monday" # first day of the app's calendar week: "monday", "sunday", "saturday"
+//!                       # or "locale" (the system locale's)
 //!
 //! [providers]
 //! claude = "auto"       # "auto" (on when credentials exist), true or false
@@ -39,6 +41,33 @@ pub enum Enabled {
     Off,
 }
 
+/// First day of the week in the app's month calendar (display only).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WeekStart {
+    /// Monday.
+    #[default]
+    Monday,
+    /// Sunday.
+    Sunday,
+    /// Saturday.
+    Saturday,
+    /// The first day of the system locale.
+    Locale,
+}
+
+impl WeekStart {
+    /// The value as written in `config.toml`.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Monday => "monday",
+            Self::Sunday => "sunday",
+            Self::Saturday => "saturday",
+            Self::Locale => "locale",
+        }
+    }
+}
+
 /// Effective configuration.
 #[derive(Debug, Clone, PartialEq, Default)]
 #[non_exhaustive]
@@ -51,6 +80,8 @@ pub struct Config {
     pub copilot: Enabled,
     /// Configured `gh` executable, if any.
     pub gh_path: Option<PathBuf>,
+    /// First day of the week in the app's calendar.
+    pub week_start: WeekStart,
 }
 
 /// The config could not be read or is invalid.
@@ -89,6 +120,7 @@ struct RawConfig {
     red_at: Option<f64>,
     stale_after: Option<String>,
     gh_path: Option<PathBuf>,
+    week_start: Option<String>,
     #[serde(default)]
     providers: RawProviders,
 }
@@ -166,6 +198,17 @@ pub fn parse(text: &str) -> Result<Config, String> {
     };
     let claude = enabled("claude", raw.providers.claude)?;
     let copilot = enabled("copilot", raw.providers.copilot)?;
+    let week_start = match raw.week_start.as_deref() {
+        None | Some("monday") => WeekStart::Monday,
+        Some("sunday") => WeekStart::Sunday,
+        Some("saturday") => WeekStart::Saturday,
+        Some("locale") => WeekStart::Locale,
+        Some(text) => {
+            return Err(format!(
+                "week_start = {text:?} must be \"monday\", \"sunday\", \"saturday\" or \"locale\""
+            ));
+        }
+    };
     Ok(Config {
         thresholds: Thresholds {
             yellow_at,
@@ -175,6 +218,7 @@ pub fn parse(text: &str) -> Result<Config, String> {
         claude,
         copilot,
         gh_path: raw.gh_path,
+        week_start,
     })
 }
 
@@ -204,7 +248,7 @@ fn parse_duration(text: &str) -> Result<SignedDuration, String> {
 mod tests {
     use jiff::SignedDuration;
 
-    use super::{Config, Enabled, parse};
+    use super::{Config, Enabled, WeekStart, parse};
 
     #[test]
     fn empty_file_is_the_defaults() {
@@ -315,6 +359,39 @@ mod tests {
         );
         assert!(parse("stale_after = \"-5m\"\n").is_err());
         assert!(parse("stale_after = 15\n").is_err());
+    }
+
+    #[test]
+    fn week_start_defaults_to_monday() {
+        assert_eq!(parse("").unwrap().week_start, WeekStart::Monday);
+    }
+
+    #[test]
+    fn week_start_accepts_the_four_values() {
+        for (value, expected) in [
+            ("monday", WeekStart::Monday),
+            ("sunday", WeekStart::Sunday),
+            ("saturday", WeekStart::Saturday),
+            ("locale", WeekStart::Locale),
+        ] {
+            let config = parse(&format!("week_start = \"{value}\"\n")).unwrap();
+            assert_eq!(config.week_start, expected, "{value}");
+            assert_eq!(expected.as_str(), value);
+        }
+    }
+
+    #[test]
+    fn invalid_week_start_is_rejected_with_key_and_allowed_values() {
+        let err = parse("week_start = \"friday\"\n").unwrap_err();
+        assert_eq!(
+            err,
+            "week_start = \"friday\" must be \"monday\", \"sunday\", \"saturday\" or \"locale\""
+        );
+        assert!(
+            parse("week_start = 1\n")
+                .unwrap_err()
+                .contains("week_start")
+        );
     }
 
     #[test]

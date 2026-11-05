@@ -6,6 +6,7 @@ import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Ipc, type ServiceStatus, type Unlisten } from "../core/ipc";
 import { Collection } from "../core/collection";
+import { WeekStart } from "../core/week-start";
 import { Settings } from "./settings";
 
 beforeAll(() => {
@@ -30,6 +31,7 @@ class StubIpc extends Ipc {
   serviceCalls: string[] = [];
   fail: unknown = null;
   available = true;
+  weekSetting = "monday";
   service: ServiceStatus = NOT_INSTALLED;
   install: () => Promise<void> = async () => {
     this.service = INSTALLED;
@@ -43,6 +45,7 @@ class StubIpc extends Ipc {
   }
 
   override async invoke<T>(command: string): Promise<T> {
+    if (command === "week_start") return this.weekSetting as T;
     if (command.startsWith("service_")) return this.serviceCommand(command) as T;
     this.calls.push(command);
     if (this.fail) throw this.fail;
@@ -85,6 +88,7 @@ async function mount(ipc: StubIpc) {
       template: readFileSync("src/app/settings/settings.html", "utf8"),
     },
   });
+  await TestBed.inject(WeekStart).load();
   const fixture = TestBed.createComponent(Settings);
   const settle = async () => {
     await fixture.whenStable();
@@ -118,6 +122,21 @@ async function mount(ipc: StubIpc) {
 }
 
 describe("Settings", () => {
+  it("shows the week start of config.toml, read only, with a hint", async () => {
+    const ipc = new StubIpc(false);
+    ipc.weekSetting = "saturday";
+    const { text, el } = await mount(ipc);
+    expect(text("week-start-value")).toBe("saturday");
+    expect(el.querySelector("[data-testid=week-start] input")).toBeNull();
+    expect(el.textContent).toContain("week_start");
+    expect(el.textContent).toContain("config.toml");
+  });
+
+  it("shows monday when config.toml sets nothing", async () => {
+    const { text } = await mount(new StubIpc(false));
+    expect(text("week-start-value")).toBe("monday");
+  });
+
   it("shows the toggle off when the OS has no autostart entry", async () => {
     const { toggle, error } = await mount(new StubIpc(false));
     expect(toggle().checked).toBe(false);

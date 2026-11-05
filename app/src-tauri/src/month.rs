@@ -10,7 +10,7 @@ use std::path::Path;
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use serde::Serialize;
-use tamias_core::config::{self, Config};
+use tamias_core::config::{self, Config, WeekStart};
 use tamias_core::paths;
 use tamias_core::report::{self, DayEntry, Status};
 use tamias_core::snapshot::{Provider, Unit};
@@ -63,6 +63,15 @@ pub fn current(year: i16, month: i8) -> Result<MonthReport, Error> {
         Timestamp::now(),
         &TimeZone::system(),
     )?)
+}
+
+/// The first day of the calendar week from `config.toml`.
+///
+/// # Errors
+///
+/// [`Error`] when the config is invalid.
+pub fn week_start() -> Result<WeekStart, Error> {
+    Ok(config::load(None)?.week_start)
 }
 
 /// The month of every provider at `now`, the days taken in `tz`, from the database file

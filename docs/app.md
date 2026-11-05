@@ -54,6 +54,12 @@ The calendar opens on the current month. Previous, Today and Next move between m
 
 A provider is stale when its last successful read is older than `stale_after` (default 15 minutes, set in `config.toml`; see also [Consumers](./consumers.md)), when it has never succeeded, or when its last run failed after its last success, even if that success is younger than `stale_after`. On today's cell the grey chip says "stale since 09:00" (the time of the last successful collect), or "stale, never collected". Today's cell is only grey while the provider is stale; the calendar does not show old numbers as current.
 
+The week starts on Monday. Set `week_start` in `config.toml` to change it: `"monday"` (default), `"sunday"`, `"saturday"` or `"locale"` (the first day of your system locale). The weekday header and the empty cells before the 1st follow it; Settings shows the active value, read only. The app reads it at start, so restart the app after changing it. It does not change how the CLI reports days or budgets.
+
+```toml
+week_start = "sunday"
+```
+
 The calendar refreshes when the collector writes new snapshots, so the app needs no reload. The first data appears with the next collect, within 5 minutes.
 
 Click a day to open its day view. The "Today overview" link shows today's report of every provider.
