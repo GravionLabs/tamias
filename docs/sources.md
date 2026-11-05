@@ -24,10 +24,18 @@ Read from the installed Claude Code bundle, version **2.1.316** (macOS arm64 nat
 | | macOS | Linux | Windows |
 |---|---|---|---|
 | Credential source | login Keychain, generic password, service `Claude Code-credentials`, read via `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w` | `~/.claude/.credentials.json` (or `$CLAUDE_CONFIG_DIR/.credentials.json`) | `%USERPROFILE%\.claude\.credentials.json` (or `%CLAUDE_CONFIG_DIR%`) |
-| Credential shape | JSON `claudeAiOauth{accessToken, refreshToken, expiresAt (epoch ms), refreshTokenExpiresAt, scopes[], subscriptionType, subscriptionTypeSource, rateLimitTier}` | expected the same | expected the same |
-| Request | `GET https://api.anthropic.com/api/oauth/usage`, `Authorization: Bearer`, `anthropic-beta: oauth-2025-04-20` | same (deferred to #20) | same (deferred to #20) |
-| Result | 200, see fixture | **pending** (#20: probe run needed) | **pending** (#20: needs a Windows machine) |
+| Credential shape | JSON `claudeAiOauth{accessToken, refreshToken, expiresAt (epoch ms), refreshTokenExpiresAt, scopes[], subscriptionType, subscriptionTypeSource, rateLimitTier}` | observed the same keys (Ubuntu 26.04.1, Claude Code 2.1.318): `claudeAiOauth{accessToken, expiresAt, rateLimitTier, refreshToken, refreshTokenExpiresAt, scopes[], subscriptionType, subscriptionTypeSource}`; file mode `0600`, `CLAUDE_CONFIG_DIR` unset | expected the same |
+| Request | `GET https://api.anthropic.com/api/oauth/usage`, `Authorization: Bearer`, `anthropic-beta: oauth-2025-04-20` | same, confirmed 2026-11-05 | same (deferred to #20) |
+| Result | 200, see fixture | 200, same top-level keys as the macOS fixture; `five_hour` and `seven_day` carry `utilization` and `resets_at` (see "Linux observations") | **pending** (#20: needs a Windows machine) |
 | Command | `pwsh -NoProfile -File spikes/claude-usage.ps1` | `pwsh -NoProfile -File spikes/claude-usage.ps1` and `... -InvalidToken` | `pwsh -NoProfile -File spikes\claude-usage.ps1` and `... -InvalidToken` |
+
+Linux observations (2026-11-05, Ubuntu 26.04.1, Claude Code 2.1.318, pwsh 7.5.0):
+
+- `~/.claude/.credentials.json` (mode `0600`) held the token; `CLAUDE_CONFIG_DIR` was unset, so the `$CLAUDE_CONFIG_DIR` path was not exercised. Same scopes as on macOS, including `user:profile`.
+- `GET /api/oauth/usage` returned 200 with the same top-level keys as `usage-ok.json`. `five_hour` and `seven_day` carry `utilization` (percent, e.g. `32.0`) and `resets_at`, plus `limit_dollars`, `used_dollars`, `remaining_dollars`, `locked_reason` (all `null`).
+- `resets_at` came with the **local UTC offset** (`+01:00`), the macOS fixture has `+00:00`: the parser must accept any offset and compare instants.
+- `seven_day_breakdown` was present (`as_of`, `window_started_at`, `rows[]` with `key`, `display_name`, `percent`).
+- Invalid token (`-InvalidToken`): HTTP 401, `authentication_error`, "OAuth access token is invalid." (same as macOS).
 
 macOS observations (2026-11-02, the tested subscription):
 
@@ -84,7 +92,7 @@ temporary LaunchAgent around `seven_day.resets_at`, 2026-11-02 (times UTC):
 
 | Case | Observed |
 |---|---|
-| Invalid token | HTTP 401, `{"type":"error","error":{"type":"authentication_error","message":"OAuth access token is invalid."},"request_id":"req_..."}` (fixture `usage-unauthorized.json`, `request_id` replaced) |
+| Invalid token | HTTP 401, `{"type":"error","error":{"type":"authentication_error","message":"OAuth access token is invalid."},"request_id":"req_..."}` (fixture `usage-unauthorized.json`, `request_id` replaced); same on Linux (2026-11-05) |
 | Expired token | not observed (the token was valid). `expiresAt` is in the credential, so tamias checks it before the call; by the bundle, Claude Code treats an expired token as 401 and refreshes. |
 | Missing Keychain item | run on macOS 2026-11-02 with a scratch copy of the probe whose service name was replaced by the non-existent `tamias-spike-missing` (real Keychain item untouched): `security` exited 44, the probe threw `Keychain item 'tamias-spike-missing' not readable (security exit 44).` and exited 1, before any HTTP call. tamias should then report `stale` (intended, not tested) |
 | Missing credentials file (Linux/Windows) | not tested (from probe code): the probe throws `Credentials file not found: <path>`; tamias should report `stale` |
@@ -125,29 +133,23 @@ Each window is present only while the API reports it and its `resets_at` has not
 statusLine input also carries `rate_limits_available` (false for API key, Bedrock, Vertex or missing
 profile scope; `rate_limits` is then null).
 
-**Real capture: pending (#20), needs an interactive Claude Code session.** No `statusline.json` fixture is committed yet. Steps for #20
-(temporary, revert afterwards):
+**Real capture (Linux, Claude Code 2.1.318, 2026-11-05):** `crates/core/tests/fixtures/claude/statusline.json` (sanitized: all-zero `session_id`, `null` paths and `pr`). Captured from an interactive `claude --settings <file>` session whose settings file set `statusLine` to `spikes/statusline-dump.ps1`; `claude -p` did not run the status line command (no file written). Observed:
 
-1. Add to `~/.claude/settings.json`:
-   `"statusLine": { "type": "command", "command": "pwsh -NoProfile -File <abs-path>/spikes/statusline-dump.ps1" }`
-2. Start `claude`, send one prompt; the status line shows `tamias-spike 5h=..% 7d=..%` or
-   `rate_limits=absent`.
-3. Copy `$TMPDIR/statusline.json` (Windows: `%TEMP%\statusline.json`) to
-   `crates/core/tests/fixtures/claude/statusline.json`, replace `session_id`, `transcript_path`,
-   `cwd`/workspace paths and any e-mail, run `spikes/Test-Fixture.ps1` (it rejects home paths,
-   session/transcript paths, `req_`/`org_`/`acct_` ids, 32-hex ids and non-zero UUIDs; use the all-zero
-   UUID, `REDACTED` or `/home/user` as placeholders).
-4. Record `claude --version`, presence and units of `rate_limits.five_hour` / `seven_day` here.
-5. Remove the `statusLine` entry again.
+- `rate_limits.five_hour` and `rate_limits.seven_day` are **present** right after the session start (before the first prompt) with `used_percentage` (integer percent 0-100, e.g. `33`) and `resets_at` (Unix epoch **seconds**, e.g. `1793862000`).
+- No `spend_limit` key and no `rate_limits_available` key in this capture (the subscription has no spend limit). `rate_limits_available` is only documented in the bundle; do not require it.
+- Other top-level keys: `session_id`, `transcript_path`, `cwd`, `scratchpad_dir`, `effort`, `model`, `workspace`, `version`, `output_style`, `cost`, `context_window`, `exceeds_200k_tokens`, `fast_mode`, `thinking`, `rate_limits`, `pr` (the PR of the checked-out branch, here #131). `context_window.used_percentage` and `current_usage` are `null` before the first API call.
+- Units differ from the OAuth endpoint (percent as integer here, float `utilization` there; epoch seconds here, ISO-8601 string there): the status line parser must convert `resets_at` to an instant and round it like the endpoint value before comparing windows.
+
+Not tested: Windows and macOS captures, an API-key or Bedrock login (`rate_limits` absent or `null`), a window after its reset.
 
 ### Verdict
 
 | Platform | Verdict |
 |---|---|
 | macOS | **Use.** OAuth usage endpoint via `/usr/bin/security`, works under launchd without a prompt. |
-| Linux | **pending** (#20): probe not yet run; needs Claude Code signed in on Linux |
+| Linux | **Use.** `~/.claude/.credentials.json` is read, the usage endpoint answers 200 without a prompt (Ubuntu 26.04.1, Claude Code 2.1.318, 2026-11-05). |
 | Windows | **pending** (#20): needs a Windows machine; nothing was run or assumed |
-| Status line fallback | schema confirmed from the 2.1.316 bundle; real capture deferred to #20 |
+| Status line fallback | **Use** as fallback. Real capture on Linux (Claude Code 2.1.318): `rate_limits.five_hour` / `seven_day` present from the session start, percent as integer, `resets_at` in epoch seconds. macOS and Windows captures pending. |
 
 ## Copilot
 
