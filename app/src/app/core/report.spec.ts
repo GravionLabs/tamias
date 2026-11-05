@@ -4,7 +4,10 @@ import {
   localTime,
   providerLabel,
   staleText,
+  todayPercent,
   todayText,
+  usedOfText,
+  usedPercent,
   usedText,
   windowLabel,
   type WindowReport,
@@ -90,6 +93,45 @@ describe("usedText", () => {
     expect(
       usedText({ ...SEVEN_DAY, window: "monthly", unit: "requests", used: 26, limit: 300 }),
     ).toBe("26 of 300 used");
+  });
+});
+
+describe("usedPercent and usedOfText", () => {
+  it("rounds the share of the limit", () => {
+    expect(usedPercent({ ...SEVEN_DAY, unit: "requests", used: 489, limit: 2380 })).toBe(21);
+    expect(usedPercent(SEVEN_DAY)).toBe(54);
+  });
+
+  it("is 0 for a limit of 0", () => {
+    expect(usedPercent({ ...SEVEN_DAY, limit: 0 })).toBe(0);
+  });
+
+  it("shows requests with thousands separators and percent against 100%", () => {
+    expect(usedOfText({ ...SEVEN_DAY, unit: "requests", used: 489, limit: 2380 })).toBe(
+      "489 of 2,380 requests",
+    );
+    expect(usedOfText({ ...SEVEN_DAY, unit: "requests", used: 1234567, limit: 2000000 })).toBe(
+      "1,234,567 of 2,000,000 requests",
+    );
+    expect(usedOfText(SEVEN_DAY)).toBe("54% of 100% used");
+  });
+});
+
+describe("todayPercent", () => {
+  it("is the ratio of today's usage to the budget in percent", () => {
+    expect(todayPercent(SEVEN_DAY)).toBe(40);
+    expect(todayPercent({ ...SEVEN_DAY, unit: "requests", ratio: 0.2134 })).toBe(21);
+  });
+
+  it("shows the real percent above the budget", () => {
+    expect(todayPercent({ ...SEVEN_DAY, ratio: 1.8 })).toBe(180);
+  });
+
+  it("is null without a budget or with a budget of 0", () => {
+    expect(
+      todayPercent({ ...SEVEN_DAY, today_usage: undefined, budget: undefined, ratio: undefined }),
+    ).toBeNull();
+    expect(todayPercent({ ...SEVEN_DAY, budget: 0, ratio: undefined })).toBeNull();
   });
 });
 

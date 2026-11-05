@@ -22,7 +22,7 @@ jiff = "0.2.39"
 notify = "8.2.1"
 serde = { version = "1.0.229", features = ["derive"] }
 tamias-core.workspace = true
-tauri = { version = "2.12.5", features = ["image-png", "tray-icon"] }
+tauri = { version = "2.12.5", features = ["image-png", "tray-icon", "macos-private-api"] }
 tauri-plugin-autostart = "2.7.0"
 thiserror = "2.0.21"
 

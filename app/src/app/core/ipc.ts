@@ -49,6 +49,26 @@ export abstract class Ipc {
     await this.invoke<void>(enabled ? "autostart_enable" : "plugin:autostart|disable");
   }
 
+  /** Hides the tray popup. */
+  async hideTrayPopup(): Promise<void> {
+    await this.invoke<void>("tray_popup_hide");
+  }
+
+  /** The pointer entered (`true`) or left (`false`) the tray popup; it hides shortly after leaving. */
+  async trayPopupHover(over: boolean): Promise<void> {
+    await this.invoke<void>("tray_popup_hover", { over });
+  }
+
+  /** Shows the main window and hides the tray popup. */
+  async openMainWindow(): Promise<void> {
+    await this.invoke<void>("tray_popup_open_main");
+  }
+
+  /** Sizes the tray popup to its content, `height` in CSS pixels. */
+  async fitTrayPopup(height: number): Promise<void> {
+    await this.invoke<void>("tray_popup_fit", { height });
+  }
+
   /** Whether collection is set up: `tamias service status` of the bundled CLI; never rejects. */
   serviceStatus(): Promise<ServiceStatus> {
     return this.invoke<ServiceStatus>("service_status");
