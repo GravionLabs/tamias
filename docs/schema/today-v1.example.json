@@ -16,7 +16,8 @@
           "colour": "green",
           "today_usage": 4.0,
           "budget": 10.0,
-          "ratio": 0.4
+          "ratio": 0.4,
+          "month_usage": 4.0
         },
         {
           "window": "five_hour",
@@ -44,7 +45,8 @@
           "colour": "grey",
           "today_usage": 6.0,
           "budget": 10.0,
-          "ratio": 0.6
+          "ratio": 0.6,
+          "month_usage": 6.0
         }
       ]
     }
