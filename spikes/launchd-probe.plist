@@ -7,7 +7,9 @@
        launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gravionlabs.tamias.probe.plist
        # wait <= 60 s for __OUT__/tamias-probe.out, then:
        launchctl bootout gui/$(id -u)/com.gravionlabs.tamias.probe
-       rm ~/Library/LaunchAgents/com.gravionlabs.tamias.probe.plist -->
+       rm ~/Library/LaunchAgents/com.gravionlabs.tamias.probe.plist
+       rm __OUT__/tamias-probe.out __OUT__/tamias-probe.err
+     The pwsh path below is /usr/local/bin/pwsh (Intel); on Homebrew arm64 use /opt/homebrew/bin/pwsh. -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
