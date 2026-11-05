@@ -130,7 +130,9 @@ describe("Settings", () => {
     ipc.available = false;
     const { toggle, text } = await mount(ipc);
     expect(toggle().disabled).toBe(true);
-    expect(text("autostart-unavailable")).toBe("Autostart is only available in an installed build.");
+    expect(text("autostart-unavailable")).toBe(
+      "Autostart is only available in an installed build.",
+    );
   });
 
   it("shows no unavailable hint in an installed build", async () => {
@@ -154,7 +156,11 @@ describe("Settings", () => {
     const ipc = new StubIpc(false);
     const { toggle, error, click } = await mount(ipc);
     await click();
-    expect(ipc.calls).toEqual(["autostart_available", "plugin:autostart|is_enabled", "autostart_enable"]);
+    expect(ipc.calls).toEqual([
+      "autostart_available",
+      "plugin:autostart|is_enabled",
+      "autostart_enable",
+    ]);
     expect(ipc.enabled).toBe(true);
     expect(toggle().checked).toBe(true);
     expect(error()).toBeNull();
@@ -164,7 +170,11 @@ describe("Settings", () => {
     const ipc = new StubIpc(true);
     const { toggle, click } = await mount(ipc);
     await click();
-    expect(ipc.calls).toEqual(["autostart_available", "plugin:autostart|is_enabled", "plugin:autostart|disable"]);
+    expect(ipc.calls).toEqual([
+      "autostart_available",
+      "plugin:autostart|is_enabled",
+      "plugin:autostart|disable",
+    ]);
     expect(ipc.enabled).toBe(false);
     expect(toggle().checked).toBe(false);
   });
