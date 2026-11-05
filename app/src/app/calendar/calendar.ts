@@ -155,7 +155,13 @@ export class Calendar {
     return status.message ?? "unknown error";
   });
 
-  /** Reads the collection status again, after \"Retry\" in the status error. */
+  /** No data and the status is not known yet: a hint instead of an empty calendar. */
+  protected readonly statusPending = computed(() => {
+    const report = this.report();
+    return !!report && hasNoData(report) && this.collection.status() === null;
+  });
+
+  /** Reads the collection status again, after "Retry" in the status error. */
   protected retryStatus(): Promise<void> {
     return this.collection.refresh();
   }
@@ -215,7 +221,7 @@ export class Calendar {
       this.report.set(report);
       this.error.set(null);
       // Only without data: the status runs the CLI, which a filled calendar does not need.
-      if (hasNoData(report) && this.collection.status() === null) void this.collection.refresh();
+      if (hasNoData(report) && this.collection.status() === null) void this.collection.check();
     } catch (error) {
       if (load !== this.loads || isBusy(error)) return;
       this.error.set(errorText(error));

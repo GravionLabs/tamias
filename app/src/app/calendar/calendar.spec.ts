@@ -7,6 +7,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Ipc, type ServiceStatus, type Unlisten } from "../core/ipc";
 import { STORE_CHANGED } from "../core/store-events";
 import type { MonthReport, ProviderMonth } from "../core/report";
+import { STATUS_RETRY_DELAY, STATUS_TIMEOUT } from "../core/collection";
 import { Calendar, FIRST_DAY, NOW } from "./calendar";
 import type { FirstDay } from "./grid";
 
@@ -26,6 +27,10 @@ class StubIpc extends Ipc {
   requests: [number, number][] = [];
   serviceCalls: string[] = [];
   service: ServiceStatus = INSTALLED;
+  /** Answers of the next status calls, before `service`. */
+  serviceQueue: ServiceStatus[] = [];
+  /** The status call never answers. */
+  hang = false;
   install: () => void = () => {
     this.service = INSTALLED;
   };
@@ -39,7 +44,9 @@ class StubIpc extends Ipc {
     if (command === "service_status" || command === "service_install") {
       this.serviceCalls.push(command);
       if (command === "service_install") this.install();
-      return (command === "service_status" ? this.service : "installed") as T;
+      if (command === "service_status" && this.hang) return new Promise<T>(() => undefined);
+      if (command === "service_status") return (this.serviceQueue.shift() ?? this.service) as T;
+      return "installed" as T;
     }
     if (command !== "month") throw new Error(`unexpected command ${command}`);
     const { year, month } = args as { year: number; month: number };
@@ -84,13 +91,22 @@ const NOV_3 = new Date(2026, 10, 3, 10, 5);
 
 async function mount(
   answer: (year: number, month: number) => unknown,
-  options: { firstDay?: FirstDay; now?: Date; month?: string; service?: ServiceStatus } = {},
+  options: {
+    firstDay?: FirstDay;
+    now?: Date;
+    month?: string;
+    service?: ServiceStatus;
+    prepare?: Partial<Pick<StubIpc, "serviceQueue" | "hang">>;
+  } = {},
 ) {
   const ipc = new StubIpc(answer);
   if (options.service) ipc.service = options.service;
+  Object.assign(ipc, options.prepare);
   TestBed.configureTestingModule({
     providers: [
       { provide: Ipc, useValue: ipc },
+      { provide: STATUS_RETRY_DELAY, useValue: 0 },
+      { provide: STATUS_TIMEOUT, useValue: 50 },
       { provide: FIRST_DAY, useValue: options.firstDay ?? 1 },
       { provide: NOW, useValue: () => options.now ?? NOV_3 },
       provideRouter([]),
@@ -404,13 +420,71 @@ describe("Calendar: first-start prompt", () => {
     );
   });
 
+  it("tries a failed first status once more before it shows the error", async () => {
+    const { el, ipc, settle } = await mount(empty, {
+      service: { state: "error", message: "did not answer within 10 s", exe: null },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await settle();
+    expect(ipc.serviceCalls).toEqual(["service_status", "service_status"]);
+    expect(el.querySelector("[data-testid=status-error]")).not.toBeNull();
+  });
+
+  it("asks to set up when the automatic retry of the status succeeds", async () => {
+    const ipc = { serviceQueue: [{ state: "error", message: "cold", exe: null } as ServiceStatus] };
+    const {
+      el,
+      ipc: stub,
+      settle,
+    } = await mount(empty, {
+      service: NOT_INSTALLED,
+      prepare: ipc,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await settle();
+    expect(stub.serviceCalls).toEqual(["service_status", "service_status"]);
+    expect(el.querySelector("[data-testid=status-error]")).toBeNull();
+    expect(prompt(el)).not.toBeNull();
+  });
+
+  it("shows the error, not an empty calendar, when the status never answers", async () => {
+    const { el, ipc, settle } = await mount(empty, { prepare: { hang: true } });
+    expect(el.querySelector("[data-testid=status-pending]")).not.toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await settle();
+    expect(ipc.serviceCalls).toEqual(["service_status", "service_status"]);
+    expect(el.querySelector("[data-testid=status-pending]")).toBeNull();
+    expect(el.querySelector("[data-testid=status-error]")?.textContent).toContain(
+      "no answer within 0.05 s",
+    );
+  });
+
+  it("asks to set up for a report whose providers are ok but have no days", async () => {
+    const hollow: ProviderMonth = { ...CLAUDE, days: [] };
+    const { el } = await mount((y, m) => month(y, m, hollow), { service: NOT_INSTALLED });
+    expect(prompt(el)).not.toBeNull();
+  });
+
+  it("asks to set up for a report without providers", async () => {
+    const { el } = await mount((y, m) => month(y, m), { service: NOT_INSTALLED });
+    expect(prompt(el)).not.toBeNull();
+  });
+
+  it("neither asks nor shows an error for an unusable report with a collector", async () => {
+    const hollow: ProviderMonth = { ...CLAUDE, days: [] };
+    const { el } = await mount((y, m) => month(y, m, hollow), { service: INSTALLED });
+    expect(prompt(el)).toBeNull();
+    expect(el.querySelector("[data-testid=status-error]")).toBeNull();
+    expect(el.querySelector("[data-testid=status-pending]")).toBeNull();
+  });
+
   it("reads the status again on Retry and then asks to set up", async () => {
     const { el, ipc, click } = await mount(empty, {
       service: { state: "error", message: "did not answer within 10 s", exe: null },
     });
     ipc.service = NOT_INSTALLED;
     await click("status-retry");
-    expect(ipc.serviceCalls).toEqual(["service_status", "service_status"]);
+    expect(ipc.serviceCalls).toEqual(["service_status", "service_status", "service_status"]);
     expect(el.querySelector("[data-testid=status-error]")).toBeNull();
     expect(prompt(el)).not.toBeNull();
   });
