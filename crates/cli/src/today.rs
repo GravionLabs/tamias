@@ -16,7 +16,6 @@ use tamias_core::snapshot::{Provider, Unit, Window};
 use tamias_core::store::{self, SourceStatus, Store};
 
 use crate::claude;
-use crate::copilot;
 use crate::unavailable::Unavailable;
 use tamias_core::config::Config;
 
@@ -140,33 +139,11 @@ fn gather(
         Some(why) => Entry::Unavailable(Provider::Claude, why),
         None => read_provider(store, Provider::Claude, now, tz, &config.thresholds)?,
     };
-    let copilot = match copilot_unavailable(config, store)? {
+    let copilot = match tamias_core::unavailable::copilot(config, store)? {
         Some(why) => Entry::Unavailable(Provider::Copilot, why),
         None => read_provider(store, Provider::Copilot, now, tz, &config.thresholds)?,
     };
     Ok(vec![claude, copilot])
-}
-
-/// Why Copilot is `unavailable`: the config, a missing `gh`, then the reason stored by the last
-/// poll without a countable quota. The stored reason takes precedence over older snapshots of
-/// the store, but not over a poll error recorded after it: then the state is unknown and
-/// Copilot is read (and shown stale).
-fn copilot_unavailable(
-    config: &Config,
-    store: &Store,
-) -> Result<Option<Unavailable>, store::Error> {
-    if let Some(why) = copilot::availability(config) {
-        return Ok(Some(why));
-    }
-    let Some(status) = store.status(Provider::Copilot)? else {
-        return Ok(None);
-    };
-    let failed_since = status.last_error_at > status.last_ok_at;
-    Ok(status
-        .unavailable
-        .as_deref()
-        .and_then(Unavailable::from_stored)
-        .filter(|_| !failed_since))
 }
 
 fn read_provider(

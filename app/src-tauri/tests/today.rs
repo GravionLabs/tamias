@@ -62,6 +62,17 @@ fn seed_claude(database: &Path) {
         .unwrap();
 }
 
+/// The default config on a machine without `gh`, whatever this machine has: Copilot `auto` is
+/// `not set up` (the explicit `gh_path` is not a file and does not fall back).
+fn no_gh() -> Config {
+    config::parse("gh_path = \"/nonexistent/tamias-test/gh\"\n").unwrap()
+}
+
+/// `copilot = true`: Copilot is set up whatever this machine has.
+fn copilot_on() -> Config {
+    config::parse("[providers]\ncopilot = true\n").unwrap()
+}
+
 fn read(database: &Path, config: &Config) -> Report {
     today::read(database, config, now(), &TimeZone::UTC).unwrap()
 }
@@ -79,7 +90,7 @@ fn seeded_claude_is_ok_with_its_windows() {
     let (_dir, database) = data_dir();
     seed_claude(&database);
 
-    let report = read(&database, &Config::default());
+    let report = read(&database, &no_gh());
 
     assert_eq!(report.schema_version, 1);
     assert_eq!(report.generated_at, now());
@@ -100,7 +111,7 @@ fn seeded_claude_is_ok_with_its_windows() {
 fn missing_database_makes_every_provider_unavailable_and_creates_nothing() {
     let (dir, database) = data_dir();
 
-    let report = read(&database, &Config::default());
+    let report = read(&database, &no_gh());
 
     assert_eq!(
         statuses(&report),
@@ -119,7 +130,7 @@ fn missing_data_dir_makes_every_provider_unavailable() {
     let dir = tempfile::tempdir().unwrap();
     let database = dir.path().join("not-there").join(DATABASE_FILE);
 
-    let report = read(&database, &Config::default());
+    let report = read(&database, &no_gh());
 
     assert!(
         report
@@ -131,11 +142,11 @@ fn missing_data_dir_makes_every_provider_unavailable() {
 }
 
 #[test]
-fn provider_never_collected_is_unavailable() {
+fn copilot_without_gh_is_unavailable() {
     let (_dir, database) = data_dir();
     seed_claude(&database);
 
-    let report = read(&database, &Config::default());
+    let report = read(&database, &no_gh());
 
     assert_eq!(
         statuses(&report),
@@ -158,7 +169,7 @@ fn seeded_copilot_is_read_too() {
         )
         .unwrap();
 
-    let report = read(&database, &Config::default());
+    let report = read(&database, &copilot_on());
 
     let copilot = &report.providers[1];
     assert_eq!(copilot.status, Status::Ok);
@@ -171,6 +182,80 @@ fn seeded_copilot_is_read_too() {
     assert_eq!(report.providers[0].status, Status::Unavailable);
 }
 
+fn seed_no_quota(database: &Path, reason: &str) {
+    Store::open(database)
+        .unwrap()
+        .record_unavailable(Provider::Copilot, at(-60), reason)
+        .unwrap();
+}
+
+fn copilot_status(report: &Report) -> (Status, usize) {
+    let copilot = &report.providers[1];
+    assert_eq!(copilot.provider, Provider::Copilot);
+    (copilot.status, copilot.windows.len())
+}
+
+#[test]
+fn copilot_seat_without_quota_is_unavailable_not_ok() {
+    for reason in ["no premium quota", "unlimited"] {
+        let (_dir, database) = data_dir();
+        seed_claude(&database);
+        seed_no_quota(&database, reason);
+
+        let report = read(&database, &copilot_on());
+
+        assert_eq!(
+            copilot_status(&report),
+            (Status::Unavailable, 0),
+            "{reason}"
+        );
+        assert_eq!(report.providers[1].stale_since, None, "{reason}");
+    }
+}
+
+#[test]
+fn copilot_error_recorded_after_the_no_quota_reason_is_stale() {
+    let (_dir, database) = data_dir();
+    seed_no_quota(&database, "unlimited");
+    Store::open(&database)
+        .unwrap()
+        .record_error(Provider::Copilot, at(-30), "network")
+        .unwrap();
+
+    let report = read(&database, &copilot_on());
+
+    assert_eq!(report.providers[1].status, Status::Stale);
+}
+
+#[test]
+fn copilot_switched_off_is_unavailable_despite_data() {
+    let (_dir, database) = data_dir();
+    Store::open(&database)
+        .unwrap()
+        .record_run(
+            Provider::Copilot,
+            &[snap(Provider::Copilot, Window::Monthly, 26.0, 24 * 20)],
+            at(-60),
+        )
+        .unwrap();
+    let config = config::parse("[providers]\ncopilot = false\n").unwrap();
+
+    let report = read(&database, &config);
+
+    assert_eq!(copilot_status(&report), (Status::Unavailable, 0));
+}
+
+#[test]
+fn copilot_with_gh_but_never_collected_is_stale() {
+    let (_dir, database) = data_dir();
+    seed_claude(&database);
+
+    let report = read(&database, &copilot_on());
+
+    assert_eq!(copilot_status(&report), (Status::Stale, 0));
+    assert_eq!(report.providers[1].stale_since, None);
+}
+
 #[test]
 fn failed_collect_is_stale_since_the_last_success() {
     let (_dir, database) = data_dir();
@@ -180,7 +265,7 @@ fn failed_collect_is_stale_since_the_last_success() {
         .record_error(Provider::Claude, at(-30), "network")
         .unwrap();
 
-    let report = read(&database, &Config::default());
+    let report = read(&database, &no_gh());
 
     let claude = &report.providers[0];
     assert_eq!(claude.status, Status::Stale);
@@ -204,7 +289,9 @@ fn claude_switched_off_is_unavailable_despite_data() {
 fn claude_switched_on_but_never_collected_is_stale() {
     let (_dir, database) = data_dir();
     Store::open(&database).unwrap();
-    let config = config::parse("[providers]\nclaude = true\n").unwrap();
+    let config =
+        config::parse("gh_path = \"/nonexistent/tamias-test/gh\"\n[providers]\nclaude = true\n")
+            .unwrap();
 
     let report = read(&database, &config);
 
@@ -235,7 +322,7 @@ fn the_store_is_not_written() {
     seed_claude(&database);
     let before = std::fs::read(&database).unwrap();
 
-    read(&database, &Config::default());
+    read(&database, &no_gh());
 
     assert_eq!(std::fs::read(&database).unwrap(), before);
 }
@@ -249,7 +336,7 @@ fn database_of_a_newer_tamias_is_an_error() {
         .pragma_update(None, "user_version", 99)
         .unwrap();
 
-    let err = today::read(&database, &Config::default(), now(), &TimeZone::UTC).unwrap_err();
+    let err = today::read(&database, &no_gh(), now(), &TimeZone::UTC).unwrap_err();
 
     assert!(
         matches!(err, Error::SchemaTooNew { found: 99, .. }),
@@ -261,7 +348,7 @@ fn database_of_a_newer_tamias_is_an_error() {
 fn report_is_schema_v1_json() {
     let (_dir, database) = data_dir();
     seed_claude(&database);
-    let report = read(&database, &Config::default());
+    let report = read(&database, &no_gh());
 
     let json = serde_json::to_value(&report).unwrap();
     let schema_path =
@@ -301,7 +388,7 @@ fn other_store_errors_are_not_busy() {
         .unwrap()
         .pragma_update(None, "user_version", 99)
         .unwrap();
-    let err = today::read(&database, &Config::default(), now(), &TimeZone::UTC).unwrap_err();
+    let err = today::read(&database, &no_gh(), now(), &TimeZone::UTC).unwrap_err();
 
     let err = CommandError::from(today::Error::Store(err));
 

@@ -1,45 +1,22 @@
-//! Wiring of the Copilot provider: `gh` lookup, user client and availability.
+//! Wiring of the Copilot provider: `gh` lookup, user client and availability (the availability
+//! shared with the app is `tamias_core::unavailable::copilot`).
 //!
 //! Two undocumented overrides let tests run the binary without a real `gh` or the network:
 //!
-//! - `TAMIAS_GH`: path of the `gh` executable (a fake one); wins over `gh_path` of the config.
+//! - `TAMIAS_GH`: path of the `gh` executable (a fake one); wins over `gh_path` of
+//!   the config.
 //! - `TAMIAS_COPILOT_USER_URL`: user endpoint URL; honoured only for `http://` loopback hosts so
 //!   the token can never be sent elsewhere.
 
-use std::path::PathBuf;
-
 use tamias_core::config::{Config, Enabled};
+use tamias_core::provider::copilot::gh_source;
 use tamias_core::provider::copilot::{CopilotProvider, CopilotUser, Error, GhTokenSource, TIMEOUT};
 
 use crate::claude::is_loopback;
 use crate::unavailable::Unavailable;
 
-/// Test-only override of the `gh` executable.
-pub const GH_ENV: &str = "TAMIAS_GH";
 /// Test-only override of the user endpoint (loopback only).
 pub const USER_URL_ENV: &str = "TAMIAS_COPILOT_USER_URL";
-
-/// Availability of Copilot without polling: `Some` when it is disabled, or `auto` and no `gh`
-/// executable can be found (the login is not probed).
-#[must_use]
-pub fn availability(config: &Config) -> Option<Unavailable> {
-    match config.copilot {
-        Enabled::Off => Some(Unavailable::Disabled),
-        Enabled::On => None,
-        Enabled::Auto => gh_source(config)
-            .resolve()
-            .is_none()
-            .then_some(Unavailable::NotSetUp),
-    }
-}
-
-fn gh_source(config: &Config) -> GhTokenSource {
-    let explicit = std::env::var_os(GH_ENV)
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| config.gh_path.clone());
-    GhTokenSource::new(explicit)
-}
 
 /// `Some` when the config alone makes Copilot `unavailable` (disabled).
 #[must_use]

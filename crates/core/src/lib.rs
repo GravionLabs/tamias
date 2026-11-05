@@ -10,6 +10,7 @@ pub mod provider;
 pub mod report;
 pub mod snapshot;
 pub mod store;
+pub mod unavailable;
 
 /// Version of `tamias-core`, the workspace version.
 #[must_use]
