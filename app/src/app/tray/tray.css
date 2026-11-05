@@ -110,42 +110,40 @@ h2 {
   color: var(--h-text-muted-color);
 }
 
+/* A text link in the card footer: an action, so a button element styled as a link. */
 .open {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  padding: 9px 12px;
-  border: 1px solid var(--h-content-border-color);
-  border-radius: 8px;
-  /* content-hover-background flips with the theme, so one rule serves light and dark. */
-  background: var(--h-content-hover-background);
+  justify-self: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
   font: inherit;
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--h-text-color);
+  color: var(--h-primary-color);
+  text-decoration: none;
+  text-underline-offset: 3px;
   cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
 }
 
 .open svg {
   flex: none;
-  color: var(--h-text-muted-color);
+  transition: transform 120ms ease;
 }
 
 .open:hover {
-  background: color-mix(in srgb, var(--h-text-color) 8%, var(--h-content-hover-background));
-  border-color: color-mix(in srgb, var(--h-text-color) 25%, var(--h-content-border-color));
+  text-decoration: underline;
 }
 
-.open:active {
-  background: color-mix(in srgb, var(--h-text-color) 14%, var(--h-content-hover-background));
+.open:hover svg {
+  transform: translate(1px, -1px);
 }
 
 .open:focus-visible {
   outline: 2px solid var(--h-focus-ring-color);
   outline-offset: 2px;
+  text-decoration: underline;
 }
