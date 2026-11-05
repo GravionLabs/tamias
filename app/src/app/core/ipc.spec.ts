@@ -27,13 +27,15 @@ describe("TauriIpc", () => {
 
   it("reads and sets autostart with the commands of the autostart plugin", async () => {
     tauri.answer("plugin:autostart|is_enabled", () => true);
-    tauri.answer("plugin:autostart|enable", () => undefined);
+    tauri.answer("autostart_enable", () => undefined);
+    tauri.answer("autostart_available", () => false);
     tauri.answer("plugin:autostart|disable", () => undefined);
     const ipc = new TauriIpc();
     await expect(ipc.autostartEnabled()).resolves.toBe(true);
+    await expect(ipc.autostartAvailable()).resolves.toBe(false);
     await ipc.setAutostart(true);
     await ipc.setAutostart(false);
-    expect(tauri.calls("plugin:autostart|enable")).toHaveLength(1);
+    expect(tauri.calls("autostart_enable")).toHaveLength(1);
     expect(tauri.calls("plugin:autostart|disable")).toHaveLength(1);
   });
 

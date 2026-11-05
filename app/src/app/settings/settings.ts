@@ -22,6 +22,8 @@ export class Settings {
 
   /** Off until the OS answered: never shown as enabled without knowing. */
   protected readonly autostart = signal(false);
+  /** False in a dev build: its executable cannot run on its own after a reboot. */
+  protected readonly available = signal(true);
   protected readonly ready = signal(false);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -33,6 +35,7 @@ export class Settings {
 
   private async read(): Promise<void> {
     try {
+      this.available.set(await this.ipc.autostartAvailable());
       this.autostart.set(await this.ipc.autostartEnabled());
       this.ready.set(true);
     } catch (error) {
