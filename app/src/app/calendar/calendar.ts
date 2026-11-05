@@ -22,18 +22,12 @@ import {
   type ProviderMonth,
   type ProviderName,
 } from "../core/report";
-import {
-  daysInMonth,
-  isoDate,
-  leadingBlanks,
-  localeFirstDay,
-  shiftMonth,
-  type FirstDay,
-} from "./grid";
+import { daysInMonth, isoDate, leadingBlanks, shiftMonth, type FirstDay } from "./grid";
+import { WeekStart } from "../core/week-start";
 
-/** First day of the week; defaults to the locale's, tests provide a fixed one. */
+/** First day of the week; defaults to `week_start` of `config.toml`, tests provide a fixed one. */
 export const FIRST_DAY = new InjectionToken<FirstDay>("FIRST_DAY", {
-  factory: () => localeFirstDay(),
+  factory: () => inject(WeekStart).firstDay,
 });
 
 /** The current time; tests provide a fixed clock. */

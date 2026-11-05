@@ -29,7 +29,7 @@ export default defineConfig({
   // docs/ is the only source: nothing is copied.
   srcDir: '../docs',
   // The ADRs stay in the repository (ADR 0003): no page, no sidebar entry, no search entry.
-  srcExclude: ['adr/**'],
+  srcExclude: ['adr/**', 'roadmap.md'],
   cleanUrls: true,
   lastUpdated: false,
   // Dead links fail the build (no ignoreDeadLinks), so a broken link in any pull request is found by CI.
@@ -49,11 +49,13 @@ export default defineConfig({
       md.use(repoLinks(repoRoot, docsRoot, isOnSite));
     },
   },
+  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}icon.svg` }]],
   themeConfig: {
+    logo: '/icon.svg',
     nav: [
       { text: 'Consumers', link: '/consumers' },
       { text: 'Usage sources', link: '/sources' },
-      { text: 'Roadmap', link: '/roadmap' },
+      { text: 'Command line', link: '/cli' },
     ],
     sidebar: [
       { text: 'tamias', items: [...PAGES] },

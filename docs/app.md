@@ -15,7 +15,7 @@ Every release on the [GitHub releases page](https://github.com/GravionLabs/tamia
 
 Check the checksum as described in [Installation](./installation.md#download). Each bundle contains the `tamias` CLI of the same version (on Windows also `tamiasw.exe`), so the app does not need a separate CLI install.
 
-The bundles are not signed or notarised (v1 ships unsigned, see the roadmap). Each system warns on the first start:
+The bundles are not signed or notarised (v1 ships unsigned). Each system warns on the first start:
 
 - **macOS**: open the `.dmg` and drag the app into `/Applications` first, then start it from there. An unsigned app started from Downloads or straight from the mounted disk image runs from a temporary path (macOS App Translocation). Collection set up from such a start would be registered with that temporary path, so move the app first. To remove the quarantine flag of the installed app once:
 
@@ -54,11 +54,25 @@ The calendar opens on the current month. Previous, Today and Next move between m
 
 A provider is stale when its last successful read is older than `stale_after` (default 15 minutes, set in `config.toml`; see also [Consumers](./consumers.md)), when it has never succeeded, or when its last run failed after its last success, even if that success is younger than `stale_after`. On today's cell the grey chip says "stale since 09:00" (the time of the last successful collect), or "stale, never collected". Today's cell is only grey while the provider is stale; the calendar does not show old numbers as current.
 
+The week starts on Monday. Set `week_start` in `config.toml` to change it: `"monday"` (default), `"sunday"`, `"saturday"` or `"locale"` (the first day of your system locale). The weekday header and the empty cells before the 1st follow it; Settings shows the active value, read only. The app reads it at start, so restart the app after changing it. It does not change how the CLI reports days or budgets.
+
+```toml
+week_start = "sunday"
+```
+
 The calendar refreshes when the collector writes new snapshots, so the app needs no reload. The first data appears with the next collect, within 5 minutes.
+
+![The month calendar with Claude and Copilot usage chips per day](/screenshots/calendar-light.png){.screenshot .light-only}
+
+![The month calendar with Claude and Copilot usage chips per day](/screenshots/calendar-dark.png){.screenshot .dark-only}
 
 Click a day to open its day view. The "Today overview" link shows today's report of every provider.
 
 ## Day view
+
+![The day view: usage over the day against the budget line, for Claude and Copilot](/screenshots/day-light.png){.screenshot .light-only}
+
+![The day view: usage over the day against the budget line, for Claude and Copilot](/screenshots/day-dark.png){.screenshot .dark-only}
 
 The day view shows, per provider, the usage over the local day as a curve against the day's budget line. Next to the chart the usage of the day is written out as "usage of budget"; a day without a budget says "No budget for this day.". The view reloads on every change of the store, like the calendar.
 

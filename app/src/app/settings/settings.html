@@ -27,6 +27,15 @@
   The app starts in the tray, without a window. Open it with "Open tamias" in the tray menu.
 </p>
 
+<h2>Calendar</h2>
+<p class="row" data-testid="week-start">
+  Week starts on: <strong data-testid="week-start-value">{{ weekStart }}</strong>
+</p>
+<p class="hint">
+  Set <code>week_start</code> in <code>config.toml</code> to <code>monday</code>,
+  <code>sunday</code>, <code>saturday</code> or <code>locale</code>.
+</p>
+
 <h2>Collection</h2>
 <p class="hint">
   The <code>tamias</code> command line reads your usage every 5 minutes in the background, also
