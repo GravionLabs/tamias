@@ -6,6 +6,7 @@
 pub const DEV_BUILD: &str = "Autostart is only available in an installed build";
 
 /// Whether this build can run on its own: not a debug (dev) build.
+#[must_use]
 pub const fn available() -> bool {
     !cfg!(debug_assertions)
 }

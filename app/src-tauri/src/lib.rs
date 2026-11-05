@@ -217,6 +217,10 @@ fn autostart_available() -> bool {
 
 /// Creates the autostart entry; refused in a dev build.
 #[tauri::command]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "tauri injects `AppHandle` by value"
+)]
 fn autostart_enable(app: tauri::AppHandle) -> Result<(), CommandError> {
     autostart::check_enable(!autostart::available()).map_err(|message| CommandError {
         message: message.to_owned(),
