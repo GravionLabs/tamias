@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -115,6 +115,30 @@ describe('the site without ADRs', () => {
     expect(links).not.toContain('Decisions');
   });
 
+  it('keeps the roadmap and the ADRs off the site: no page, no nav, no sidebar entry, no link', async () => {
+    const { default: config } = await import('../.vitepress/config.mts');
+    const links = JSON.stringify([config.themeConfig?.nav, config.themeConfig?.sidebar]);
+    const site = await resolveConfig(resolve(import.meta.dirname, '..'), 'build', 'production');
+    const home = readFileSync(join(repoDocs, 'index.md'), 'utf8');
+
+    expect(config.srcExclude).toContain('roadmap.md');
+    expect(site.pages).not.toContain('roadmap.md');
+    expect(links).not.toMatch(/roadmap/i);
+    expect(home).not.toMatch(/roadmap|\/adr\/|Decisions/i);
+  });
+
+  it('shows the icon as logo, favicon and hero image, and the command line page after Installation', async () => {
+    const { default: config } = await import('../.vitepress/config.mts');
+    const sidebar = JSON.stringify(config.themeConfig?.sidebar);
+
+    expect(config.themeConfig?.logo).toBe('/icon.svg');
+    expect(JSON.stringify(config.head)).toContain('icon.svg');
+    expect(readFileSync(join(repoDocs, 'index.md'), 'utf8')).toContain('src: /icon.svg');
+    expect(existsSync(join(repoDocs, 'public/icon.svg'))).toBe(true);
+    expect(sidebar.indexOf('/installation')).toBeLessThan(sidebar.indexOf('/cli'));
+    expect(sidebar.indexOf('/cli')).toBeLessThan(sidebar.indexOf('/app'));
+  });
+
   it('keeps no page of the site linking to an ADR page', () => {
     for (const file of readdirSync(repoDocs).filter((name) => name.endsWith('.md'))) {
       const text = readFileSync(join(repoDocs, file), 'utf8');
@@ -126,6 +150,7 @@ describe('the site without ADRs', () => {
     const site = await resolveConfig(resolve(import.meta.dirname, '..'), 'build', 'production');
 
     expect(site.pages).toContain('sources.md');
+    expect(site.pages).toContain('cli.md');
     expect(site.pages.filter((page) => page.startsWith('adr/'))).toEqual([]);
   });
 

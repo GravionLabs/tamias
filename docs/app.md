@@ -15,7 +15,7 @@ Every release on the [GitHub releases page](https://github.com/GravionLabs/tamia
 
 Check the checksum as described in [Installation](./installation.md#download). Each bundle contains the `tamias` CLI of the same version (on Windows also `tamiasw.exe`), so the app does not need a separate CLI install.
 
-The bundles are not signed or notarised (v1 ships unsigned, see the roadmap). Each system warns on the first start:
+The bundles are not signed or notarised (v1 ships unsigned). Each system warns on the first start:
 
 - **macOS**: open the `.dmg` and drag the app into `/Applications` first, then start it from there. An unsigned app started from Downloads or straight from the mounted disk image runs from a temporary path (macOS App Translocation). Collection set up from such a start would be registered with that temporary path, so move the app first. To remove the quarantine flag of the installed app once:
 
@@ -62,9 +62,17 @@ week_start = "sunday"
 
 The calendar refreshes when the collector writes new snapshots, so the app needs no reload. The first data appears with the next collect, within 5 minutes.
 
+![The month calendar with Claude and Copilot usage chips per day](/screenshots/calendar-light.png){.screenshot .light-only}
+
+![The month calendar with Claude and Copilot usage chips per day](/screenshots/calendar-dark.png){.screenshot .dark-only}
+
 Click a day to open its day view. The "Today overview" link shows today's report of every provider.
 
 ## Day view
+
+![The day view: usage over the day against the budget line, for Claude and Copilot](/screenshots/day-light.png){.screenshot .light-only}
+
+![The day view: usage over the day against the budget line, for Claude and Copilot](/screenshots/day-dark.png){.screenshot .dark-only}
 
 The day view shows, per provider, the usage over the local day as a curve against the day's budget line. Next to the chart the usage of the day is written out as "usage of budget"; a day without a budget says "No budget for this day.". The view reloads on every change of the store, like the calendar.
 

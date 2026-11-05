@@ -1,0 +1,11 @@
+/* Screenshots come as a light and a dark PNG; the one that matches the theme of the site is shown. */
+.screenshot {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--vp-c-divider);
+}
+.dark .screenshot.light-only,
+:root:not(.dark) .screenshot.dark-only {
+  display: none;
+}
