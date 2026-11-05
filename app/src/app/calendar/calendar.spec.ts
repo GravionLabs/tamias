@@ -394,11 +394,32 @@ describe("Calendar: first-start prompt", () => {
     expect(prompt(el)).toBeNull();
   });
 
-  it("does not ask when the status cannot be read", async () => {
+  it("shows the error, not an empty calendar, when the status cannot be read", async () => {
     const { el } = await mount(empty, {
       service: { state: "error", message: "did not answer within 10 s", exe: null },
     });
     expect(prompt(el)).toBeNull();
+    expect(el.querySelector("[data-testid=status-error]")?.textContent).toContain(
+      "Cannot read the collection status: did not answer within 10 s",
+    );
+  });
+
+  it("reads the status again on Retry and then asks to set up", async () => {
+    const { el, ipc, click } = await mount(empty, {
+      service: { state: "error", message: "did not answer within 10 s", exe: null },
+    });
+    ipc.service = NOT_INSTALLED;
+    await click("status-retry");
+    expect(ipc.serviceCalls).toEqual(["service_status", "service_status"]);
+    expect(el.querySelector("[data-testid=status-error]")).toBeNull();
+    expect(prompt(el)).not.toBeNull();
+  });
+
+  it("does not show a status error when there is data", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE, COPILOT_UNAVAILABLE), {
+      service: { state: "error", message: "boom", exe: null },
+    });
+    expect(el.querySelector("[data-testid=status-error]")).toBeNull();
   });
 
   it("sets up collection and then shows that it is set up", async () => {

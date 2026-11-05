@@ -36,7 +36,7 @@ On the first start without data and without a collector, the calendar asks "Coll
 
 "Not now" hides the prompt only until the app is closed; it returns on the next start. Settings shows the collection status at any time, with "Set up" and "Remove". A collector you registered with a CLI from the archives keeps working: the app shows it as set up and does not replace it.
 
-Every call of the CLI is limited to 10 seconds; a call that fails or does not answer is shown as an error with its message.
+Every call of the CLI is limited to 10 seconds; a call that fails or does not answer is shown as an error with its message. In the calendar, without data, an unreadable status shows that message with a Retry button instead of an empty calendar.
 
 "Remove" in Settings (or `tamias service uninstall`) removes the registration; it keeps the data and the log. Remove the registration before you delete the app, otherwise the scheduler keeps running a missing executable.
 

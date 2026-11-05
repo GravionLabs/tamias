@@ -83,6 +83,16 @@
     >Collection is set up. The calendar fills with the next collect, within 5 minutes.</hx-message
   >
 }
+@if (statusError(); as message) {
+  <section class="setup" data-testid="status-error" aria-label="Collection status">
+    <hx-message severity="error">Cannot read the collection status: {{ message }}</hx-message>
+    <div class="actions">
+      <button hx-button variant="outlined" data-testid="status-retry" (click)="retryStatus()">
+        Retry
+      </button>
+    </div>
+  </section>
+}
 @if (error(); as message) {
   <hx-message severity="error" data-testid="error">Cannot read the month: {{ message }}</hx-message>
 }

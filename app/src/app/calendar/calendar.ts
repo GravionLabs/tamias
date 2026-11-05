@@ -143,6 +143,23 @@ export class Calendar {
     return status.state === "not_installed" || this.collection.actionError() !== null;
   });
 
+  /**
+   * The CLI could not tell whether collection is set up (sidecar missing, timeout, non-zero
+   * exit, unexpected output) and there is no data: shown instead of an empty calendar with no
+   * explanation, with the message of the failure.
+   */
+  protected readonly statusError = computed(() => {
+    const report = this.report();
+    const status = this.collection.status();
+    if (!report || !hasNoData(report) || status?.state !== "error") return null;
+    return status.message ?? "unknown error";
+  });
+
+  /** Reads the collection status again, after \"Retry\" in the status error. */
+  protected retryStatus(): Promise<void> {
+    return this.collection.refresh();
+  }
+
   /** Set up from the prompt and the CLI now reports the collector: the first data is on its way. */
   protected readonly setupDone = signal(false);
 
