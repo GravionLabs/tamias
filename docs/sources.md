@@ -24,9 +24,9 @@ Read from the installed Claude Code bundle, version **2.1.316** (macOS arm64 nat
 | | macOS | Linux | Windows |
 |---|---|---|---|
 | Credential source | login Keychain, generic password, service `Claude Code-credentials`, read via `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w` | `~/.claude/.credentials.json` (or `$CLAUDE_CONFIG_DIR/.credentials.json`) | `%USERPROFILE%\.claude\.credentials.json` (or `%CLAUDE_CONFIG_DIR%`) |
-| Credential shape | JSON `claudeAiOauth{accessToken, refreshToken, expiresAt (epoch ms), refreshTokenExpiresAt, scopes[], subscriptionType, subscriptionTypeSource, rateLimitTier}` | expected the same (deferred to #20) | expected the same (deferred to #20) |
+| Credential shape | JSON `claudeAiOauth{accessToken, refreshToken, expiresAt (epoch ms), refreshTokenExpiresAt, scopes[], subscriptionType, subscriptionTypeSource, rateLimitTier}` | expected the same | expected the same |
 | Request | `GET https://api.anthropic.com/api/oauth/usage`, `Authorization: Bearer`, `anthropic-beta: oauth-2025-04-20` | same (deferred to #20) | same (deferred to #20) |
-| Result | 200, see fixture | **deferred to #20** | **deferred to #20** |
+| Result | 200, see fixture | **pending** (#20: probe run needed) | **pending** (#20: needs a Windows machine) |
 | Command | `pwsh -NoProfile -File spikes/claude-usage.ps1` | `pwsh -NoProfile -File spikes/claude-usage.ps1` and `... -InvalidToken` | `pwsh -NoProfile -File spikes\claude-usage.ps1` and `... -InvalidToken` |
 
 macOS observations (2026-11-02, the tested subscription):
@@ -42,7 +42,7 @@ From `crates/core/tests/fixtures/claude/usage-ok.json`:
 | Field | Type / unit | Meaning |
 |---|---|---|
 | `five_hour.utilization` | number, percent 0-100 (e.g. `42.0`) | five-hour window used |
-| `five_hour.resets_at` | ISO-8601 string with offset and microseconds (`2026-11-02T08:40:00.155067+01:00`) | end of the five-hour window |
+| `five_hour.resets_at` | ISO-8601 string with offset and microseconds (`2026-11-02T07:40:00.155067+00:00`) | end of the five-hour window |
 | `seven_day.utilization` | number, percent 0-100 | seven-day window used (binding limit) |
 | `seven_day.resets_at` | ISO-8601 string | end of the seven-day window |
 
@@ -53,7 +53,7 @@ Notes for the parser:
   minute** before comparing for a window jump. Whole seconds are not enough. After a reset the value
   can come without fractional seconds (`2026-11-09T21:00:00+00:00`).
 - The seven-day window is **anchored, not rolling**: `seven_day_breakdown.window_started_at`
-  (`2026-10-26T21:00Z`) is exactly seven days before `seven_day.resets_at` (`2026-11-02T21:00Z`), and
+  (`2026-10-26T21:00:00.155085+00:00`) is exactly seven days before `seven_day.resets_at` (`2026-11-02T21:00:00.155085+00:00`), and
   `resets_at` stayed the same across calls; one observed reset confirms it (see "Window behaviour").
 - `seven_day_breakdown` is `null` right after a reset; do not rely on it.
 - Many other keys are present and `null` (`seven_day_opus`, `seven_day_sonnet`, codenamed keys such as
@@ -105,6 +105,10 @@ GUI session gets the secret without a prompt. A binary that reads the item throu
 framework directly is expected not to be on that list and to prompt; the collector should therefore
 shell out to `/usr/bin/security` (untested alternative).
 
+To repeat it: the plist hardcodes `/usr/local/bin/pwsh` (Intel Homebrew); on Homebrew arm64 change it to
+`/opt/homebrew/bin/pwsh` (`command -v pwsh` shows the path). The job leaves `$TMPDIR/tamias-probe.out` and
+`.err` behind: delete them after reading (`rm "$TMPDIR"/tamias-probe.out "$TMPDIR"/tamias-probe.err`).
+
 ### Status line
 
 Source of the schema: the statusLine documentation embedded in Claude Code 2.1.316:
@@ -121,7 +125,7 @@ Each window is present only while the API reports it and its `resets_at` has not
 statusLine input also carries `rate_limits_available` (false for API key, Bedrock, Vertex or missing
 profile scope; `rate_limits` is then null).
 
-**Real capture: deferred to #20.** No `statusline.json` fixture is committed yet. Steps for #20
+**Real capture: pending (#20), needs an interactive Claude Code session.** No `statusline.json` fixture is committed yet. Steps for #20
 (temporary, revert afterwards):
 
 1. Add to `~/.claude/settings.json`:
@@ -130,7 +134,9 @@ profile scope; `rate_limits` is then null).
    `rate_limits=absent`.
 3. Copy `$TMPDIR/statusline.json` (Windows: `%TEMP%\statusline.json`) to
    `crates/core/tests/fixtures/claude/statusline.json`, replace `session_id`, `transcript_path`,
-   `cwd`/workspace paths and any e-mail, run `spikes/Test-Fixture.ps1`.
+   `cwd`/workspace paths and any e-mail, run `spikes/Test-Fixture.ps1` (it rejects home paths,
+   session/transcript paths, `req_`/`org_`/`acct_` ids, 32-hex ids and non-zero UUIDs; use the all-zero
+   UUID, `REDACTED` or `/home/user` as placeholders).
 4. Record `claude --version`, presence and units of `rate_limits.five_hour` / `seven_day` here.
 5. Remove the `statusLine` entry again.
 
@@ -139,8 +145,8 @@ profile scope; `rate_limits` is then null).
 | Platform | Verdict |
 |---|---|
 | macOS | **Use.** OAuth usage endpoint via `/usr/bin/security`, works under launchd without a prompt. |
-| Linux | deferred to #20 (`pwsh -NoProfile -File spikes/claude-usage.ps1`, then `-InvalidToken`) |
-| Windows | deferred to #20 (`pwsh -NoProfile -File spikes\claude-usage.ps1`, then `-InvalidToken`) |
+| Linux | **pending** (#20): probe not yet run; needs Claude Code signed in on Linux |
+| Windows | **pending** (#20): needs a Windows machine; nothing was run or assumed |
 | Status line fallback | schema confirmed from the 2.1.316 bundle; real capture deferred to #20 |
 
 ## Copilot
