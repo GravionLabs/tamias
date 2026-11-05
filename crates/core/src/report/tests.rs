@@ -271,6 +271,7 @@ fn read_takes_the_numbers_from_the_store() {
     assert_eq!(monthly.today_usage, Some(6.0));
     assert_eq!(monthly.budget, Some(10.0));
     assert_eq!(monthly.ratio, Some(0.6));
+    assert_eq!(monthly.month_usage, Some(6.0));
     assert_eq!(monthly.colour, Colour::Green);
 }
 
@@ -574,4 +575,63 @@ fn month_ignores_snapshots_observed_after_now() {
     assert_eq!(today.date.to_string(), "2026-11-12");
     // 10 at the start of the day (carried), 30 by `now`; the 90 observed later is not seen.
     assert!((today.usage - 20.0).abs() < 1e-9);
+}
+
+fn month_usage_of(snaps: &[Snapshot], now: &str) -> Option<f64> {
+    let p = provider(
+        snapshot::Provider::Claude,
+        snaps,
+        None,
+        ts(now),
+        &TimeZone::UTC,
+        &Thresholds::default(),
+    );
+    p.windows
+        .iter()
+        .find(|w| w.window == Window::SevenDay)
+        .and_then(|w| w.month_usage)
+}
+
+#[test]
+fn month_usage_sums_the_days_of_a_month_with_gaps() {
+    let c = snapshot::Provider::Claude;
+    let s =
+        |used, observed: &str| snap(c, Window::SevenDay, used, "2026-11-12T12:00:00Z", observed);
+    // Activity on Nov 2 and Nov 5 only; Nov 1, 3, 4 and 6 to 8 have no snapshots.
+    let snaps = [
+        s(10.0, "2026-11-02T01:00:00Z"),
+        s(30.0, "2026-11-02T20:00:00Z"),
+        s(30.0, "2026-11-04T20:00:00Z"),
+        s(50.0, "2026-11-05T20:00:00Z"),
+    ];
+    assert_eq!(month_usage_of(&snaps, "2026-11-08T10:00:00Z"), Some(40.0));
+}
+
+#[test]
+fn month_usage_does_not_count_negative_or_double_across_a_reset() {
+    let c = snapshot::Provider::Claude;
+    let s = |used, resets: &str, observed: &str| snap(c, Window::SevenDay, used, resets, observed);
+    let snaps = [
+        s(10.0, "2026-11-12T12:00:00Z", "2026-11-09T01:00:00Z"),
+        s(50.0, "2026-11-12T12:00:00Z", "2026-11-11T20:00:00Z"),
+        s(5.0, "2026-11-19T12:00:00Z", "2026-11-12T20:00:00Z"),
+        s(25.0, "2026-11-19T12:00:00Z", "2026-11-13T20:00:00Z"),
+    ];
+    // 10 -> 50 before the reset (the first observation is the baseline), then 5 -> 25 plus the
+    // 5 already used in the new window: 40 + 25, not negative and not counted twice.
+    assert_eq!(month_usage_of(&snaps, "2026-11-15T10:00:00Z"), Some(65.0));
+}
+
+#[test]
+fn month_usage_is_absent_for_informational_windows() {
+    let p = provider(
+        snapshot::Provider::Claude,
+        &claude(),
+        None,
+        ts(NOW),
+        &TimeZone::UTC,
+        &Thresholds::default(),
+    );
+    let five = p.windows.iter().find(|w| w.window == Window::FiveHour);
+    assert_eq!(five.unwrap().month_usage, None);
 }

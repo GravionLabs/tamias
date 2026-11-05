@@ -116,6 +116,7 @@ mod tests {
             today_usage: None,
             budget: None,
             ratio: None,
+            month_usage: None,
         }
     }
 

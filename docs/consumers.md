@@ -30,7 +30,8 @@ Prints one JSON document, never coloured, described by the [JSON Schema](https:/
           "colour": "green",
           "today_usage": 4.0,
           "budget": 10.0,
-          "ratio": 0.4
+          "ratio": 0.4,
+          "month_usage": 4.0
         }
       ]
     }
@@ -54,6 +55,7 @@ Prints one JSON document, never coloured, described by the [JSON Schema](https:/
 | `windows[].resets_at` | End of the most recently observed window. |
 | `windows[].colour` | `green` below 80 % of the daily budget, `yellow` 80 to 100 %, `red` above, `grey` when the provider is stale. |
 | `windows[].today_usage`, `budget`, `ratio` | Usage of the local day, the budget of the local day and `today_usage / budget`. Only on binding windows, once a day can be derived; `ratio` is absent when the budget is 0. |
+| `windows[].month_usage` | Usage of the local month up to and including today, in `unit`: the sum of the daily usage (as `today_usage`); days without snapshots count 0. Only on binding windows, once a day can be derived. |
 
 A window without any snapshot is left out. Optional fields are absent, never `null`.
 

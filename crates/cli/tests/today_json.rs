@@ -174,6 +174,8 @@ fn claude_ok_is_valid() {
     assert_eq!(windows[0]["binding"], true);
     assert_eq!(windows[0]["used"], 34.0);
     assert!(windows[0]["budget"].is_number(), "{doc:#}");
+    assert!(windows[0]["month_usage"].is_number(), "{doc:#}");
+    assert!(windows[1].get("month_usage").is_none());
     assert_eq!(windows[1]["window"], "five_hour");
     assert_eq!(windows[1]["used"], 12.0);
     assert!(windows[1].get("budget").is_none());
