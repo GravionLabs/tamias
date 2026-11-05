@@ -281,10 +281,29 @@ describe("Tray month projection", () => {
     expect(row.textContent).toContain("Month (projected)");
     expect(text(row.querySelector("[data-testid=projection]"))).toBe("50%");
     const bar = row.querySelector<HTMLElement>("[data-testid=projection-bar]")!;
-    expect(bar.classList).toContain("colour-yellow");
+    expect(bar.classList).toContain("colour-green");
     expect(bar.style.width).toBe("50%");
     expect(row.querySelectorAll(".today-row").length).toBe(2);
     expect(row.querySelectorAll(".today-track").length).toBe(2);
+  });
+
+  it("colours the projection by its own ratio, not by the window colour", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 3, 10, 0));
+    const bar = async (month_usage: number, colour: WindowReport["colour"]) => {
+      const { el } = await mount(() =>
+        report(claude({ today_usage: 1, budget: 10, ratio: 0.1, colour, month_usage })),
+      );
+      const found = el.querySelector("[data-testid=projection-bar]")!;
+      const result = [...found.classList].find((c) => c.startsWith("colour-"));
+      TestBed.resetTestingModule();
+      return result;
+    };
+    expect(await bar(45, "green")).toBe("colour-red"); // 150 %
+    expect(await bar(27, "green")).toBe("colour-yellow"); // 90 %
+    expect(await bar(24, "red")).toBe("colour-yellow"); // 80 %, boundary
+    expect(await bar(23, "red")).toBe("colour-green"); // 76.7 %
+    expect(await bar(45, "grey")).toBe("colour-grey"); // stale
   });
 
   it("has no projection row without a budget or without month usage", async () => {

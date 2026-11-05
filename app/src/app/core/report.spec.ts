@@ -3,6 +3,8 @@ import {
   amount,
   localTime,
   monthProjection,
+  projectionColour,
+  ratioColour,
   windowProjection,
   providerLabel,
   staleText,
@@ -164,15 +166,30 @@ describe("todayText", () => {
 
 describe("monthProjection", () => {
   it("extrapolates mid-month: 15 of 30 days used 30 against a daily budget of 4", () => {
-    expect(monthProjection(30, 4, 15, 30)).toEqual({ projected: 60, budget: 120, percent: 50 });
+    expect(monthProjection(30, 4, 15, 30)).toEqual({
+      projected: 60,
+      budget: 120,
+      percent: 50,
+      colour: "green",
+    });
   });
 
   it("on day 1 takes the usage of the day times the days of the month", () => {
-    expect(monthProjection(2, 10, 1, 30)).toEqual({ projected: 60, budget: 300, percent: 20 });
+    expect(monthProjection(2, 10, 1, 30)).toEqual({
+      projected: 60,
+      budget: 300,
+      percent: 20,
+      colour: "green",
+    });
   });
 
   it("is 0 without usage, not NaN", () => {
-    expect(monthProjection(0, 10, 5, 30)).toEqual({ projected: 0, budget: 300, percent: 0 });
+    expect(monthProjection(0, 10, 5, 30)).toEqual({
+      projected: 0,
+      budget: 300,
+      percent: 0,
+      colour: "green",
+    });
   });
 
   it("at month end is the usage itself", () => {
@@ -188,6 +205,29 @@ describe("monthProjection", () => {
     expect(monthProjection(5, undefined, 5, 30)).toBeNull();
     expect(monthProjection(5, 0, 5, 30)).toBeNull();
     expect(monthProjection(5, 10, 0, 30)).toBeNull();
+  });
+});
+
+describe("ratioColour", () => {
+  it("is green below 0.8, yellow from 0.8 up to and including 1.0, red above", () => {
+    expect(ratioColour(0)).toBe("green");
+    expect(ratioColour(0.79)).toBe("green");
+    expect(ratioColour(0.8)).toBe("yellow");
+    expect(ratioColour(1.0)).toBe("yellow");
+    expect(ratioColour(1.01)).toBe("red");
+    expect(ratioColour(1.5)).toBe("red");
+  });
+
+  it("colours a 150 % projection red, 90 % yellow, 50 % green", () => {
+    expect(monthProjection(30, 10, 2, 30)?.colour).toBe("red");
+    expect(monthProjection(27, 10, 3, 30)?.colour).toBe("yellow");
+    expect(monthProjection(15, 10, 3, 30)?.colour).toBe("green");
+  });
+
+  it("projectionColour turns a stale provider grey", () => {
+    const p = monthProjection(30, 10, 2, 30)!;
+    expect(projectionColour(p, "grey")).toBe("grey");
+    expect(projectionColour(p, "green")).toBe("red");
   });
 });
 

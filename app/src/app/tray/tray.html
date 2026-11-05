@@ -61,7 +61,8 @@
                 <div
                   class="bar"
                   data-testid="projection-bar"
-                  [class]="'bar colour-' + w.colour"
+                  [attr.data-colour]="projectionColour(month, w.colour)"
+                  [class]="'bar colour-' + projectionColour(month, w.colour)"
                   [style.width.%]="projectionWidth(w)"
                 ></div>
               </div>

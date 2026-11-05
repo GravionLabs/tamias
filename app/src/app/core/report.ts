@@ -219,6 +219,22 @@ export interface Projection {
   budget: number;
   /** `projected / budget` in percent, whole number (not capped). */
   percent: number;
+  /** Budget colour of the ratio `projected / budget` (never grey; the caller maps a stale provider to grey). */
+  colour: Exclude<Colour, "grey">;
+}
+
+/**
+ * Default `yellow_at` / `red_at` of `tamias_core::budget::Thresholds` (crates/core/src/budget.rs). The report
+ * does not expose the configured values, so the projection colour uses the defaults, like the colour
+ * legend in docs/app.md. Keep in sync with the core.
+ */
+export const YELLOW_AT = 0.8;
+export const RED_AT = 1.0;
+
+/** Colour of a ratio as in the core: green below `YELLOW_AT`, yellow up to and including `RED_AT`, red above. */
+export function ratioColour(ratio: number): Exclude<Colour, "grey"> {
+  if (ratio < YELLOW_AT) return "green";
+  return ratio <= RED_AT ? "yellow" : "red";
 }
 
 /**
@@ -237,7 +253,13 @@ export function monthProjection(
   if (!(dailyBudget > 0) || !(elapsedDays >= 1) || !(daysInMonth >= 1)) return null;
   const projected = (monthUsage / Math.min(elapsedDays, daysInMonth)) * daysInMonth;
   const budget = dailyBudget * daysInMonth;
-  return { projected, budget, percent: Math.round((projected / budget) * 100) };
+  const ratio = projected / budget;
+  return { projected, budget, percent: Math.round(ratio * 100), colour: ratioColour(ratio) };
+}
+
+/** The colour of a projection: its own ratio colour, grey when the provider is stale. */
+export function projectionColour(p: Projection, stale: Colour): Colour {
+  return stale === "grey" ? "grey" : p.colour;
 }
 
 /** The projection of a binding window of today's report at `now` (local month); `null` as `monthProjection`. */

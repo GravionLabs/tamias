@@ -20,6 +20,7 @@ import {
   todayPercent,
   usedOfText,
   usedPercent,
+  projectionColour,
   windowProjection,
   windowLabel,
   type ProviderReport,
@@ -85,6 +86,7 @@ export class Tray {
   protected readonly today = todayPercent;
   protected readonly todayWidth = todayBarWidth;
   protected readonly projection = (w: WindowReport) => windowProjection(w);
+  protected readonly projectionColour = projectionColour;
   protected readonly projectionWidth = (w: WindowReport) => projectionBarWidth(w);
   protected readonly note = providerNote;
   protected readonly shown = shownProviders;

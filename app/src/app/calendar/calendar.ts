@@ -16,6 +16,7 @@ import { StoreEvents } from "../core/store-events";
 import {
   amount,
   monthProjection,
+  projectionColour,
   providerLabel,
   staleText,
   type Colour,
@@ -145,7 +146,7 @@ export class Calendar {
   /**
    * Per provider with a budget the projection of the current month (usage so far / elapsed days x days
    * in the month, against the daily budget x days in the month); a past month shows its final usage
-   * the same way, a future month nothing. The colour is that of the latest day with data.
+   * the same way, a future month nothing. The colour is that of the projection ratio (grey while the provider is stale).
    */
   protected readonly monthLines = computed<MonthLine[]>(() => {
     const year = this.year();
@@ -169,7 +170,7 @@ export class Calendar {
       lines.push({
         provider: p.provider,
         label: `${name}: ${current ? "projected" : "month total"} ${result.percent} %`,
-        colour: last.colour,
+        colour: projectionColour(result, last.colour),
         title:
           `${name}: ${amount(Math.round(result.projected * 10) / 10, p.unit)} of ` +
           `${amount(result.budget, p.unit)} monthly budget`,
