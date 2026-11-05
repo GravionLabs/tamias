@@ -32,7 +32,7 @@ On Windows use `tamias.exe`, not `tamiasw`: the status line needs the output on 
 
 ## What it does
 
-- It is a fallback source for Claude. While sessions run, the limits that Claude Code reports keep Claude `ok` in `tamias today`, even when the OAuth poll of `tamias collect` fails or did not run.
+- It is a fallback source for Claude (shown in the line only if Claude is set up, see [No Claude part](#no-claude-part)). While sessions run, the limits that Claude Code reports keep Claude `ok` in `tamias today`, even when the OAuth poll of `tamias collect` fails or did not run.
 - It stores a window again only when its values changed or the last stored value is older than 5 minutes, so it stays cheap on every refresh.
 - It never breaks the status line: errors are logged at `debug` level only, the line is printed from what can be read (or stays empty) and the exit code is always 0. It makes no network requests.
 
@@ -59,7 +59,14 @@ The segments are coloured with ANSI colours (green, yellow, red, grey), because 
 
 ## No Claude part
 
-Claude Code reports no limits with an API key, Bedrock or Vertex (`rate_limits_available: false`, or no `rate_limits`). Nothing is stored then, and the line shows a Claude part only if the OAuth poll of `tamias collect` has data for it. The Copilot part is not affected. With Claude switched off in the config nothing is stored either.
+Claude Code reports no limits with an API key, Bedrock or Vertex (`rate_limits_available: false`, or no `rate_limits`). Nothing is stored then. The Copilot part is not affected. With Claude switched off in the config (`providers.claude = false`) nothing is stored either.
+
+The Claude part of the line also needs a Claude OAuth credential. With the default `providers.claude = "auto"` and no OAuth credentials (for example a login by API key), the Claude part is left out of the line (the line may be empty), although the limits are stored. Set `claude = true` under `[providers]` in the config file to show it (see [Installation](./installation.md)):
+
+```toml
+[providers]
+claude = true
+```
 
 ## Combine with another status line command
 
@@ -73,7 +80,7 @@ printf '%s\n' "$input" | your-existing-statusline-command
 printf '%s\n' "$input" | tamias ingest-statusline
 ```
 
-Both lines are printed. Use the script in the settings:
+Both lines are printed. The script assumes a POSIX shell: on native Windows use Git Bash or WSL, or a small script in another language. Use the script in the settings:
 
 ```json
 {
