@@ -243,6 +243,17 @@ describe("Calendar", () => {
     expect(cells(el)).toHaveLength(30);
   });
 
+  it("names the icon-only month buttons for assistive technology", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE));
+    const prev = el.querySelector("[data-testid=prev]")!;
+    const next = el.querySelector("[data-testid=next]")!;
+    expect(prev.getAttribute("aria-label")).toBe("Previous month");
+    expect(prev.getAttribute("title")).toBe("Previous month");
+    expect(next.getAttribute("aria-label")).toBe("Next month");
+    expect(next.getAttribute("title")).toBe("Next month");
+    expect(el.querySelector<HTMLButtonElement>("[data-testid=today]")!.disabled).toBe(true);
+  });
+
   it("crosses the year boundary", async () => {
     const { ipc, click } = await mount((y, m) => month(y, m, CLAUDE), {
       now: new Date(2026, 0, 10),
