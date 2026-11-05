@@ -8,13 +8,15 @@ import {
   signal,
   untracked,
 } from "@angular/core";
-import { ActivatedRoute, RouterLink } from "@angular/router";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { HxButton, HxMessage, HxProgressSpinner } from "@gravionlabs/helix-ui";
 import { Collection, hasNoData } from "../core/collection";
 import { Ipc, errorText, isBusy } from "../core/ipc";
 import { StoreEvents } from "../core/store-events";
 import {
   amount,
+  monthProjection,
+  projectionColour,
   providerLabel,
   staleText,
   type Colour,
@@ -58,6 +60,15 @@ interface Cell {
   stale: string | null;
 }
 
+/** A provider's month line below the header: the projection of the current month, the final usage of a past one. */
+interface MonthLine {
+  provider: ProviderName;
+  /** "Claude: projected 62 %" / "Claude: month total 48 %". */
+  label: string;
+  colour: Colour;
+  title: string;
+}
+
 const LETTERS: Record<ProviderName, string> = { claude: "C", copilot: "CP" };
 
 /**
@@ -72,6 +83,7 @@ const LETTERS: Record<ProviderName, string> = { claude: "C", copilot: "CP" };
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Calendar {
+  private readonly router = inject(Router);
   private readonly ipc = inject(Ipc);
   private readonly now = inject(NOW);
   private readonly firstDay = inject(FIRST_DAY);
@@ -132,6 +144,42 @@ export class Calendar {
   });
 
   /**
+   * Per provider with a budget the projection of the current month (usage so far / elapsed days x days
+   * in the month, against the daily budget x days in the month); a past month shows its final usage
+   * the same way, a future month nothing. The colour is that of the projection ratio (grey while the provider is stale).
+   */
+  protected readonly monthLines = computed<MonthLine[]>(() => {
+    const year = this.year();
+    const month = this.month();
+    const report = this.report();
+    const now = this.now();
+    if (!report || report.year !== year || report.month !== month) return [];
+    const days = daysInMonth(year, month);
+    const current = this.isCurrentMonth();
+    if (!current && isoDate(year, month, 1) > isoDate(now.getFullYear(), now.getMonth() + 1, 1)) {
+      return [];
+    }
+    const lines: MonthLine[] = [];
+    for (const p of report.providers) {
+      const last = p.days[p.days.length - 1];
+      if (p.status === "unavailable" || !last) continue;
+      const usage = p.days.reduce((sum, d) => sum + d.usage, 0);
+      const result = monthProjection(usage, last.budget, current ? now.getDate() : days, days);
+      if (!result) continue;
+      const name = providerLabel(p.provider);
+      lines.push({
+        provider: p.provider,
+        label: `${name}: ${current ? "projected" : "month total"} ${result.percent} %`,
+        colour: projectionColour(result, last.colour),
+        title:
+          `${name}: ${amount(Math.round(result.projected * 10) / 10, p.unit)} of ` +
+          `${amount(result.budget, p.unit)} monthly budget`,
+      });
+    }
+    return lines;
+  });
+
+  /**
    * "Collection is not set up — set up now?": no data and no collector, until "Not now". It stays
    * after a failed setup to show its error, unless the CLI then reports an installed collector.
    */
@@ -182,6 +230,17 @@ export class Calendar {
       const year = this.year();
       const month = this.month();
       untracked(() => void this.load(year, month));
+    });
+  }
+
+  /**
+   * A click anywhere on a day card opens its day view. The number's link covers the card already; this
+   * catches the chips above it. A click on the link itself is left to the router.
+   */
+  protected openDay(event: Event, cell: Cell): void {
+    if (!cell.open || (event.target as Element | null)?.closest("a")) return;
+    void this.router.navigate(["/day", cell.date], {
+      queryParams: { month: cell.date.slice(0, 7) },
     });
   }
 

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { TestBed, getTestBed } from "@angular/core/testing";
-import { ActivatedRoute, convertToParamMap, provideRouter } from "@angular/router";
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from "@angular/router";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Ipc, type ServiceStatus, type Unlisten } from "../core/ipc";
 import { STORE_CHANGED } from "../core/store-events";
 import type { MonthReport, ProviderMonth } from "../core/report";
@@ -348,6 +348,19 @@ describe("Calendar", () => {
     expect(cell(el, "2026-11-04").querySelector("[data-testid=open-day]")).toBeNull();
   });
 
+  it("opens the day view when a chip of the card is clicked", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE));
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, "navigate").mockResolvedValue(true);
+    chip(el, "2026-11-03", "claude").click();
+    expect(navigate).toHaveBeenCalledWith(["/day", "2026-11-03"], {
+      queryParams: { month: "2026-11" },
+    });
+    navigate.mockClear();
+    chip(el, "2026-11-04", "claude")?.click();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it("opens on the month of the query, e.g. when coming back from a day", async () => {
     const { el, ipc } = await mount((y, m) => month(y, m, CLAUDE), { month: "2026-10" });
     expect(ipc.requests).toEqual([[2026, 10]]);
@@ -525,5 +538,60 @@ describe("Calendar: first-start prompt", () => {
     const { el, click } = await mount(empty, { service: NOT_INSTALLED });
     await click("setup-dismiss");
     expect(prompt(el)).toBeNull();
+  });
+});
+
+describe("Calendar month projection", () => {
+  const lines = (el: HTMLElement) =>
+    [...el.querySelectorAll("[data-testid=month-line]")].map((e) => ({
+      text: e.textContent?.trim(),
+      colour: e.getAttribute("data-colour"),
+    }));
+
+  it("projects the current month: 26 in 3 days against a daily 10 is 260 of 300", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE, COPILOT_UNAVAILABLE));
+    expect(lines(el)).toEqual([{ text: "Claude: projected 87 %", colour: "yellow" }]);
+  });
+
+  it("colours the chip by the projection ratio, not by the latest day", async () => {
+    const heavy: ProviderMonth = {
+      ...CLAUDE,
+      days: [
+        { date: "2026-11-01", usage: 20, budget: 10, ratio: 2, colour: "red" },
+        { date: "2026-11-03", usage: 1, budget: 10, ratio: 0.1, colour: "green" },
+      ],
+    };
+    // 21 in 3 days against a daily 10: 210 of 300 = 70 %, green although day 1 was red.
+    const { el } = await mount((y, m) => month(y, m, heavy));
+    expect(lines(el)).toEqual([{ text: "Claude: projected 70 %", colour: "green" }]);
+    TestBed.resetTestingModule();
+    const over: ProviderMonth = { ...heavy, days: [{ ...heavy.days[0], usage: 45 }] };
+    // 45 in 3 days: 450 of 300 = 150 %.
+    const high = await mount((y, m) => month(y, m, over));
+    expect(lines(high.el)).toEqual([{ text: "Claude: projected 150 %", colour: "red" }]);
+  });
+
+  it("shows the final usage of a past month, without projection", async () => {
+    const october: ProviderMonth = {
+      ...CLAUDE,
+      days: [{ date: "2026-10-31", usage: 62, budget: 10, ratio: 6.2, colour: "red" }],
+    };
+    const { el } = await mount((y, m) => month(y, m, october), { month: "2026-10" });
+    expect(lines(el)).toEqual([{ text: "Claude: month total 20 %", colour: "green" }]);
+  });
+
+  it("shows nothing for a future month, without data or with a budget of 0", async () => {
+    const future = await mount((y, m) => month(y, m, CLAUDE), { month: "2026-12" });
+    expect(lines(future.el)).toEqual([]);
+    TestBed.resetTestingModule();
+    const none = await mount((y, m) => month(y, m, { ...CLAUDE, days: [] }));
+    expect(lines(none.el)).toEqual([]);
+    TestBed.resetTestingModule();
+    const zero: ProviderMonth = {
+      ...CLAUDE,
+      days: [{ date: "2026-11-01", usage: 2, budget: 0, colour: "green" }],
+    };
+    const noBudget = await mount((y, m) => month(y, m, zero));
+    expect(lines(noBudget.el)).toEqual([]);
   });
 });

@@ -55,7 +55,7 @@ h2 {
 .chart-box {
   position: relative;
   width: 100%;
-  height: clamp(220px, 45vh, 1200px);
+  height: clamp(220px, calc(100vh - 300px), 1200px);
 }
 
 .chart {

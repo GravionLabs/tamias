@@ -46,6 +46,22 @@
   >
 </header>
 
+@if (monthLines().length > 0) {
+  <p class="month-lines" data-testid="month-lines">
+    @for (line of monthLines(); track line.provider) {
+      <span
+        class="chip"
+        [class]="'chip colour-' + line.colour"
+        data-testid="month-line"
+        [attr.data-provider]="line.provider"
+        [attr.data-colour]="line.colour"
+        [attr.title]="line.title"
+        >{{ line.label }}</span
+      >
+    }
+  </p>
+}
+
 @if (setupPrompt()) {
   <section class="setup" data-testid="setup-prompt" aria-label="Collection setup">
     <p class="setup-text">Collection is not set up — set up now?</p>
@@ -108,6 +124,8 @@
       <div class="cell blank" aria-hidden="true"></div>
     }
     @for (cell of cells(); track cell.date) {
+      <!-- The day number link inside is the keyboard and screen reader path; the click only widens the hit area. -->
+      <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
       <div
         class="cell"
         role="gridcell"
@@ -118,6 +136,7 @@
         [class.weekend]="cell.weekend"
         [class.nodata]="!cell.future && !cell.chips.some((c) => c.colour !== 'neutral')"
         [attr.aria-current]="cell.today ? 'date' : null"
+        (click)="openDay($event, cell)"
       >
         @if (cell.open) {
           <a

@@ -52,6 +52,8 @@ The calendar opens on the current month. Previous, Today and Next move between m
 | Grey | today only: the provider is stale |
 | Neutral | no data for that day, or the provider is not available |
 
+Below the header the calendar shows a month projection per provider ("Hochrechnung"): the usage of the month so far divided by the elapsed days of the current local month (up to and including today), times the days in the month, as a percentage of the monthly budget (the daily budget times the days in the month). A past month shows its final usage as "month total" instead, a future month nothing. The chip's colour comes from the projection itself (projected usage / monthly budget) with the same limits as the day colours above: green below 80 %, yellow up to and including 100 %, red above (a 150 % projection is red); it is grey while the provider is stale. Providers without a budget or without data have no projection.
+
 A provider is stale when its last successful read is older than `stale_after` (default 15 minutes, set in `config.toml`; see also [Consumers](./consumers.md)), when it has never succeeded, or when its last run failed after its last success, even if that success is younger than `stale_after`. On today's cell the grey chip says "stale since 09:00" (the time of the last successful collect), or "stale, never collected". Today's cell is only grey while the provider is stale; the calendar does not show old numbers as current.
 
 The week starts on Monday. Set `week_start` in `config.toml` to change it: `"monday"` (default), `"sunday"`, `"saturday"` or `"locale"` (the first day of your system locale). The weekday header and the empty cells before the 1st follow it; Settings shows the active value, read only. The app reads it at start, so restart the app after changing it. It does not change how the CLI reports days or budgets.
@@ -89,6 +91,7 @@ The tray icon shows the worst colour of the binding windows of the set-up provid
 Grey wins over red: a stale provider's numbers may be outdated.
 
 - Hovering the icon (Windows and macOS) shows a small usage card next to it: per provider the binding window, its usage and the reset. A window with a daily budget also shows "Today": today's usage in percent of today's budget, with its own bar in the budget colour. It hides when the pointer leaves the icon and the card, on Escape and when it loses focus. Its "Open tamias" link opens the window.
+- Per binding window (Claude 7-day, Copilot monthly) with a budget, a "Month (projected)" row: the same projection as in the calendar (month usage so far / elapsed days x days in the month) as a percentage of the monthly budget, with a bar coloured by the projection itself (green below 80 %, yellow up to and including 100 %, red above; grey while the provider is stale). Windows without a budget (informational) have no such row.
 - A left click on the icon (Windows and macOS) opens the window on the calendar and hides the card.
 - A right click opens the menu: the summary, "Open tamias", "Show usage" and "Quit". "Open tamias" shows and focuses the window on the calendar. "Show usage" opens the card; on Linux, which sends no hover or click events, it is the only way to open the card, and "Open tamias" the only way to open the window.
 - Closing the window hides it to the tray; the app keeps running and collection is not affected.

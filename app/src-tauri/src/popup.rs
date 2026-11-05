@@ -227,22 +227,34 @@ fn schedule_hide(app: &AppHandle) {
     };
     let handle = app.clone();
     std::thread::spawn(move || {
-        std::thread::sleep(HIDE_DELAY);
+        loop {
+            std::thread::sleep(HIDE_DELAY);
+            let Some(popup) = handle.try_state::<Popup>() else {
+                return;
+            };
+            let due = {
+                let state = lock(&popup);
+                hide_due(
+                    scheduled,
+                    state.generation,
+                    state.over_icon,
+                    state.over_card,
+                )
+            };
+            if !due {
+                return;
+            }
+            // macOS does not deliver mouse enter and leave to the unfocused card, so the frontend
+            // cannot report the pointer there: look at the pointer itself and keep the card while
+            // it is inside the window, checking again until it leaves.
+            if pointer_in_card(&handle) {
+                continue;
+            }
+            break;
+        }
         let Some(popup) = handle.try_state::<Popup>() else {
             return;
         };
-        let due = {
-            let state = lock(&popup);
-            hide_due(
-                scheduled,
-                state.generation,
-                state.over_icon,
-                state.over_card,
-            )
-        };
-        if !due {
-            return;
-        }
         // The lock must not be held over `hide`: the window's focus-loss handler takes it on the
         // main thread. So an enter or move in between is caught afterwards: the card is shown
         // again when the pointer came back.
@@ -255,6 +267,36 @@ fn schedule_hide(app: &AppHandle) {
             show(&handle, anchor, false);
         }
     });
+}
+
+/// Whether the point (`x`, `y`) lies in `rect` (edges included).
+#[must_use]
+pub fn contains(rect: Rect, x: f64, y: f64) -> bool {
+    x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height
+}
+
+/// Whether the pointer is over the visible popup window.
+fn pointer_in_card(app: &AppHandle) -> bool {
+    let Some(window) = window(app) else {
+        return false;
+    };
+    if !window.is_visible().unwrap_or(false) {
+        return false;
+    }
+    let (Ok(at), Ok(position), Ok(size)) = (
+        app.cursor_position(),
+        window.outer_position(),
+        window.outer_size(),
+    ) else {
+        return false;
+    };
+    let rect = Rect {
+        x: f64::from(position.x),
+        y: f64::from(position.y),
+        width: f64::from(size.width),
+        height: f64::from(size.height),
+    };
+    contains(rect, at.x, at.y)
 }
 
 /// The pointer as an empty rectangle, the anchor of a popup opened from a menu.
@@ -404,6 +446,21 @@ pub fn tray_popup_fit(app: AppHandle, height: f64) {
 )]
 mod tests {
     use super::*;
+
+    #[test]
+    fn contains_includes_the_edges_and_excludes_outside() {
+        let rect = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 50.0,
+        };
+        assert!(contains(rect, 10.0, 20.0));
+        assert!(contains(rect, 110.0, 70.0));
+        assert!(contains(rect, 60.0, 40.0));
+        assert!(!contains(rect, 9.0, 40.0));
+        assert!(!contains(rect, 60.0, 71.0));
+    }
 
     const MONITOR: Rect = Rect {
         x: 0.0,
