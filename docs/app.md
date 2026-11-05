@@ -106,4 +106,6 @@ pnpm sidecar    # debug build of the CLI for the host, copied to src-tauri/binar
 pnpm tauri dev  # then the app; rerun pnpm sidecar after changing the CLI
 ```
 
+`pnpm tauri dev` applies no CSP (`devCsp` is null) and builds the frontend without optimization, so CSP problems only show in a release build. Check UI changes with `pnpm tauri build --no-bundle` and run `src-tauri/../target/release/tamias-app`. The production build must not inline critical CSS (`inlineCritical: false` in `app/angular.json`): Tauri would add a hash for the inline `<style>` to `style-src`, which makes browsers ignore `'unsafe-inline'` and block the component styles. `app/src/csp.spec.ts` guards this.
+
 For a local `cargo clippy` or `cargo test -p tamias-app`, run `pnpm sidecar` before. The frontend tests are `pnpm test` and `pnpm check` in `app/`.
