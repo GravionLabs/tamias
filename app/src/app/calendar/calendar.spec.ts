@@ -202,6 +202,15 @@ describe("Calendar", () => {
     expect(cell(el, "2026-11-02").classList.contains("weekend")).toBe(false);
   });
 
+  it("carries both weekend and future classes on a future weekend day", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE));
+    for (const date of ["2026-11-07", "2026-11-08"]) {
+      expect(cell(el, date).classList.contains("weekend")).toBe(true);
+      expect(cell(el, date).classList.contains("future")).toBe(true);
+    }
+    expect(cell(el, "2026-11-09").classList.contains("weekend")).toBe(false);
+  });
+
   it("keeps future days and days without data neutral", async () => {
     const { el } = await mount((y, m) =>
       month(y, m, {

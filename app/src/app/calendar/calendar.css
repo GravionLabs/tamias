@@ -79,6 +79,16 @@ h1 {
   background: color-mix(in srgb, var(--h-content-background), transparent 55%);
 }
 
+/* Weekend and quiet: keep the weekend tint, but stay quieter than a weekend with data. */
+.cell.weekend.future,
+.cell.weekend.nodata {
+  background: color-mix(
+    in srgb,
+    var(--h-primary-color) 6%,
+    color-mix(in srgb, var(--h-content-background), transparent 55%)
+  );
+}
+
 .cell.future .day,
 .cell.nodata .day {
   color: var(--h-text-muted-color);
