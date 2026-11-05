@@ -8,6 +8,7 @@ pub mod autostart;
 pub mod day;
 pub mod launch;
 pub mod month;
+pub mod popup;
 pub mod service;
 pub mod today;
 pub mod tray;
@@ -256,6 +257,7 @@ pub fn run() {
             Some(vec![launch::HIDDEN]),
         ))
         .setup(|app| {
+            popup::init(app.handle());
             let tray = tray::create(app.handle());
             if let Err(error) = &tray {
                 eprintln!("tamias-app: tray: cannot create: {error}");
@@ -275,12 +277,24 @@ pub fn run() {
         .on_window_event(|window, event| {
             // Closing hides to the tray, "Quit" in the tray menu exits; without a tray the
             // window closes and the app exits.
-            if let WindowEvent::CloseRequested { api, .. } = event
-                && window.label() == tray::MAIN_WINDOW
-                && tray::exists(window.app_handle())
-            {
-                api.prevent_close();
-                tray::hide_window(window.app_handle());
+            match event {
+                WindowEvent::CloseRequested { api, .. }
+                    if window.label() == tray::MAIN_WINDOW && tray::exists(window.app_handle()) =>
+                {
+                    api.prevent_close();
+                    tray::hide_window(window.app_handle());
+                }
+                // The usage card is never destroyed, only hidden.
+                WindowEvent::CloseRequested { api, .. }
+                    if window.label() == popup::POPUP_WINDOW =>
+                {
+                    api.prevent_close();
+                    popup::hide(window.app_handle());
+                }
+                WindowEvent::Focused(false) if window.label() == popup::POPUP_WINDOW => {
+                    popup::on_focus_lost(window.app_handle());
+                }
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -292,7 +306,11 @@ pub fn run() {
             service_install,
             service_uninstall,
             autostart_available,
-            autostart_enable
+            autostart_enable,
+            popup::tray_popup_hide,
+            popup::tray_popup_hover,
+            popup::tray_popup_open_main,
+            popup::tray_popup_fit
         ])
         .build(tauri::generate_context!())
         .expect("error while running the tamias app")

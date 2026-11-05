@@ -5,6 +5,8 @@ import {
   providerLabel,
   staleText,
   todayText,
+  usedOfText,
+  usedPercent,
   usedText,
   windowLabel,
   type WindowReport,
@@ -90,6 +92,27 @@ describe("usedText", () => {
     expect(
       usedText({ ...SEVEN_DAY, window: "monthly", unit: "requests", used: 26, limit: 300 }),
     ).toBe("26 of 300 used");
+  });
+});
+
+describe("usedPercent and usedOfText", () => {
+  it("rounds the share of the limit", () => {
+    expect(usedPercent({ ...SEVEN_DAY, unit: "requests", used: 489, limit: 2380 })).toBe(21);
+    expect(usedPercent(SEVEN_DAY)).toBe(54);
+  });
+
+  it("is 0 for a limit of 0", () => {
+    expect(usedPercent({ ...SEVEN_DAY, limit: 0 })).toBe(0);
+  });
+
+  it("shows requests with thousands separators and percent against 100%", () => {
+    expect(usedOfText({ ...SEVEN_DAY, unit: "requests", used: 489, limit: 2380 })).toBe(
+      "489 of 2,380 requests",
+    );
+    expect(usedOfText({ ...SEVEN_DAY, unit: "requests", used: 1234567, limit: 2000000 })).toBe(
+      "1,234,567 of 2,000,000 requests",
+    );
+    expect(usedOfText(SEVEN_DAY)).toBe("54% of 100% used");
   });
 });
 

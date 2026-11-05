@@ -169,6 +169,26 @@ export function staleText(since: Timestamp | undefined, now: Date = new Date()):
   return since ? `stale since ${localTime(since, now)}` : "stale, never collected";
 }
 
+/** `value` with thousands separators (`2,380`), fractions as in `amount`. */
+function grouped(value: number): string {
+  const [whole, fraction] = (Number.isInteger(value) ? String(value) : value.toFixed(1)).split(".");
+  const digits = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return fraction === undefined ? digits : `${digits}.${fraction}`;
+}
+
+/** The share of the limit used, in percent, as a whole number: `0` for a limit of 0. */
+export function usedPercent(w: WindowReport): number {
+  if (w.limit <= 0) return 0;
+  return Math.round((w.used / w.limit) * 100);
+}
+
+/** The absolute numbers of `w`: `54% of 100% used`, or `489 of 2,380 requests`. */
+export function usedOfText(w: WindowReport): string {
+  return w.unit === "percent"
+    ? `${amount(w.used, w.unit)} of ${amount(w.limit, w.unit)} used`
+    : `${grouped(w.used)} of ${grouped(w.limit)} requests`;
+}
+
 /** `HH:MM` when `at` is on the local day of `now`, else `YYYY-MM-DD HH:MM`; both in local time. */
 export function localTime(at: Timestamp, now: Date = new Date()): string {
   const date = new Date(at);

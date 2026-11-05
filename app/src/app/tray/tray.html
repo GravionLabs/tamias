@@ -1,0 +1,39 @@
+<main class="card">
+  @if (error(); as message) {
+    <p class="note" role="alert" data-testid="error">Cannot read today's usage: {{ message }}</p>
+  } @else if (report(); as r) {
+    @for (p of shown(r); track p.provider) {
+      <section class="provider" [attr.data-provider]="p.provider" [attr.data-status]="p.status">
+        <h2>{{ providerLabel(p.provider) }} Usage</h2>
+        @if (note(p); as text) {
+          <p class="note" data-testid="note">{{ text }}</p>
+        }
+        @for (w of p.windows; track w.window) {
+          <div class="window" [attr.data-window]="w.window" [attr.data-colour]="w.colour">
+            <div class="row">
+              <span class="label">{{ windowLabel(w.window) }}</span>
+              <span class="percent" data-testid="percent">{{ percent(w) }}%</span>
+            </div>
+            <div
+              class="track"
+              role="progressbar"
+              [attr.aria-label]="windowLabel(w.window)"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              [attr.aria-valuenow]="width(w)"
+            >
+              <div class="bar" [class]="'bar colour-' + w.colour" [style.width.%]="width(w)"></div>
+            </div>
+            <div class="detail">
+              <span data-testid="used">{{ usedOfText(w) }}</span>
+              <span data-testid="resets">{{ resets(w.resets_at) }}</span>
+            </div>
+          </div>
+        }
+      </section>
+    }
+  } @else {
+    <p class="note" role="status">Reading usage…</p>
+  }
+  <button type="button" class="open" (click)="open()">Open tamias</button>
+</main>
