@@ -13,6 +13,7 @@ pub mod service;
 pub mod today;
 pub mod tray;
 pub mod watch;
+pub mod year;
 
 use std::sync::{Mutex, PoisonError};
 
@@ -87,6 +88,21 @@ async fn today() -> Result<Report, CommandError> {
 #[tauri::command]
 async fn month(year: i16, month: i8) -> Result<month::MonthReport, CommandError> {
     tauri::async_runtime::spawn_blocking(move || month::current(year, month))
+        .await
+        .map_err(|e| CommandError {
+            message: e.to_string(),
+            busy: false,
+        })?
+        .map_err(CommandError::from)
+}
+
+/// The year of every provider: per month the usage, the budget of the elapsed days, the ratio and
+/// the colour; a month without data is marked `has_data: false`.
+///
+/// Runs off the main thread: reading the store may wait for the collector's lock.
+#[tauri::command]
+async fn year(year: i16) -> Result<year::YearReport, CommandError> {
+    tauri::async_runtime::spawn_blocking(move || year::current(year))
         .await
         .map_err(|e| CommandError {
             message: e.to_string(),
@@ -300,6 +316,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             today,
             month,
+            year,
             week_start,
             day,
             service_status,

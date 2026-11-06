@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/GravionLabs/tamias/blob/main/docs/schema/year-v1.schema.json",
+  "title": "tamias app year report, schema version 1",
+  "description": "The `year` IPC report of the app: usage, budget and ratio per provider and month. Within version 1 fields are only added as optional; a rename or removal bumps the version.",
+  "type": "object",
+  "required": ["year", "generated_at", "providers"],
+  "properties": {
+    "year": { "type": "integer" },
+    "generated_at": { "$ref": "#/$defs/timestamp" },
+    "providers": { "type": "array", "items": { "$ref": "#/$defs/provider" } }
+  },
+  "$defs": {
+    "timestamp": {
+      "description": "RFC 3339 instant in UTC.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+    },
+    "colour": { "enum": ["green", "yellow", "red", "grey"] },
+    "provider": {
+      "type": "object",
+      "required": ["provider", "status", "unit", "months"],
+      "properties": {
+        "provider": { "enum": ["claude", "copilot"] },
+        "status": { "enum": ["ok", "stale", "unavailable"] },
+        "stale_since": { "$ref": "#/$defs/timestamp" },
+        "unit": { "enum": ["percent", "requests"] },
+        "months": {
+          "description": "Months 1-12 in order; empty for an unavailable provider.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["month", "has_data", "usage", "budget", "colour"],
+            "properties": {
+              "month": { "type": "integer", "minimum": 1, "maximum": 12 },
+              "has_data": {
+                "description": "false for a month without any day of data: usage and budget are 0 and the colour is grey.",
+                "type": "boolean"
+              },
+              "usage": { "type": "number" },
+              "budget": { "description": "Sum of the budgets of the elapsed days with data.", "type": "number" },
+              "ratio": { "description": "usage / budget; absent when the budget is 0.", "type": "number" },
+              "colour": { "$ref": "#/$defs/colour" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
