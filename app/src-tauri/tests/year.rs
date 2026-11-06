@@ -57,7 +57,7 @@ fn year_returns_twelve_months_for_claude_and_none_for_unavailable_copilot() {
     assert!(!claude.months[0].has_data);
     let copilot = &report.providers[1];
     assert_eq!(copilot.status, Status::Unavailable);
-    assert!(copilot.months.is_empty());
+    assert_eq!(copilot.months, []);
 }
 
 #[test]
