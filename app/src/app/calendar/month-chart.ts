@@ -5,8 +5,15 @@ import {
   type Colour,
   type ProviderMonth,
 } from "../core/report";
-import { niceMax } from "../day/chart";
 import { isoDate } from "./grid";
+
+/** A round top for the y axis that holds `value`: 1, 2, 2.5, 5 or 10 times a power of ten. */
+export function niceMax(value: number): number {
+  if (!(value > 0)) return 1;
+  const power = 10 ** Math.floor(Math.log10(value));
+  const step = [1, 2, 2.5, 5, 10].find((s) => s * power >= value) ?? 10;
+  return step * power;
+}
 
 /** Size of the SVG (its `viewBox`); the plot lies inside the margins. */
 export const WIDTH = 720;

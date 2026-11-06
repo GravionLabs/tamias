@@ -13,20 +13,8 @@ import {
 import { DOCUMENT } from "@angular/common";
 import { Ipc, errorText, isBusy } from "../core/ipc";
 import { StoreEvents } from "../core/store-events";
-import {
-  localTime,
-  providerLabel,
-  staleText,
-  todayPercent,
-  usedOfText,
-  usedPercent,
-  projectionColour,
-  windowProjection,
-  windowLabel,
-  type ProviderReport,
-  type Report,
-  type WindowReport,
-} from "../core/report";
+import { WindowList } from "../core/window-list";
+import { providerLabel, staleText, type ProviderReport, type Report } from "../core/report";
 
 /** What a provider block says besides its windows, like the overview; `null` for a healthy one. */
 export function providerNote(p: ProviderReport): string | null {
@@ -42,21 +30,6 @@ export function shownProviders(report: Report): ProviderReport[] {
   return setUp.length > 0 ? setUp : report.providers;
 }
 
-/** Fill of the bar in percent: the share used, at most the full track. */
-export function barWidth(w: WindowReport): number {
-  return Math.min(100, Math.max(0, usedPercent(w)));
-}
-
-/** Fill of the today bar in percent: today's share of the budget, at most the full track. */
-export function todayBarWidth(w: WindowReport): number {
-  return Math.min(100, Math.max(0, todayPercent(w) ?? 0));
-}
-
-/** Fill of the projection bar in percent: the projected share of the monthly budget, at most the full track. */
-export function projectionBarWidth(w: WindowReport, now: Date = new Date()): number {
-  return Math.min(100, Math.max(0, windowProjection(w, now)?.percent ?? 0));
-}
-
 /**
  * The compact usage card of the tray popup (`/tray`): per set-up provider the windows of today's
  * report with percentage, bar in the budget colour and absolute numbers. Loads like the overview
@@ -64,6 +37,7 @@ export function projectionBarWidth(w: WindowReport, now: Date = new Date()): num
  */
 @Component({
   selector: "app-tray",
+  imports: [WindowList],
   templateUrl: "./tray.html",
   styleUrl: "./tray.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -79,18 +53,8 @@ export class Tray {
   protected readonly error = signal<string | null>(null);
 
   protected readonly providerLabel = providerLabel;
-  protected readonly windowLabel = windowLabel;
-  protected readonly usedOfText = usedOfText;
-  protected readonly percent = usedPercent;
-  protected readonly width = barWidth;
-  protected readonly today = todayPercent;
-  protected readonly todayWidth = todayBarWidth;
-  protected readonly projection = (w: WindowReport) => windowProjection(w);
-  protected readonly projectionColour = projectionColour;
-  protected readonly projectionWidth = (w: WindowReport) => projectionBarWidth(w);
   protected readonly note = providerNote;
   protected readonly shown = shownProviders;
-  protected readonly resets = (at: string) => `resets ${localTime(at)}`;
 
   constructor() {
     const doc = inject(DOCUMENT);

@@ -52,58 +52,6 @@ h2 {
   display: inline-block;
 }
 
-.chart-box {
-  position: relative;
-  width: 100%;
-  height: clamp(220px, calc(100vh - 300px), 1200px);
-}
-
-.chart {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.grid {
-  stroke: var(--h-surface-300);
-  stroke-width: 1;
-}
-
-.tick {
-  fill: var(--h-text-muted-color);
-  font-size: 11px;
-}
-
-.budget {
-  stroke: var(--h-text-color);
-  stroke-width: 1.5;
-  stroke-dasharray: 6 4;
-}
-
-.usage {
-  fill: none;
-  stroke-width: 2.5;
-  stroke-linejoin: round;
-}
-
-path.colour-green {
-  stroke: var(--h-green-500);
-}
-
-path.colour-yellow {
-  stroke: var(--h-yellow-500);
-}
-
-path.colour-red {
-  stroke: var(--h-red-500);
-}
-
-path.colour-grey,
-path.colour-neutral {
-  stroke: var(--h-surface-400);
-}
-
 .dot.colour-green {
   background: var(--h-green-500);
 }
@@ -119,43 +67,6 @@ path.colour-neutral {
 .dot.colour-grey,
 .dot.colour-neutral {
   background: var(--h-surface-400);
-}
-
-.legend {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 4px 0 8px;
-  font-size: 0.8rem;
-  color: var(--h-text-muted-color);
-}
-
-.swatch {
-  display: inline-block;
-  width: 18px;
-  height: 0;
-  border-top: 3px solid var(--h-text-muted-color);
-  margin-left: 8px;
-}
-
-path.curve-day {
-  stroke: var(--h-blue-500);
-}
-
-path.curve-five-hour {
-  stroke: var(--h-orange-500);
-}
-
-.curve-day-swatch {
-  border-top-color: var(--h-blue-500);
-}
-
-.curve-five-hour-swatch {
-  border-top-color: var(--h-orange-500);
-}
-
-.budget-swatch {
-  border-top: 2px dashed var(--h-text-color);
 }
 
 .empty {

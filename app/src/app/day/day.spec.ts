@@ -4,12 +4,13 @@ import { TestBed, getTestBed } from "@angular/core/testing";
 import { ActivatedRoute, convertToParamMap, provideRouter } from "@angular/router";
 import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-browser/testing";
 import { of } from "rxjs";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { NOW } from "../calendar/calendar";
 import { Ipc, type Unlisten } from "../core/ipc";
 import { STORE_CHANGED } from "../core/store-events";
-import type { DayReport, ProviderDay } from "../core/report";
-import { Day } from "./day";
+import type { DayReport, ProviderDay, Report } from "../core/report";
+import { WindowList } from "../core/window-list";
+import { Day, dayBounds, emptyReason } from "./day";
 
 beforeAll(() => {
   getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
@@ -20,11 +21,15 @@ class StubIpc extends Ipc {
   requests: string[] = [];
   private readonly handlers = new Map<string, Set<() => void>>();
 
-  constructor(public answer: (date: string) => unknown) {
+  constructor(
+    public answer: (date: string) => unknown,
+    public todayAnswer: () => unknown = () => TODAY,
+  ) {
     super();
   }
 
   override async invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+    if (command === "today") return this.todayAnswer() as T;
     if (command !== "day") throw new Error(`unexpected command ${command}`);
     const { date } = args as { date: string };
     this.requests.push(date);
@@ -76,14 +81,70 @@ const COPILOT_UNAVAILABLE: ProviderDay = {
   points: [],
 };
 
+const text = (el: Element | null) => el?.textContent?.trim();
+
+/** Today's report: Claude with a budgeted 7-day window, Copilot with a monthly one. */
+const TODAY: Report = {
+  generated_at: at(12),
+  providers: [
+    {
+      provider: "claude",
+      status: "ok",
+      windows: [
+        {
+          window: "seven_day",
+          binding: true,
+          unit: "percent",
+          used: 54,
+          limit: 100,
+          resets_at: "2026-11-10T00:00:00Z",
+          colour: "yellow",
+          today_usage: 4,
+          budget: 10,
+          ratio: 0.4,
+          month_usage: 12,
+        },
+        {
+          window: "five_hour",
+          binding: false,
+          unit: "percent",
+          used: 30,
+          limit: 100,
+          resets_at: "2026-11-03T15:00:00Z",
+          colour: "green",
+        },
+      ],
+    },
+    {
+      provider: "copilot",
+      status: "ok",
+      windows: [
+        {
+          window: "monthly",
+          binding: true,
+          unit: "requests",
+          used: 21,
+          limit: 100,
+          resets_at: "2026-12-01T00:00:00Z",
+          colour: "red",
+        },
+      ],
+    },
+  ],
+} as Report;
+
 function day(date: string, ...providers: ProviderDay[]): DayReport {
   return { date, generated_at: at(12), providers };
 }
 
 const NOV_3 = new Date(2026, 10, 3, 12);
 
-async function mount(answer: (date: string) => unknown, date = "2026-11-03") {
-  const ipc = new StubIpc(answer);
+async function mount(
+  answer: (date: string) => unknown,
+  date = "2026-11-03",
+  today: () => unknown = () => TODAY,
+) {
+  const ipc = new StubIpc(answer, today);
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
@@ -97,6 +158,13 @@ async function mount(answer: (date: string) => unknown, date = "2026-11-03") {
       templateUrl: undefined,
       styleUrl: undefined,
       template: readFileSync("src/app/day/day.html", "utf8"),
+    },
+  });
+  TestBed.overrideComponent(WindowList, {
+    set: {
+      templateUrl: undefined,
+      styleUrl: undefined,
+      template: readFileSync("src/app/core/window-list.html", "utf8"),
     },
   });
   const fixture = TestBed.createComponent(Day);
@@ -120,119 +188,59 @@ describe("Day", () => {
     expect(ipc.requests).toEqual(["2026-11-03"]);
   });
 
-  it("draws the usage step line and the budget line at the mapped coordinates", async () => {
+  it("shows the summary of the day and no chart", async () => {
     const { el } = await mount((d) => day(d, CLAUDE, COPILOT_UNAVAILABLE));
     const claude = panel(el, "claude");
-    // 00:00 -> 48, 06:00 -> 153, 12:00 -> 258; y = 232 - 22 * usage; the line runs on to now (12:00).
-    expect(claude.querySelector("[data-testid=usage-line]")?.getAttribute("d")).toBe(
-      "M48 232 H153 V188 H258 V100",
-    );
-    const budget = claude.querySelector("[data-testid=budget-line]");
-    expect(budget?.getAttribute("y1")).toBe("12");
-    expect(budget?.getAttribute("x1")).toBe("48");
-    expect(budget?.getAttribute("x2")).toBe("468");
     expect(claude.querySelector("[data-testid=summary]")?.textContent).toContain("6% of 10%");
-    expect(claude.querySelector("[data-testid=five-hour]")).toBeNull();
     expect(claude.querySelector("[data-testid=empty]")).toBeNull();
+    expect(el.querySelector("svg")).toBeNull();
+    expect(el.querySelector("[data-testid=chart]")).toBeNull();
   });
 
-  it("colours a single curve like the day", async () => {
-    const red: ProviderDay = { ...COPILOT_OK, colour: "red" };
-    const { el } = await mount((d) => day(d, CLAUDE, red));
-    expect(
-      panel(el, "copilot").querySelector("[data-testid=usage-line]")?.getAttribute("class"),
-    ).toContain("colour-red");
-    expect(panel(el, "copilot").querySelector("[data-testid=five-hour-line]")).toBeNull();
+  it("shows the windows like the tray card, per provider", async () => {
+    const { el } = await mount((d) => day(d, CLAUDE, COPILOT_OK));
+    const claude = panel(el, "claude");
+    const sevenDay = claude.querySelector("[data-window=seven_day]")!;
+    expect(text(sevenDay.querySelector(".label"))).toBe("7-day window");
+    expect(text(sevenDay.querySelector("[data-testid=percent]"))).toBe("54%");
+    expect(sevenDay.querySelector<HTMLElement>(".bar")?.style.width).toBe("54%");
+    expect(text(sevenDay.querySelector("[data-testid=today]"))).toBe("40%");
+    expect(sevenDay.querySelector("[data-testid=projection]")).not.toBeNull();
+    expect(text(sevenDay.querySelector("[data-testid=used]"))).toBe("54% of 100% used");
+    expect(text(sevenDay.querySelector("[data-testid=resets]"))).toMatch(/^resets /);
+    expect(claude.querySelector("[data-window=five_hour]")).not.toBeNull();
+    const copilot = panel(el, "copilot");
+    expect(text(copilot.querySelector("[data-window=monthly] [data-testid=percent]"))).toBe("21%");
+    expect(claude.querySelector("[data-window=monthly]")).toBeNull();
   });
 
-  describe("two curves", () => {
-    const WITH_WINDOW: ProviderDay = {
-      ...CLAUDE,
-      five_hour_points: [
-        { at: at(0), used: 0, limit: 100 },
-        { at: at(6), used: 50, limit: 100 },
-        { at: at(7), used: 0, limit: 100 },
-      ],
-    };
-
-    it("scales the day to the budget and the window to its limit on one percent axis", async () => {
-      const { el } = await mount((d) => day(d, WITH_WINDOW, COPILOT_UNAVAILABLE));
-      const claude = panel(el, "claude");
-      // Day: 0, 2, 6 of 10 -> 0, 20, 60 %; axis top 100 %: y = 232 - 2.2 * percent.
-      expect(claude.querySelector("[data-testid=usage-line]")?.getAttribute("d")).toBe(
-        "M48 232 H153 V188 H258 V100",
-      );
-      // Window: 0, 50, 0 % at 00:00, 06:00, 07:00; the drop is a reset.
-      expect(claude.querySelector("[data-testid=five-hour-line]")?.getAttribute("d")).toBe(
-        "M48 232 H153 V122 H170.5 V232 H258",
-      );
-      // Budget at 100 %, the axis top.
-      expect(claude.querySelector("[data-testid=budget-line]")?.getAttribute("y1")).toBe("12");
-      expect(claude.querySelectorAll("[data-testid=chart]").length).toBe(1);
-    });
-
-    it("names the curves in the legend with their value and drops the old text line", async () => {
-      const { el } = await mount((d) => day(d, WITH_WINDOW, COPILOT_UNAVAILABLE));
-      const claude = panel(el, "claude");
-      expect(claude.querySelector("[data-testid=legend-day]")?.textContent).toBe(
-        "Day vs budget 60%",
-      );
-      expect(claude.querySelector("[data-testid=legend-five-hour]")?.textContent).toBe(
-        "5-hour window 0%",
-      );
-      expect(claude.querySelector("[data-testid=five-hour]")).toBeNull();
-      expect(claude.querySelector("[data-testid=summary]")?.textContent).toContain("6% of 10%");
-    });
-
-    it("shows the last drawn point of the 5-hour curve, not the current level, on a past day", async () => {
-      const past: ProviderDay = {
-        ...CLAUDE,
-        five_hour: { used: 90, limit: 100, colour: "red" },
-        five_hour_points: [
-          { at: at(0), used: 10, limit: 100 },
-          { at: at(6), used: 40, limit: 200 },
-        ],
-      };
-      const { el } = await mount((d) => day(d, past, COPILOT_UNAVAILABLE));
-      expect(panel(el, "claude").querySelector("[data-testid=legend-five-hour]")?.textContent).toBe(
-        "5-hour window 20%",
-      );
-    });
-
-    it("gives the curves different theme colours", async () => {
-      const { el } = await mount((d) => day(d, WITH_WINDOW, COPILOT_UNAVAILABLE));
-      const claude = panel(el, "claude");
-      const dayClass = claude.querySelector("[data-testid=usage-line]")?.getAttribute("class");
-      const windowClass = claude
-        .querySelector("[data-testid=five-hour-line]")
-        ?.getAttribute("class");
-      expect(dayClass).toContain("curve-day");
-      expect(windowClass).toContain("curve-five-hour");
-      const css = readFileSync("src/app/day/day.css", "utf8");
-      expect(css).toMatch(/path\.curve-day\s*{\s*stroke: var\(--h-blue-500\);/);
-      expect(css).toMatch(/path\.curve-five-hour\s*{\s*stroke: var\(--h-orange-500\);/);
-    });
-
-    it("draws only the day curve against the budget on a day without five-hour points", async () => {
-      const none: ProviderDay = { ...CLAUDE, five_hour_points: [] };
-      const { el } = await mount((d) => day(d, none, COPILOT_UNAVAILABLE));
-      const claude = panel(el, "claude");
-      expect(claude.querySelector("[data-testid=five-hour-line]")).toBeNull();
-      expect(claude.querySelector("[data-testid=legend-five-hour]")).toBeNull();
-      expect(claude.querySelector("[data-testid=legend-day]")?.textContent).toBe(
-        "Day vs budget 60%",
-      );
-      expect(claude.querySelector("[data-testid=usage-line]")?.getAttribute("d")).toBe(
-        "M48 232 H153 V188 H258 V100",
-      );
-    });
+  it("still shows the day when today's report cannot be read", async () => {
+    const { el } = await mount(
+      (d) => day(d, CLAUDE),
+      "2026-11-03",
+      () => {
+        throw { message: "boom", busy: false };
+      },
+    );
+    const claude = panel(el, "claude");
+    expect(claude.querySelector("[data-testid=summary]")).not.toBeNull();
+    expect(claude.querySelector("[data-window]")).toBeNull();
+    expect(el.querySelector("[data-testid=error]")).toBeNull();
   });
 
   it("shows both providers side by side, the unavailable one as an empty state with the reason", async () => {
-    const { el } = await mount((d) => day(d, CLAUDE, COPILOT_UNAVAILABLE));
+    const noCopilot = {
+      ...TODAY,
+      providers: [TODAY.providers[0], { provider: "copilot", status: "unavailable", windows: [] }],
+    };
+    const { el } = await mount(
+      (d) => day(d, CLAUDE, COPILOT_UNAVAILABLE),
+      "2026-11-03",
+      () => noCopilot,
+    );
     expect(el.querySelectorAll("[data-testid=panel]")).toHaveLength(2);
     const copilot = panel(el, "copilot");
-    expect(copilot.querySelector("[data-testid=chart]")).toBeNull();
+    expect(copilot.querySelector("[data-window]")).toBeNull();
     expect(copilot.querySelector("[data-testid=empty]")?.textContent).toBe(
       "Not set up or switched off.",
     );
@@ -242,7 +250,6 @@ describe("Day", () => {
     const none: ProviderDay = { ...CLAUDE, points: [], usage: undefined, budget: undefined };
     const { el } = await mount((d) => day(d, none, COPILOT_UNAVAILABLE));
     const claude = panel(el, "claude");
-    expect(claude.querySelector("[data-testid=chart]")).toBeNull();
     expect(claude.querySelector("[data-testid=empty]")?.textContent).toBe("No data for this day.");
   });
 
@@ -260,11 +267,11 @@ describe("Day", () => {
     );
   });
 
-  it("keeps the curve of a stale provider and shows since when it is stale", async () => {
+  it("keeps the data of a stale provider and shows since when it is stale", async () => {
     const stale: ProviderDay = { ...CLAUDE, status: "stale", stale_since: at(9), colour: "grey" };
     const { el } = await mount((d) => day(d, stale, COPILOT_UNAVAILABLE));
     const claude = panel(el, "claude");
-    expect(claude.querySelector("[data-testid=chart]")).not.toBeNull();
+    expect(claude.querySelector("[data-testid=summary]")).not.toBeNull();
     expect(claude.querySelector("[data-testid=stale]")?.textContent).toBe("stale since 09:00");
   });
 
@@ -285,12 +292,12 @@ describe("Day", () => {
     ipc.emit(STORE_CHANGED);
     await settle();
     expect(el.querySelector("[data-testid=error]")).toBeNull();
-    expect(el.querySelectorAll("[data-testid=chart]")).toHaveLength(1);
+    expect(el.querySelectorAll("[data-testid=panel]")).toHaveLength(1);
     fail = { message: "locked", busy: true };
     ipc.emit(STORE_CHANGED);
     await settle();
     expect(el.querySelector("[data-testid=error]")).toBeNull();
-    expect(el.querySelectorAll("[data-testid=chart]")).toHaveLength(1);
+    expect(el.querySelectorAll("[data-testid=panel]")).toHaveLength(1);
   });
 
   it("reloads on every store-changed event", async () => {
@@ -304,38 +311,36 @@ describe("Day", () => {
     const css = readFileSync("src/app/day/day.css", "utf8");
     expect(css).not.toMatch(/max-width\s*:\s*\d+px/);
   });
+});
 
-  it("draws the chart in the measured size of its box, so text is not stretched", async () => {
-    const observers: { cb: ResizeObserverCallback; el: Element }[] = [];
-    vi.stubGlobal(
-      "ResizeObserver",
-      class {
-        constructor(private cb: ResizeObserverCallback) {}
-        observe(el: Element) {
-          observers.push({ cb: this.cb, el });
-        }
-        disconnect() {}
-        unobserve() {}
-      },
+describe("dayBounds", () => {
+  it("spans the local day, midnight to the next midnight", () => {
+    const { start, end } = dayBounds("2026-12-31");
+    expect(new Date(start).getFullYear()).toBe(2026);
+    expect(new Date(end).getFullYear()).toBe(2027);
+    expect(new Date(end).getDate()).toBe(1);
+    expect(new Date(end).getHours()).toBe(0);
+  });
+});
+
+describe("emptyReason", () => {
+  const base: ProviderDay = { provider: "claude", status: "ok", unit: "percent", points: [] };
+  const now = new Date(2026, 10, 3, 10, 5);
+
+  it("says an unavailable provider is not set up", () => {
+    expect(emptyReason({ ...base, status: "unavailable" }, now)).toBe(
+      "Not set up or switched off.",
     );
-    try {
-      const { el, settle } = await mount((d) => day(d, CLAUDE));
-      const resize = async (width: number, height: number) => {
-        for (const o of observers) {
-          o.cb(
-            [{ target: o.el, contentRect: { width, height } } as unknown as ResizeObserverEntry],
-            {} as ResizeObserver,
-          );
-        }
-        await settle();
-      };
-      const svg = () => el.querySelector("[data-testid=chart]")!;
-      await resize(960, 400);
-      expect(svg().getAttribute("viewBox")).toBe("0 0 960 400");
-      await resize(500, 260);
-      expect(svg().getAttribute("viewBox")).toBe("0 0 500 260");
-    } finally {
-      vi.unstubAllGlobals();
-    }
+  });
+
+  it("says a day without points has no data, and adds the staleness", () => {
+    expect(emptyReason(base, now)).toBe("No data for this day.");
+    expect(emptyReason({ ...base, status: "stale" }, now)).toBe(
+      "No data for this day. The provider is stale, never collected.",
+    );
+  });
+
+  it("has no reason with data", () => {
+    expect(emptyReason({ ...base, points: [{ at: at(1), usage: 0 }] }, now)).toBeNull();
   });
 });

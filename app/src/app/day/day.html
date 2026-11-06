@@ -21,63 +21,8 @@
         @if (p.stale; as hint) {
           <p class="muted" data-testid="stale">{{ hint }}</p>
         }
-        @if (p.chart; as c) {
-          <div class="chart-box" appChartBox (sized)="resized(p.provider, $event)">
-            <svg
-              class="chart"
-              data-testid="chart"
-              [attr.viewBox]="'0 0 ' + p.box.width + ' ' + p.box.height"
-              role="img"
-              [attr.aria-label]="p.name + ' usage over the day against the budget'"
-            >
-              @for (t of c.yTicks; track $index) {
-                <line
-                  class="grid"
-                  [attr.x1]="c.left"
-                  [attr.x2]="c.right"
-                  [attr.y1]="t.at"
-                  [attr.y2]="t.at"
-                />
-                <text class="tick" text-anchor="end" [attr.x]="c.left - 6" [attr.y]="t.at + 4">
-                  {{ t.label }}
-                </text>
-              }
-              @for (t of c.xTicks; track $index) {
-                <text class="tick" text-anchor="middle" [attr.x]="t.at" [attr.y]="c.bottom + 18">
-                  {{ t.label }}
-                </text>
-              }
-              <line
-                class="budget"
-                data-testid="budget-line"
-                [attr.x1]="c.left"
-                [attr.x2]="c.right"
-                [attr.y1]="c.budgetY"
-                [attr.y2]="c.budgetY"
-              />
-              <path
-                [class]="c.dual ? 'usage curve-day' : 'usage colour-' + p.colour"
-                data-testid="usage-line"
-                [attr.d]="c.path"
-              />
-              @if (c.fiveHourPath; as d) {
-                <path class="usage curve-five-hour" data-testid="five-hour-line" [attr.d]="d" />
-              }
-            </svg>
-          </div>
-          <p class="legend" data-testid="legend">
-            @if (p.legend.length > 0) {
-              @for (e of p.legend; track e.id) {
-                <span [class]="'swatch curve-' + e.id + '-swatch'"></span>
-                <span [attr.data-testid]="'legend-' + e.id"
-                  >{{ e.label }}{{ e.value ? " " + e.value : "" }}</span
-                >
-              }
-            } @else {
-              <span class="swatch usage-swatch"></span> Usage
-            }
-            <span class="swatch budget-swatch"></span> Budget
-          </p>
+        @if (p.windows.length > 0) {
+          <app-window-list [windows]="p.windows" />
         }
         @if (p.empty; as reason) {
           <p class="empty" data-testid="empty">{{ reason }}</p>

@@ -12,39 +12,52 @@ import { ActivatedRoute, RouterLink } from "@angular/router";
 import { HxMessage, HxProgressSpinner } from "@gravionlabs/helix-ui";
 import { NOW } from "../calendar/calendar";
 import { Ipc, errorText, isBusy } from "../core/ipc";
-import { amount, providerLabel, staleText, type DayReport, type ProviderDay } from "../core/report";
+import {
+  amount,
+  providerLabel,
+  staleText,
+  type DayReport,
+  type ProviderDay,
+  type Report,
+  type WindowReport,
+} from "../core/report";
 import { StoreEvents } from "../core/store-events";
-import { ChartBox, type ChartSize } from "./chart-box";
-import { HEIGHT, WIDTH, buildChart, dayBounds, emptyReason, type Chart } from "./chart";
+import { WindowList } from "../core/window-list";
 
-interface LegendEntry {
-  id: "day" | "five-hour";
-  label: string;
-  /** Current value, "" when unknown. */
-  value: string;
+/** First instant of the local day `date` (`YYYY-MM-DD`) and the first of the next one. */
+export function dayBounds(date: string): { start: number; end: number } {
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+  return {
+    start: new Date(year, month - 1, day).getTime(),
+    end: new Date(year, month - 1, day + 1).getTime(),
+  };
+}
+
+/** Why a provider has nothing to show for the day, `null` when it has data. */
+export function emptyReason(p: ProviderDay, now: Date): string | null {
+  if (p.status === "unavailable") return "Not set up or switched off.";
+  if (p.points.length > 0) return null;
+  const stale = p.status === "stale" ? ` The provider is ${staleText(p.stale_since, now)}.` : "";
+  return `No data for this day.${stale}`;
 }
 
 interface Panel {
   provider: ProviderDay["provider"];
   name: string;
-  /** The chart, `null` when there is nothing to draw. */
-  chart: Chart | null;
-  /** viewBox of the chart: its measured size, so one unit is one pixel. */
-  box: ChartSize;
-  /** Why there is no chart. */
+  /** Why the day has no data. */
   empty: string | null;
-  /** "stale since 09:00" for a stale provider with a curve. */
+  /** "stale since 09:00" for a stale provider with data. */
   stale: string | null;
   summary: string | null;
-  /** Legend entries of the two-curve chart, empty for a single curve. */
-  legend: LegendEntry[];
+  /** The windows like the tray card shows them; empty while today's report is not read. */
+  windows: WindowReport[];
   colour: string;
 }
 
-/** The intraday curve of one day (`day/:date`): Claude and Copilot side by side. */
+/** One day (`day/:date`): per provider the usage of the day against its budget and the windows as the tray card shows them, Claude and Copilot side by side. */
 @Component({
   selector: "app-day",
-  imports: [ChartBox, HxMessage, HxProgressSpinner, RouterLink],
+  imports: [HxMessage, HxProgressSpinner, RouterLink, WindowList],
   templateUrl: "./day.html",
   styleUrl: "./day.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -55,8 +68,8 @@ export class Day {
   private loads = 0;
   private readonly params = toSignal(inject(ActivatedRoute).paramMap);
 
-  /** Measured size of the chart box per provider; the default until measured. */
-  protected readonly sizes = signal<Record<string, ChartSize>>({});
+  /** Today's report, whose windows the panels show; `null` until read or when it cannot be read. */
+  private readonly overview = signal<Report | null>(null);
   protected readonly date = computed(() => this.params()?.get("date") ?? "");
   protected readonly report = signal<DayReport | null>(null);
   protected readonly error = signal<string | null>(null);
@@ -76,8 +89,10 @@ export class Day {
     const report = this.report();
     if (!report || report.date !== this.date()) return [];
     const now = this.now();
-    const sizes = this.sizes();
-    return report.providers.map((p) => panel(report.date, p, now, sizes[p.provider]));
+    const windows = this.overview()?.providers ?? [];
+    return report.providers.map((p) =>
+      panel(p, now, windows.find((w) => w.provider === p.provider)?.windows ?? []),
+    );
   });
 
   constructor() {
@@ -90,18 +105,19 @@ export class Day {
     });
   }
 
-  protected resized(provider: string, size: ChartSize): void {
-    this.sizes.update((s) => ({ ...s, [provider]: size }));
-  }
-
   /** Reads the day from the backend. A busy store keeps what is shown; the next event retries. */
   async load(date: string): Promise<void> {
     // Only the latest load is shown: an earlier one that answers late is dropped.
     const load = ++this.loads;
     try {
-      const report = await this.ipc.day(date);
+      const [report, overview] = await Promise.all([
+        this.ipc.day(date),
+        // The windows are extra: a failing overview leaves the panels without them.
+        this.ipc.today().catch(() => null),
+      ]);
       if (load !== this.loads) return;
       this.report.set(report);
+      this.overview.set(overview);
       this.error.set(null);
     } catch (error) {
       if (load !== this.loads || isBusy(error)) return;
@@ -110,61 +126,18 @@ export class Day {
   }
 }
 
-function panel(date: string, p: ProviderDay, now: Date, size?: ChartSize): Panel {
-  const name = providerLabel(p.provider);
-  const empty = emptyReason(p, now);
+function panel(p: ProviderDay, now: Date, windows: WindowReport[]): Panel {
   const budget = p.budget;
-  const chart =
-    empty === null && budget !== undefined
-      ? buildChart(
-          date,
-          p.points,
-          budget,
-          p.unit,
-          // Today's line runs on to the present.
-          dayBounds(date).start <= now.getTime() && now.getTime() < dayBounds(date).end
-            ? now.getTime()
-            : undefined,
-          size ?? { width: WIDTH, height: HEIGHT },
-          p.five_hour_points,
-        )
-      : null;
   return {
     provider: p.provider,
-    name,
-    chart,
-    box: size ?? { width: WIDTH, height: HEIGHT },
-    empty: empty ?? (chart ? null : "No budget for this day."),
+    name: providerLabel(p.provider),
+    empty: emptyReason(p, now) ?? (budget === undefined ? "No budget for this day." : null),
     stale: p.status === "stale" && p.points.length > 0 ? staleText(p.stale_since, now) : null,
     summary:
       p.usage !== undefined && budget !== undefined
         ? `${amount(p.usage, p.unit)} of ${amount(budget, p.unit)}`
         : null,
-    legend: chart?.dual ? legend(p, chart.fiveHourPath !== null) : [],
+    windows,
     colour: p.colour ?? "neutral",
   };
-}
-
-function legend(p: ProviderDay, withWindow: boolean): LegendEntry[] {
-  const day: LegendEntry = {
-    id: "day",
-    label: "Day vs budget",
-    value:
-      p.usage !== undefined && p.budget
-        ? amount(Math.round((p.usage / p.budget) * 100), "percent")
-        : "",
-  };
-  if (!withWindow) return [day];
-  const level = p.five_hour_points?.at(-1);
-  return [
-    day,
-    {
-      id: "five-hour",
-      label: "5-hour window",
-      value:
-        level && level.limit > 0
-          ? amount(Math.round((level.used / level.limit) * 100), "percent")
-          : "",
-    },
-  ];
 }
