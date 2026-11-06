@@ -2,6 +2,7 @@ import type { Routes } from "@angular/router";
 import { Calendar } from "./calendar/calendar";
 import { Day } from "./day/day";
 import { Overview } from "./overview/overview";
+import { Year } from "./year/year";
 import { Tray } from "./tray/tray";
 import { Settings } from "./settings/settings";
 
@@ -9,6 +10,7 @@ import { Settings } from "./settings/settings";
 export const routes: Routes = [
   { path: "", component: Calendar },
   { path: "day/:date", component: Day },
+  { path: "year/:year", component: Year },
   { path: "today", component: Overview },
   { path: "tray", component: Tray },
   { path: "settings", component: Settings },

@@ -17,6 +17,13 @@ import { StoreEvents } from "../core/store-events";
 import { ChartBox, type ChartSize } from "./chart-box";
 import { HEIGHT, WIDTH, buildChart, dayBounds, emptyReason, type Chart } from "./chart";
 
+interface LegendEntry {
+  id: "day" | "five-hour";
+  label: string;
+  /** Current value, "" when unknown. */
+  value: string;
+}
+
 interface Panel {
   provider: ProviderDay["provider"];
   name: string;
@@ -29,7 +36,8 @@ interface Panel {
   /** "stale since 09:00" for a stale provider with a curve. */
   stale: string | null;
   summary: string | null;
-  fiveHour: string | null;
+  /** Legend entries of the two-curve chart, empty for a single curve. */
+  legend: LegendEntry[];
   colour: string;
 }
 
@@ -118,6 +126,7 @@ function panel(date: string, p: ProviderDay, now: Date, size?: ChartSize): Panel
             ? now.getTime()
             : undefined,
           size ?? { width: WIDTH, height: HEIGHT },
+          p.five_hour_points,
         )
       : null;
   return {
@@ -131,9 +140,31 @@ function panel(date: string, p: ProviderDay, now: Date, size?: ChartSize): Panel
       p.usage !== undefined && budget !== undefined
         ? `${amount(p.usage, p.unit)} of ${amount(budget, p.unit)}`
         : null,
-    fiveHour: p.five_hour
-      ? `5-hour window: ${amount(p.five_hour.used, "percent")} of ${amount(p.five_hour.limit, "percent")}`
-      : null,
+    legend: chart?.dual ? legend(p, chart.fiveHourPath !== null) : [],
     colour: p.colour ?? "neutral",
   };
+}
+
+function legend(p: ProviderDay, withWindow: boolean): LegendEntry[] {
+  const day: LegendEntry = {
+    id: "day",
+    label: "Day vs budget",
+    value:
+      p.usage !== undefined && p.budget
+        ? amount(Math.round((p.usage / p.budget) * 100), "percent")
+        : "",
+  };
+  if (!withWindow) return [day];
+  const level = p.five_hour_points?.at(-1);
+  return [
+    day,
+    {
+      id: "five-hour",
+      label: "5-hour window",
+      value:
+        level && level.limit > 0
+          ? amount(Math.round((level.used / level.limit) * 100), "percent")
+          : "",
+    },
+  ];
 }

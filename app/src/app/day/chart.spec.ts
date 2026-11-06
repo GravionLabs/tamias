@@ -139,3 +139,29 @@ describe("emptyReason", () => {
     expect(emptyReason({ ...base, points: [{ at: at(1), usage: 0 }] }, now)).toBeNull();
   });
 });
+
+describe("buildChart with five-hour points", () => {
+  const points = [{ at: at(12), usage: 5 }];
+
+  it("scales both curves to percent, the budget at 100 and the axis above a higher curve", () => {
+    const chart = buildChart(DATE, points, 10, "requests", undefined, undefined, [
+      { at: at(12), used: 150, limit: 100 },
+    ]);
+    expect(chart.dual).toBe(true);
+    expect(chart.max).toBe(200);
+    // y: 232 - 220 * percent / 200; day 50 % -> 177, window 150 % -> 67, budget 100 % -> 122.
+    expect(chart.path).toBe("M258 177");
+    expect(chart.fiveHourPath).toBe("M258 67");
+    expect(chart.budgetY).toBe(122);
+    expect(chart.yTicks.at(-1)?.label).toBe("200%");
+  });
+
+  it("has no window path without points, and stays single without the field", () => {
+    expect(
+      buildChart(DATE, points, 10, "percent", undefined, undefined, []).fiveHourPath,
+    ).toBeNull();
+    const single = buildChart(DATE, points, 10, "percent");
+    expect(single.dual).toBe(false);
+    expect(single.fiveHourPath).toBeNull();
+  });
+});

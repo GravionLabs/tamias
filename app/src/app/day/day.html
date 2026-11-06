@@ -56,22 +56,31 @@
                 [attr.y2]="c.budgetY"
               />
               <path
-                [class]="'usage colour-' + p.colour"
+                [class]="c.dual ? 'usage curve-day' : 'usage colour-' + p.colour"
                 data-testid="usage-line"
                 [attr.d]="c.path"
               />
+              @if (c.fiveHourPath; as d) {
+                <path class="usage curve-five-hour" data-testid="five-hour-line" [attr.d]="d" />
+              }
             </svg>
           </div>
-          <p class="legend">
-            <span class="swatch usage-swatch"></span> Usage
+          <p class="legend" data-testid="legend">
+            @if (p.legend.length > 0) {
+              @for (e of p.legend; track e.id) {
+                <span [class]="'swatch curve-' + e.id + '-swatch'"></span>
+                <span [attr.data-testid]="'legend-' + e.id"
+                  >{{ e.label }}{{ e.value ? " " + e.value : "" }}</span
+                >
+              }
+            } @else {
+              <span class="swatch usage-swatch"></span> Usage
+            }
             <span class="swatch budget-swatch"></span> Budget
           </p>
         }
         @if (p.empty; as reason) {
           <p class="empty" data-testid="empty">{{ reason }}</p>
-        }
-        @if (p.fiveHour; as level) {
-          <p class="muted" data-testid="five-hour">{{ level }}</p>
         }
       </section>
     }

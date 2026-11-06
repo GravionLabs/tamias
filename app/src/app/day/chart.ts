@@ -1,4 +1,11 @@
-import { amount, staleText, type CurvePoint, type ProviderDay, type Unit } from "../core/report";
+import {
+  amount,
+  staleText,
+  type CurvePoint,
+  type FiveHourPoint,
+  type ProviderDay,
+  type Unit,
+} from "../core/report";
 
 /** Default size of the SVG (its `viewBox`) until the box is measured; the plot lies inside the margins. */
 export const WIDTH = 480;
@@ -21,6 +28,10 @@ export interface Tick {
 export interface Chart {
   /** The usage step line: along to the next snapshot, then up. */
   path: string;
+  /** The five-hour window step line, in percent of its limit; `null` unless the chart has two curves. */
+  fiveHourPath: string | null;
+  /** True for the two-curve chart (Claude): both curves in percent, the budget line at 100 %. */
+  dual: boolean;
   /** y of the budget line, which spans `left` to `right`. */
   budgetY: number;
   left: number;
@@ -64,26 +75,43 @@ export function buildChart(
   unit: Unit,
   until?: number,
   size: { width: number; height: number } = { width: WIDTH, height: HEIGHT },
+  fiveHour?: FiveHourPoint[],
 ): Chart {
   const { start, end } = dayBounds(date);
   const right = Math.max(size.width, MIN_WIDTH) - RIGHT;
   const bottom = Math.max(size.height, MIN_HEIGHT) - BOTTOM;
   const top = TOP;
-  const high = points.reduce((m, p) => Math.max(m, p.usage), 0);
-  const max = niceMax(Math.max(budget, high));
+  // Two curves (a provider with five-hour points): everything in percent, the day against its
+  // budget (the budget line at 100 %), the window against its limit.
+  const dual = fiveHour !== undefined && budget > 0;
+  const dayValues = points.map((p) => ({
+    at: p.at,
+    value: dual ? (p.usage / budget) * 100 : p.usage,
+  }));
+  const windowValues = (dual ? fiveHour : []).map((p) => ({
+    at: p.at,
+    value: p.limit > 0 ? (p.used / p.limit) * 100 : 0,
+  }));
+  const budgetValue = dual ? 100 : budget;
+  const high = [...dayValues, ...windowValues].reduce((m, p) => Math.max(m, p.value), 0);
+  const max = niceMax(Math.max(budgetValue, high));
   const x = (t: number) =>
     LEFT + ((Math.min(Math.max(t, start), end) - start) / (end - start)) * (right - LEFT);
   const y = (v: number) => bottom - (v / max) * (bottom - top);
-
-  let path = "";
-  points.forEach((p, i) => {
-    const px = round(x(new Date(p.at).getTime()));
-    path += i === 0 ? `M${px} ${round(y(p.usage))}` : ` H${px} V${round(y(p.usage))}`;
-  });
-  const lastAt = points.length ? new Date(points[points.length - 1]!.at).getTime() : start;
-  if (points.length > 0 && until !== undefined && until > lastAt) {
-    path += ` H${round(x(until))}`;
-  }
+  const stepPath = (values: { at: string; value: number }[]) => {
+    let path = "";
+    values.forEach((p, i) => {
+      const px = round(x(new Date(p.at).getTime()));
+      path += i === 0 ? `M${px} ${round(y(p.value))}` : ` H${px} V${round(y(p.value))}`;
+    });
+    const lastAt = values.length ? new Date(values[values.length - 1]!.at).getTime() : start;
+    if (values.length > 0 && until !== undefined && until > lastAt) {
+      path += ` H${round(x(until))}`;
+    }
+    return path;
+  };
+  const path = stepPath(dayValues);
+  const fiveHourPath = dual && windowValues.length > 0 ? stepPath(windowValues) : null;
 
   // Ticks sit at the real instants of local 00:00, 06:00, 12:00 and 18:00, the last one at the end
   // of the day (so on a 23 or 25 hour day the spacing is uneven but each label is right).
@@ -94,9 +122,21 @@ export function buildChart(
   }));
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => ({
     at: round(y(f * max)),
-    label: amount(f * max, unit),
+    label: amount(f * max, dual ? "percent" : unit),
   }));
-  return { path, budgetY: round(y(budget)), left: LEFT, right, top, bottom, max, xTicks, yTicks };
+  return {
+    path,
+    fiveHourPath,
+    dual,
+    budgetY: round(y(budgetValue)),
+    left: LEFT,
+    right,
+    top,
+    bottom,
+    max,
+    xTicks,
+    yTicks,
+  };
 }
 
 /** Why a provider has no curve for the day, `null` when it has one. */

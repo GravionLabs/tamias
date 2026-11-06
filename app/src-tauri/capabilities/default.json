@@ -5,7 +5,12 @@
   "windows": ["main", "tray"],
   "permissions": [
     "core:default",
+    "core:app:allow-version",
+    "core:webview:allow-set-webview-zoom",
     "autostart:allow-disable",
-    "autostart:allow-is-enabled"
+    "autostart:allow-is-enabled",
+    "updater:allow-check",
+    "updater:allow-download-and-install",
+    "process:allow-restart"
   ]
 }

@@ -1,6 +1,6 @@
 # Desktop app
 
-The desktop app shows the same numbers as `tamias today`: a month calendar with each day coloured by the daily budget, a day view with the usage over the day, and a tray icon with the traffic light. It only reads. Collection stays the scheduled `tamias collect` of the CLI, which the app can set up for you ([Installation](./installation.md#scheduled-collection)).
+The desktop app shows the same numbers as `tamias today`: a month calendar with each day coloured by the daily budget, a day view with the usage over the day, a year view with a bar per month, and a tray icon with the traffic light. It only reads. Collection stays the scheduled `tamias collect` of the CLI, which the app can set up for you ([Installation](./installation.md#scheduled-collection)).
 
 ## Download
 
@@ -15,7 +15,7 @@ Every release on the [GitHub releases page](https://github.com/GravionLabs/tamia
 
 Check the checksum as described in [Installation](./installation.md#download). Each bundle contains the `tamias` CLI of the same version (on Windows also `tamiasw.exe`), so the app does not need a separate CLI install.
 
-The bundles are not signed or notarised (v1 ships unsigned). Each system warns on the first start:
+The bundles are not signed or notarised by the operating system (v1 ships unsigned); they are signed for the updater only (see [Updates](#updates)). Each system warns on the first start:
 
 - **macOS**: open the `.dmg` and drag the app into `/Applications` first, then start it from there. An unsigned app started from Downloads or straight from the mounted disk image runs from a temporary path (macOS App Translocation). Collection set up from such a start would be registered with that temporary path, so move the app first. To remove the quarantine flag of the installed app once:
 
@@ -68,7 +68,13 @@ The calendar refreshes when the collector writes new snapshots, so the app needs
 
 ![The month calendar with Claude and Copilot usage chips per day](/screenshots/calendar-dark.png){.screenshot .dark-only}
 
-Click a day to open its day view. The "Today overview" link shows today's report of every provider.
+Click a day to open its day view, or "Year" for the year view. The "Today overview" link shows today's report of every provider.
+
+## Status bar and zoom
+
+The window opens at 960 x 880 and cannot get smaller than 640 x 840, so a whole month (header, projection chips, six week rows) is visible at 100 % without scrolling. The bar at the bottom of the window shows the installed version (for example `v0.6.0`) and the zoom: `−`, the percentage and `+`. The percentage is the zoom of the window, in steps of 10 % between 50 % and 200 %; click it to go back to 100 %. The zoom is remembered across restarts. At a high zoom the content scrolls above the bar. The tray card has no status bar.
+
+The sizes were measured, not guessed: the calendar content is 783 px high at zoom 100 % (week cells 98 px high with the two projection chips wrapped; headless Chrome on the real `calendar.css`/`styles.css` with sample data), the status bar is about 28 px, and the content needs about 600 px of width. Hence the minimum of 640 x 840 and the default of 960 x 880. Fonts on macOS and Windows may differ from the headless Chrome ones, so the owner verifies the sizes there.
 
 ## Day view
 
@@ -76,7 +82,17 @@ Click a day to open its day view. The "Today overview" link shows today's report
 
 ![The day view: usage over the day against the budget line, for Claude and Copilot](/screenshots/day-dark.png){.screenshot .dark-only}
 
-The day view shows, per provider, the usage over the local day as a curve against the day's budget line. Next to the chart the usage of the day is written out as "usage of budget"; a day without a budget says "No budget for this day.". The view reloads on every change of the store, like the calendar.
+The day view shows, per provider, the usage over the local day as a step line (midnight to midnight, 23 or 25 hours on a daylight saving change) against the day's budget. Next to the chart the usage of the day is written out as "usage of budget"; a day without a budget says "No budget for this day.". The view reloads on every change of the store, like the calendar.
+
+Claude has two curves, both in percent: "Day vs budget" is the usage of the day against the day's budget, with the budget line at 100 %, and "5-hour window" is the usage of the 5-hour window against its limit (the `five_hour_points` of the `day` report). The legend names each curve with its latest value. A provider without five-hour points, like Copilot, shows one curve in the unit of its budget, coloured by the day colour, with the budget as a line. For today the curves run on to the current time.
+
+## Month chart
+
+Below the calendar grid, each provider with a budget has a month chart: the cumulative usage of the month as a line against the cumulative budget, a straight line from 0 to the monthly budget at the end of the month. A day without data adds nothing and leaves a gap in the line. For the current month a dashed line continues from the last usage point to the projected month end (the month projection described under [Calendar](#calendar)). The usage line and the projection take the colour of the projection; a past month shows no projection.
+
+## Year view
+
+"Year" in the calendar header opens the year view at `/year/<year>`. It has one panel per provider with a bar for each month, January to December. A bar's height is the month's usage against its monthly budget; the budget mark sits at 100 % and a bar is full at 150 %. The bar's colour follows the same limits as the calendar (green below 80 %, yellow up to and including 100 %, red above), months without data are empty, and the percentage and the month name are written under the bar. A click on a bar opens that month in the calendar. Previous year, "This year" and Next year move between years; "Calendar" returns to the month. The view is read through the `year` command of the app.
 
 ## Tray
 
@@ -102,6 +118,14 @@ If the tray icon cannot be created (for example on Linux without an AppIndicator
 ## Unavailable providers
 
 The app shows the same document as `tamias today --json`. A provider that is `unavailable` has no windows, no calendar chips and a grey tray (when all are unavailable). For Copilot that is: `copilot = false` in `config.toml` (old data is ignored), `auto` without a `gh` executable (not set up), and a seat without a countable monthly quota (`no premium quota` for a free seat, `unlimited`), as recorded by the last `tamias collect`. An error recorded after that makes it `stale` instead. With `gh` installed but logged out, Copilot is `stale` (never collected), not unavailable. See [Copilot](./installation.md#copilot).
+
+## Updates
+
+The status bar has "Check for updates", "Update to vX.Y.Z" and an "Auto-update" switch. The app asks `https://github.com/GravionLabs/tamias/releases/latest/download/latest.json` (written by the release workflow) for a newer version. With the switch on (the default, remembered across restarts) it checks once at start; it never installs without you: when a newer release exists the button reads "Update to vX.Y.Z", and clicking it downloads the bundle, checks its minisign signature against the public key in `tauri.conf.json`, installs it and restarts the app. Turn the switch off to check only with "Check for updates".
+
+A failure (offline, GitHub unreachable, a signature that does not match) shows a message in the status bar ("Update check failed: ..." or "Update failed: ...") and changes nothing: the app keeps running and you can check again. The update signature protects the download; it is not the operating system's code signature.
+
+Because the app is not signed or notarised, an updated macOS app is quarantined again: after every update run `xattr -cr /Applications/tamias.app` once (and start it again if macOS refuses). The maintainers sign the bundles with the secret `TAURI_SIGNING_PRIVATE_KEY` of the repository (empty password); the matching public key is in `tauri.conf.json`.
 
 ## Start at login
 

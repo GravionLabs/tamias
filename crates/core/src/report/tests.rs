@@ -3,7 +3,7 @@ use jiff::tz::TimeZone;
 
 use super::{
     DayEntry, Provider, Report, SCHEMA_VERSION, Stale, Status, month, provider, read, stale,
-    unavailable,
+    unavailable, year,
 };
 use crate::budget::{Colour, Thresholds};
 use crate::snapshot::{self, Snapshot, Source, Unit, Window};
@@ -634,4 +634,128 @@ fn month_usage_is_absent_for_informational_windows() {
     );
     let five = p.windows.iter().find(|w| w.window == Window::FiveHour);
     assert_eq!(five.unwrap().month_usage, None);
+}
+
+fn year_of(snaps: &[Snapshot], y: i16, now: &str) -> Vec<super::MonthEntry> {
+    let (_dir, store) = month_store(snaps);
+    year(
+        &store,
+        snapshot::Provider::Claude,
+        y,
+        &TimeZone::UTC,
+        &Thresholds::default(),
+        ts(now),
+    )
+    .unwrap()
+}
+
+fn seven_day(used: f64, observed: &str) -> Snapshot {
+    snap(
+        snapshot::Provider::Claude,
+        Window::SevenDay,
+        used,
+        "2026-12-30T12:00:00Z",
+        observed,
+    )
+}
+
+#[test]
+fn year_in_progress_sums_elapsed_days_and_marks_other_months_without_data() {
+    let snaps = [
+        seven_day(10.0, "2026-10-05T10:00:00Z"),
+        seven_day(20.0, "2026-10-20T10:00:00Z"),
+        seven_day(30.0, "2026-11-02T10:00:00Z"),
+    ];
+    let months = year_of(&snaps, 2026, "2026-11-03T10:00:00Z");
+    assert_eq!(months.len(), 12);
+    assert_eq!(
+        months.iter().map(|m| m.month).collect::<Vec<_>>(),
+        (1..=12).collect::<Vec<_>>()
+    );
+    let nov = months[10];
+    assert!(nov.has_data);
+    // Only Nov 1-3 count, not the 30 days of the month.
+    let days = month_of(&snaps, 2026, 11, "2026-11-03T10:00:00Z");
+    assert_eq!(days, ["2026-11-02", "2026-11-03"]);
+    assert!(nov.budget > 0.0);
+    assert!(nov.ratio.is_some());
+    for m in &months[11..] {
+        assert!(!m.has_data);
+        assert_eq!(
+            (m.usage, m.budget, m.ratio, m.colour),
+            (0.0, 0.0, None, Colour::Grey)
+        );
+    }
+}
+
+#[test]
+fn year_month_without_data_is_marked_and_grey() {
+    let months = year_of(
+        &[seven_day(10.0, "2026-10-05T10:00:00Z")],
+        2026,
+        "2026-11-03T10:00:00Z",
+    );
+    assert!(months[9].has_data);
+    assert!(!months[0].has_data);
+    assert_eq!(months[0].colour, Colour::Grey);
+    assert_eq!(months[0].ratio, None);
+}
+
+#[test]
+fn year_of_an_empty_store_has_twelve_months_without_data() {
+    let months = year_of(&[], 2026, "2026-11-03T10:00:00Z");
+    assert_eq!(months.len(), 12);
+    assert!(months.iter().all(|m| !m.has_data));
+}
+
+#[test]
+fn year_of_a_leap_year_budgets_29_days_of_february() {
+    let c = snapshot::Provider::Claude;
+    let snaps = [snap(
+        c,
+        Window::SevenDay,
+        10.0,
+        "2028-03-05T12:00:00Z",
+        "2028-02-01T01:00:00Z",
+    )];
+    let now = "2028-03-02T10:00:00Z";
+    let months = year_of(&snaps, 2028, now);
+    let days = month_of(&snaps, 2028, 2, now);
+    assert_eq!(days.len(), 29);
+    let feb = months[1];
+    assert!(feb.has_data);
+    let (_dir, store) = month_store(&snaps);
+    let entries = month(
+        &store,
+        c,
+        2028,
+        2,
+        &TimeZone::UTC,
+        &Thresholds::default(),
+        ts(now),
+    )
+    .unwrap();
+    assert_eq!(entries.len(), 29);
+    let expected: f64 = entries.iter().map(|d| d.budget).sum();
+    assert!((feb.budget - expected).abs() < 1e-9);
+}
+
+#[test]
+fn year_colours_follow_the_day_rule() {
+    // 10 % used in a 7-day window with a ~14 %/day budget: green; then far above: red.
+    let low = year_of(
+        &[seven_day(1.0, "2026-10-05T10:00:00Z")],
+        2026,
+        "2026-11-03T10:00:00Z",
+    );
+    assert_eq!(low[9].colour, Colour::Green);
+    let high = year_of(
+        &[
+            seven_day(0.0, "2026-10-05T00:30:00Z"),
+            seven_day(100.0, "2026-10-05T10:00:00Z"),
+        ],
+        2026,
+        "2026-11-03T10:00:00Z",
+    );
+    assert_eq!(high[9].colour, Colour::Red);
 }

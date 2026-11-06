@@ -59,6 +59,16 @@ const CLAUDE: ProviderDay = {
   five_hour: { used: 30, limit: 100, colour: "green" },
 };
 
+const COPILOT_OK: ProviderDay = {
+  provider: "copilot",
+  status: "ok",
+  unit: "requests",
+  points: [{ at: at(6), usage: 5 }],
+  usage: 5,
+  budget: 10,
+  colour: "green",
+};
+
 const COPILOT_UNAVAILABLE: ProviderDay = {
   provider: "copilot",
   status: "unavailable",
@@ -122,18 +132,100 @@ describe("Day", () => {
     expect(budget?.getAttribute("x1")).toBe("48");
     expect(budget?.getAttribute("x2")).toBe("468");
     expect(claude.querySelector("[data-testid=summary]")?.textContent).toContain("6% of 10%");
-    expect(claude.querySelector("[data-testid=five-hour]")?.textContent).toBe(
-      "5-hour window: 30% of 100%",
-    );
+    expect(claude.querySelector("[data-testid=five-hour]")).toBeNull();
     expect(claude.querySelector("[data-testid=empty]")).toBeNull();
   });
 
-  it("colours the line like the day", async () => {
-    const red: ProviderDay = { ...CLAUDE, colour: "red" };
-    const { el } = await mount((d) => day(d, red, COPILOT_UNAVAILABLE));
+  it("colours a single curve like the day", async () => {
+    const red: ProviderDay = { ...COPILOT_OK, colour: "red" };
+    const { el } = await mount((d) => day(d, CLAUDE, red));
     expect(
-      panel(el, "claude").querySelector("[data-testid=usage-line]")?.getAttribute("class"),
+      panel(el, "copilot").querySelector("[data-testid=usage-line]")?.getAttribute("class"),
     ).toContain("colour-red");
+    expect(panel(el, "copilot").querySelector("[data-testid=five-hour-line]")).toBeNull();
+  });
+
+  describe("two curves", () => {
+    const WITH_WINDOW: ProviderDay = {
+      ...CLAUDE,
+      five_hour_points: [
+        { at: at(0), used: 0, limit: 100 },
+        { at: at(6), used: 50, limit: 100 },
+        { at: at(7), used: 0, limit: 100 },
+      ],
+    };
+
+    it("scales the day to the budget and the window to its limit on one percent axis", async () => {
+      const { el } = await mount((d) => day(d, WITH_WINDOW, COPILOT_UNAVAILABLE));
+      const claude = panel(el, "claude");
+      // Day: 0, 2, 6 of 10 -> 0, 20, 60 %; axis top 100 %: y = 232 - 2.2 * percent.
+      expect(claude.querySelector("[data-testid=usage-line]")?.getAttribute("d")).toBe(
+        "M48 232 H153 V188 H258 V100",
+      );
+      // Window: 0, 50, 0 % at 00:00, 06:00, 07:00; the drop is a reset.
+      expect(claude.querySelector("[data-testid=five-hour-line]")?.getAttribute("d")).toBe(
+        "M48 232 H153 V122 H170.5 V232 H258",
+      );
+      // Budget at 100 %, the axis top.
+      expect(claude.querySelector("[data-testid=budget-line]")?.getAttribute("y1")).toBe("12");
+      expect(claude.querySelectorAll("[data-testid=chart]").length).toBe(1);
+    });
+
+    it("names the curves in the legend with their value and drops the old text line", async () => {
+      const { el } = await mount((d) => day(d, WITH_WINDOW, COPILOT_UNAVAILABLE));
+      const claude = panel(el, "claude");
+      expect(claude.querySelector("[data-testid=legend-day]")?.textContent).toBe(
+        "Day vs budget 60%",
+      );
+      expect(claude.querySelector("[data-testid=legend-five-hour]")?.textContent).toBe(
+        "5-hour window 0%",
+      );
+      expect(claude.querySelector("[data-testid=five-hour]")).toBeNull();
+      expect(claude.querySelector("[data-testid=summary]")?.textContent).toContain("6% of 10%");
+    });
+
+    it("shows the last drawn point of the 5-hour curve, not the current level, on a past day", async () => {
+      const past: ProviderDay = {
+        ...CLAUDE,
+        five_hour: { used: 90, limit: 100, colour: "red" },
+        five_hour_points: [
+          { at: at(0), used: 10, limit: 100 },
+          { at: at(6), used: 40, limit: 200 },
+        ],
+      };
+      const { el } = await mount((d) => day(d, past, COPILOT_UNAVAILABLE));
+      expect(panel(el, "claude").querySelector("[data-testid=legend-five-hour]")?.textContent).toBe(
+        "5-hour window 20%",
+      );
+    });
+
+    it("gives the curves different theme colours", async () => {
+      const { el } = await mount((d) => day(d, WITH_WINDOW, COPILOT_UNAVAILABLE));
+      const claude = panel(el, "claude");
+      const dayClass = claude.querySelector("[data-testid=usage-line]")?.getAttribute("class");
+      const windowClass = claude
+        .querySelector("[data-testid=five-hour-line]")
+        ?.getAttribute("class");
+      expect(dayClass).toContain("curve-day");
+      expect(windowClass).toContain("curve-five-hour");
+      const css = readFileSync("src/app/day/day.css", "utf8");
+      expect(css).toMatch(/path\.curve-day\s*{\s*stroke: var\(--h-blue-500\);/);
+      expect(css).toMatch(/path\.curve-five-hour\s*{\s*stroke: var\(--h-orange-500\);/);
+    });
+
+    it("draws only the day curve against the budget on a day without five-hour points", async () => {
+      const none: ProviderDay = { ...CLAUDE, five_hour_points: [] };
+      const { el } = await mount((d) => day(d, none, COPILOT_UNAVAILABLE));
+      const claude = panel(el, "claude");
+      expect(claude.querySelector("[data-testid=five-hour-line]")).toBeNull();
+      expect(claude.querySelector("[data-testid=legend-five-hour]")).toBeNull();
+      expect(claude.querySelector("[data-testid=legend-day]")?.textContent).toBe(
+        "Day vs budget 60%",
+      );
+      expect(claude.querySelector("[data-testid=usage-line]")?.getAttribute("d")).toBe(
+        "M48 232 H153 V188 H258 V100",
+      );
+    });
   });
 
   it("shows both providers side by side, the unavailable one as an empty state with the reason", async () => {

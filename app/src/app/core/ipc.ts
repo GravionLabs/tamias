@@ -1,7 +1,7 @@
 import { Injectable } from "@angular/core";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { DayReport, MonthReport, Report } from "./report";
+import type { DayReport, MonthReport, Report, YearReport } from "./report";
 import type { WeekStartSetting } from "./week-start";
 
 /** Stops a listener registered with `Ipc.listen`. */
@@ -24,6 +24,11 @@ export abstract class Ipc {
     return this.invoke<MonthReport>("month", { year, month });
   }
 
+  /** The twelve months of `year` of every provider, with usage against the budget. */
+  year(year: number): Promise<YearReport> {
+    return this.invoke<YearReport>("year", { year });
+  }
+
   /** `week_start` of `config.toml`: `monday`, `sunday`, `saturday` or `locale`. */
   weekStart(): Promise<WeekStartSetting> {
     return this.invoke<WeekStartSetting>("week_start");
@@ -32,6 +37,16 @@ export abstract class Ipc {
   /** The intraday curve of the local day `date` (`YYYY-MM-DD`) of every provider. */
   day(date: string): Promise<DayReport> {
     return this.invoke<DayReport>("day", { date });
+  }
+
+  /** The installed version of the app (`getVersion()` of the Tauri app API, capability `app:allow-version`). */
+  appVersion(): Promise<string> {
+    return this.invoke<string>("plugin:app|version");
+  }
+
+  /** Zooms the web content of the main window (`1` is 100 %; webview zoom, capability `core:webview:allow-set-webview-zoom`). */
+  async setZoom(factor: number): Promise<void> {
+    await this.invoke<void>("plugin:webview|set_webview_zoom", { label: "main", value: factor });
   }
 
   /** Whether the OS has the autostart entry (the autostart plugin's `isEnabled`). */

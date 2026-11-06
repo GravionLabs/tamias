@@ -456,5 +456,74 @@ pub fn month(
     Ok(days)
 }
 
+/// Usage against the budget of one calendar month, one entry of [`year`].
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct MonthEntry {
+    /// Month 1-12.
+    pub month: i8,
+    /// Whether any day of the month has data; when `false`, `usage` and `budget` are 0, `ratio`
+    /// is absent and `colour` is `grey`.
+    pub has_data: bool,
+    /// Sum of the usage of the days with data, in the unit of the binding window.
+    pub usage: f64,
+    /// Sum of the budgets of the same days (the elapsed days of a running month).
+    pub budget: f64,
+    /// `usage / budget`; absent when the budget is 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ratio: Option<f64>,
+    /// Colour of the month against `thresholds`, by the rule of a day; `grey` without data.
+    pub colour: Colour,
+}
+
+/// The twelve months of `year` (local, in `tz`) of `provider`, each summed from [`month`] up to
+/// the local day of `now`. A month without any day of data (also a future month) has
+/// `has_data: false`.
+///
+/// # Errors
+///
+/// Store errors.
+pub fn year(
+    store: &Store,
+    provider: snapshot::Provider,
+    year: i16,
+    tz: &TimeZone,
+    thresholds: &Thresholds,
+    now: Timestamp,
+) -> store::Result<Vec<MonthEntry>> {
+    let mut months = Vec::with_capacity(12);
+    for m in 1..=12_i8 {
+        let days = month(store, provider, year, m, tz, thresholds, now)?;
+        if days.is_empty() {
+            months.push(MonthEntry {
+                month: m,
+                has_data: false,
+                usage: 0.0,
+                budget: 0.0,
+                ratio: None,
+                colour: Colour::Grey,
+            });
+            continue;
+        }
+        let usage: f64 = days.iter().map(|d| d.usage).sum();
+        let budget: f64 = days.iter().map(|d| d.budget).sum();
+        let ratio = (budget > 0.0).then(|| usage / budget);
+        let colour = match ratio {
+            Some(r) => thresholds.colour(r),
+            None if usage > 0.0 => Colour::Red,
+            None => Colour::Green,
+        };
+        months.push(MonthEntry {
+            month: m,
+            has_data: true,
+            usage,
+            budget,
+            ratio,
+            colour,
+        });
+    }
+    Ok(months)
+}
+
 #[cfg(test)]
 mod tests;

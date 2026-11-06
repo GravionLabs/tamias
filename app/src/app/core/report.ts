@@ -89,6 +89,38 @@ export interface MonthReport {
   providers: ProviderMonth[];
 }
 
+/** One calendar month of a binding window, an entry of `YearReport` (`MonthEntry` in `tamias_core::report`). */
+export interface MonthEntry {
+  /** 1-12. */
+  month: number;
+  /** `false` for a month without any day of data (also a future month): the numbers are 0 and `colour` is `grey`. */
+  has_data: boolean;
+  usage: number;
+  /** Sum of the budgets of the elapsed days with data. */
+  budget: number;
+  /** `usage / budget`, absent when the budget is 0. */
+  ratio?: number;
+  colour: Colour;
+}
+
+export interface ProviderYear {
+  provider: ProviderName;
+  status: Status;
+  /** Last successful collect of a stale provider; absent when it never succeeded. */
+  stale_since?: Timestamp;
+  /** Unit of the months' `usage` and `budget`. */
+  unit: Unit;
+  /** The months 1-12 in order; empty for an unavailable provider. */
+  months: MonthEntry[];
+}
+
+/** The answer of the `year` command (`YearReport` in `app/src-tauri/src/year.rs`). */
+export interface YearReport {
+  year: number;
+  generated_at: Timestamp;
+  providers: ProviderYear[];
+}
+
 /** One point of the intraday curve: the usage of the day up to `at`, in the provider's unit. */
 export interface CurvePoint {
   at: Timestamp;
@@ -117,6 +149,15 @@ export interface ProviderDay {
   colour?: Colour;
   /** Current level, Claude only. */
   five_hour?: FiveHourLevel;
+  /** Fill of the five-hour window over the day, oldest first; Claude only. */
+  five_hour_points?: FiveHourPoint[];
+}
+
+/** One snapshot of the five-hour window; a reset shows as a drop. */
+export interface FiveHourPoint {
+  at: Timestamp;
+  used: number;
+  limit: number;
 }
 
 /** The answer of the `day` command (`DayReport` in `app/src-tauri/src/day.rs`). */

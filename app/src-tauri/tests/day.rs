@@ -141,3 +141,51 @@ fn a_future_day_has_no_points_and_no_error() {
     let report = read(&dir.path().join(DATABASE_FILE), "2099-01-01").unwrap();
     assert!(report.providers.iter().all(|p| p.points.is_empty()));
 }
+
+#[test]
+fn day_has_the_five_hour_curve_for_claude_only_and_nothing_after_now() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = database(
+        &dir,
+        &[
+            snap(Window::SevenDay, 50.0, "2026-11-03T06:00:00Z"),
+            snap(Window::FiveHour, 80.0, "2026-11-03T04:00:00Z"),
+            snap(Window::FiveHour, 10.0, "2026-11-03T09:00:00Z"),
+            snap(Window::FiveHour, 99.0, "2026-11-03T12:00:00Z"), // after now
+        ],
+    );
+    let report = read(&path, "2026-11-03").unwrap();
+    let points = report.providers[0].five_hour_points.as_ref().unwrap();
+    let used: Vec<f64> = points.iter().map(|p| p.used).collect();
+    assert_eq!(used, [80.0, 10.0]);
+    assert!(report.providers[1].five_hour_points.is_none());
+
+    let json = serde_json::to_value(&report).unwrap();
+    assert_eq!(json["providers"][0]["five_hour_points"][1]["limit"], 100.0);
+    assert!(json["providers"][1].get("five_hour_points").is_none());
+}
+
+#[test]
+fn day_report_is_schema_v1_json() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = database(
+        &dir,
+        &[
+            snap(Window::SevenDay, 50.0, "2026-11-03T06:00:00Z"),
+            snap(Window::SevenDay, 52.0, "2026-11-03T09:00:00Z"),
+            snap(Window::FiveHour, 30.0, "2026-11-03T09:00:00Z"),
+        ],
+    );
+    let json = serde_json::to_value(read(&path, "2026-11-03").unwrap()).unwrap();
+    let schema_path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/schema/day-v1.schema.json");
+    let schema: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(schema_path).unwrap()).unwrap();
+    let validator = jsonschema::draft202012::new(&schema).unwrap();
+    let errors: Vec<String> = validator
+        .iter_errors(&json)
+        .map(|e| e.to_string())
+        .collect();
+    assert!(errors.is_empty(), "{errors:#?}\n{json:#}");
+    assert_eq!(json["providers"][0]["five_hour_points"][0]["used"], 30.0);
+}

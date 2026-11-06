@@ -14,10 +14,10 @@
       {
         "label": "main",
         "title": "tamias",
-        "width": 820,
-        "height": 600,
-        "minWidth": 480,
-        "minHeight": 360,
+        "width": 960,
+        "height": 880,
+        "minWidth": 640,
+        "minHeight": 840,
         "visible": false
       },
       {
@@ -57,6 +57,7 @@
     "category": "Utility",
     "shortDescription": "Today's usage against the daily budget per provider",
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "externalBin": ["binaries/tamias"],
     "icon": [
       "icons/32x32.png",
@@ -66,5 +67,11 @@
       "icons/icon.ico",
       "icons/icon.png"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://github.com/GravionLabs/tamias/releases/latest/download/latest.json"],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZEQzA0ODg3RTA0NTQyMDgKUldRSVFrWGdoMGpBL1RZdmF3RHRqa0MzUkpVb3RTak5MaVkwMEVyeGN2TllUeDhUSC9tV3hRdmkK"
+    }
   }
 }
