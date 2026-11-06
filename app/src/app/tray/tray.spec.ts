@@ -6,14 +6,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Ipc, type Unlisten } from "../core/ipc";
 import { STORE_CHANGED } from "../core/store-events";
 import type { ProviderReport, Report, WindowReport } from "../core/report";
-import {
-  Tray,
-  barWidth,
-  providerNote,
-  todayBarWidth,
-  shownProviders,
-  projectionBarWidth,
-} from "./tray";
+import { barWidth, todayBarWidth, projectionBarWidth, WindowList } from "../core/window-list";
+import { Tray, providerNote, shownProviders } from "./tray";
 
 beforeAll(() => {
   getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
@@ -111,6 +105,13 @@ async function mount(answer: () => unknown) {
       templateUrl: undefined,
       styleUrl: undefined,
       template: readFileSync("src/app/tray/tray.html", "utf8"),
+    },
+  });
+  TestBed.overrideComponent(WindowList, {
+    set: {
+      templateUrl: undefined,
+      styleUrl: undefined,
+      template: readFileSync("src/app/core/window-list.html", "utf8"),
     },
   });
   const fixture = TestBed.createComponent(Tray);

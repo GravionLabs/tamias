@@ -1,0 +1,65 @@
+@for (w of windows; track w.window) {
+  <div class="window" [attr.data-window]="w.window" [attr.data-colour]="w.colour">
+    <div class="row">
+      <span class="label">{{ windowLabel(w.window) }}</span>
+      <span class="percent" data-testid="percent">{{ percent(w) }}%</span>
+    </div>
+    <div
+      class="track"
+      role="progressbar"
+      [attr.aria-label]="windowLabel(w.window)"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      [attr.aria-valuenow]="width(w)"
+    >
+      <div class="bar" [class]="'bar colour-' + w.colour" [style.width.%]="width(w)"></div>
+    </div>
+    @if (today(w) !== null) {
+      <div class="row today-row">
+        <span class="label">Today</span>
+        <span class="today-percent" data-testid="today">{{ today(w) }}%</span>
+      </div>
+      <div
+        class="track today-track"
+        role="progressbar"
+        aria-label="Today"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        [attr.aria-valuenow]="todayWidth(w)"
+      >
+        <div
+          class="bar"
+          data-testid="today-bar"
+          [class]="'bar colour-' + w.colour"
+          [style.width.%]="todayWidth(w)"
+        ></div>
+      </div>
+    }
+    @if (projection(w); as month) {
+      <div class="row today-row">
+        <span class="label">Month (projected)</span>
+        <span class="today-percent" data-testid="projection">{{ month.percent }}%</span>
+      </div>
+      <div
+        class="track today-track"
+        role="progressbar"
+        aria-label="Month (projected)"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        [attr.aria-valuenow]="projectionWidth(w)"
+      >
+        <div
+          class="bar"
+          data-testid="projection-bar"
+          [attr.data-colour]="projectionColour(month, w.colour)"
+          [class]="'bar colour-' + projectionColour(month, w.colour)"
+          [style.width.%]="projectionWidth(w)"
+        ></div>
+      </div>
+    }
+    <div class="detail">
+      <span data-testid="used">{{ usedOfText(w) }}</span>
+      <span data-testid="resets">{{ resets(w.resets_at) }}</span>
+    </div>
+  </div>
+}

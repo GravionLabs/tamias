@@ -1,6 +1,6 @@
 # Desktop app
 
-The desktop app shows the same numbers as `tamias today`: a month calendar with each day coloured by the daily budget, a day view with the usage over the day, a year view with a bar per month, and a tray icon with the traffic light. It only reads. Collection stays the scheduled `tamias collect` of the CLI, which the app can set up for you ([Installation](./installation.md#scheduled-collection)).
+The desktop app shows the same numbers as `tamias today`: a month calendar with each day coloured by the daily budget, a day view with the usage of the day and the windows, a year view with a bar per month, and a tray icon with the traffic light. It only reads. Collection stays the scheduled `tamias collect` of the CLI, which the app can set up for you ([Installation](./installation.md#scheduled-collection)).
 
 ## Download
 
@@ -78,13 +78,11 @@ The sizes were measured, not guessed: the calendar content is 783 px high at zoo
 
 ## Day view
 
-![The day view: usage over the day against the budget line, for Claude and Copilot](/screenshots/day-light.png){.screenshot .light-only}
+![The day view: the usage of the day and the windows, for Claude and Copilot](/screenshots/day-light.png){.screenshot .light-only}
 
-![The day view: usage over the day against the budget line, for Claude and Copilot](/screenshots/day-dark.png){.screenshot .dark-only}
+![The day view: the usage of the day and the windows, for Claude and Copilot](/screenshots/day-dark.png){.screenshot .dark-only}
 
-The day view shows, per provider, the usage over the local day as a step line (midnight to midnight, 23 or 25 hours on a daylight saving change) against the day's budget. Next to the chart the usage of the day is written out as "usage of budget"; a day without a budget says "No budget for this day.". The view reloads on every change of the store, like the calendar.
-
-Claude has two curves, both in percent: "Day vs budget" is the usage of the day against the day's budget, with the budget line at 100 %, and "5-hour window" is the usage of the 5-hour window against its limit (the `five_hour_points` of the `day` report). The legend names each curve with its latest value. A provider without five-hour points, like Copilot, shows one curve in the unit of its budget, coloured by the day colour, with the budget as a line. For today the curves run on to the current time.
+The day view shows, per provider, the usage of the local day written out as "usage of budget" (a day without a budget says "No budget for this day.", a day without data says why) and below it the windows exactly as the tray card shows them: per window the label and the percentage, the progress bar, the "Today" and "Month (projected)" rows where the window has a budget, `x of y used` and `resets …`. The windows are the current ones of `tamias today`, whatever day is open; if that report cannot be read, the day is shown without them. A stale provider says since when. The view reloads on every change of the store, like the calendar.
 
 ## Month chart
 
