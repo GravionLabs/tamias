@@ -4025,7 +4025,7 @@ dependencies = [
 
 [[package]]
 name = "tamias"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -4044,7 +4044,7 @@ dependencies = [
 
 [[package]]
 name = "tamias-app"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "jiff",
  "jsonschema",
@@ -4064,7 +4064,7 @@ dependencies = [
 
 [[package]]
 name = "tamias-core"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "directories",
  "jiff",
