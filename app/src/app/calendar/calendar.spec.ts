@@ -595,3 +595,31 @@ describe("Calendar month projection", () => {
     expect(lines(noBudget.el)).toEqual([]);
   });
 });
+
+describe("Calendar month chart", () => {
+  const charts = (el: HTMLElement) => [...el.querySelectorAll("[data-testid=month-chart]")];
+
+  it("shows a chart per provider with data, with usage, budget and projection lines", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE, COPILOT_UNAVAILABLE));
+    const found = charts(el);
+    expect(found.map((c) => c.getAttribute("data-provider"))).toEqual(["claude"]);
+    expect(found[0]!.querySelector("[data-testid=budget-line]")).not.toBeNull();
+    expect(found[0]!.querySelector("[data-testid=usage-line]")!.getAttribute("class")).toContain(
+      "colour-yellow",
+    );
+    expect(found[0]!.querySelector("[data-testid=projection-line]")).not.toBeNull();
+  });
+
+  it("shows no projection line for a past month and no chart for a future one", async () => {
+    const october: ProviderMonth = {
+      ...CLAUDE,
+      days: [{ date: "2026-10-31", usage: 62, budget: 10, ratio: 6.2, colour: "red" }],
+    };
+    const past = await mount((y, m) => month(y, m, october), { month: "2026-10" });
+    expect(charts(past.el)).toHaveLength(1);
+    expect(past.el.querySelector("[data-testid=projection-line]")).toBeNull();
+    TestBed.resetTestingModule();
+    const future = await mount((y, m) => month(y, m, CLAUDE), { month: "2026-12" });
+    expect(charts(future.el)).toHaveLength(1);
+  });
+});

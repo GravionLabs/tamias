@@ -26,6 +26,7 @@ import {
 } from "../core/report";
 import { daysInMonth, isoDate, leadingBlanks, shiftMonth, type FirstDay } from "./grid";
 import { WeekStart } from "../core/week-start";
+import { HEIGHT, WIDTH, buildMonthChart, type MonthChart } from "./month-chart";
 
 /** First day of the week; defaults to `week_start` of `config.toml`, tests provide a fixed one. */
 export const FIRST_DAY = new InjectionToken<FirstDay>("FIRST_DAY", {
@@ -58,6 +59,13 @@ interface Cell {
   chips: Chip[];
   /** "stale since 09:00" on today's cell when a provider is stale. */
   stale: string | null;
+}
+
+/** The month chart of one provider below the grid. */
+interface MonthChartPanel {
+  provider: ProviderName;
+  name: string;
+  chart: MonthChart;
 }
 
 /** A provider's month line below the header: the projection of the current month, the final usage of a past one. */
@@ -177,6 +185,26 @@ export class Calendar {
       });
     }
     return lines;
+  });
+
+  protected readonly chartWidth = WIDTH;
+  protected readonly chartHeight = HEIGHT;
+
+  /** Per provider with data and a budget the month chart: cumulative usage against budget and the projection. */
+  protected readonly monthCharts = computed<MonthChartPanel[]>(() => {
+    const year = this.year();
+    const month = this.month();
+    const report = this.report();
+    const now = this.now();
+    if (!report || report.year !== year || report.month !== month) return [];
+    const days = daysInMonth(year, month);
+    const current = this.isCurrentMonth();
+    const panels: MonthChartPanel[] = [];
+    for (const p of report.providers) {
+      const chart = buildMonthChart(year, month, days, p, current, now.getDate());
+      if (chart) panels.push({ provider: p.provider, name: providerLabel(p.provider), chart });
+    }
+    return panels;
   });
 
   /**
