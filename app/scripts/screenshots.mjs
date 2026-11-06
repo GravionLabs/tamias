@@ -75,7 +75,60 @@ const answers = {
   },
   autostart_available: true,
   "plugin:autostart|is_enabled": false,
-  today: { schema_version: 1, generated_at: NOW, providers: [] },
+  "plugin:app|version": "0.7.1",
+  today: {
+    schema_version: 1,
+    generated_at: NOW,
+    providers: [
+      {
+        provider: "claude",
+        status: "ok",
+        windows: [
+          {
+            window: "seven_day",
+            binding: true,
+            unit: "percent",
+            used: 54,
+            limit: 100,
+            resets_at: "2026-11-21T12:00:00Z",
+            colour: "yellow",
+            today_usage: 8.6,
+            budget: 10,
+            ratio: 0.86,
+            month_usage: 61,
+          },
+          {
+            window: "five_hour",
+            binding: false,
+            unit: "percent",
+            used: 18,
+            limit: 100,
+            resets_at: "2026-11-18T17:30:00Z",
+            colour: "green",
+          },
+        ],
+      },
+      {
+        provider: "copilot",
+        status: "ok",
+        windows: [
+          {
+            window: "monthly",
+            binding: true,
+            unit: "requests",
+            used: 489,
+            limit: 2380,
+            resets_at: "2026-12-01T00:00:00Z",
+            colour: "green",
+            today_usage: 6,
+            budget: 10,
+            ratio: 0.6,
+            month_usage: 160,
+          },
+        ],
+      },
+    ],
+  },
   month: {
     year: 2026,
     month: 11,
@@ -138,7 +191,7 @@ for (const scheme of ["light", "dark"]) {
     ["day", `#/day/${DAY}`],
   ]) {
     await page.goto(base + hash);
-    await page.waitForSelector(name === "calendar" ? "[data-colour]" : "[data-testid=chart]");
+    await page.waitForSelector(name === "calendar" ? "[data-colour]" : "[data-testid=panel] app-window-list");
     await page.waitForTimeout(500);
     await page.screenshot({ path: join(out, `${name}-${scheme}.png`) });
   }

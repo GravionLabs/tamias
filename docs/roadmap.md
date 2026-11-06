@@ -68,7 +68,7 @@ Goal: a window that fits the calendar with a status bar (version, zoom, auto-upd
 
 ## M6 – Usage history charts
 
-Goal: the [#164](https://github.com/GravionLabs/tamias/issues/164) Feature: one day chart with the daily budget and the 5-hour curve, a month chart with the projection and a year view with a bar per month; see the [app page](./app.md#day-view). Open; no tag yet.
+Goal: the [#164](https://github.com/GravionLabs/tamias/issues/164) Feature: a month chart with the cumulative usage, the budget line and the projection, the window list of the tray card in the day view (the day chart was dropped) and a year view with a bar per month; see the [app page](./app.md#day-view). Open; no tag yet.
 
 ## Consumers in other repositories
 
