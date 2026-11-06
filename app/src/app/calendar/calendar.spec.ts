@@ -622,4 +622,11 @@ describe("Calendar month chart", () => {
     const future = await mount((y, m) => month(y, m, CLAUDE), { month: "2026-12" });
     expect(charts(future.el)).toHaveLength(0);
   });
+
+  it("links the header to the year view of the shown month", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE), { month: "2025-03" });
+    const link = el.querySelector<HTMLAnchorElement>("[data-testid=year-link]")!;
+    expect(link.getAttribute("href")).toBe("/year/2025");
+    expect(link.textContent).toContain("2025");
+  });
 });

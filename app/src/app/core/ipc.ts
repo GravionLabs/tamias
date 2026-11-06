@@ -1,7 +1,7 @@
 import { Injectable } from "@angular/core";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { DayReport, MonthReport, Report } from "./report";
+import type { DayReport, MonthReport, Report, YearReport } from "./report";
 import type { WeekStartSetting } from "./week-start";
 
 /** Stops a listener registered with `Ipc.listen`. */
@@ -22,6 +22,11 @@ export abstract class Ipc {
   /** The days of `month` (1-12) of `year` of every provider, with usage against the budget. */
   month(year: number, month: number): Promise<MonthReport> {
     return this.invoke<MonthReport>("month", { year, month });
+  }
+
+  /** The twelve months of `year` of every provider, with usage against the budget. */
+  year(year: number): Promise<YearReport> {
+    return this.invoke<YearReport>("year", { year });
   }
 
   /** `week_start` of `config.toml`: `monday`, `sunday`, `saturday` or `locale`. */

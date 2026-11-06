@@ -1,0 +1,144 @@
+:host {
+  display: block;
+  padding: 24px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  min-width: 5rem;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.muted {
+  color: var(--h-text-muted-color);
+  margin-left: auto;
+}
+
+.panel h2 {
+  margin: 20px 0 8px;
+  font-size: 1rem;
+}
+
+.stale {
+  font-style: italic;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--h-text-muted-color);
+  margin-left: 8px;
+}
+
+.bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.bar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--h-text-color);
+  text-decoration: none;
+  text-align: center;
+}
+
+.bar:hover {
+  background: var(--h-content-hover-background);
+  border-color: var(--h-content-border-color);
+}
+
+.bar:focus-visible {
+  outline: 2px solid var(--h-focus-ring-color);
+  outline-offset: 2px;
+}
+
+.track {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  height: 140px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--h-content-background), transparent 55%);
+  border: 1px solid color-mix(in srgb, var(--h-content-border-color), transparent 55%);
+  overflow: hidden;
+}
+
+.bar.empty .track {
+  border-style: dashed;
+}
+
+.fill {
+  width: 100%;
+}
+
+/* The budget: a dashed line at 100 % of the monthly budget. */
+.budget {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  border-top: 1.5px dashed var(--h-text-color);
+}
+
+.colour-green {
+  background: var(--h-green-500);
+}
+
+.colour-yellow {
+  background: var(--h-yellow-500);
+}
+
+.colour-red {
+  background: var(--h-red-500);
+}
+
+.colour-grey {
+  background: var(--h-surface-400);
+}
+
+.percent {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.bar.empty .percent,
+.bar.empty .label {
+  color: var(--h-text-muted-color);
+}
+
+.label {
+  font-size: 0.8rem;
+}
+
+.hint {
+  color: var(--h-text-muted-color);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

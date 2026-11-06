@@ -25,9 +25,12 @@ h1 {
   gap: 2px;
 }
 
+.year-link {
+  margin-left: auto;
+}
+
 .muted {
   color: var(--h-text-muted-color);
-  margin-left: auto;
 }
 
 .gear {

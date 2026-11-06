@@ -40,6 +40,9 @@
       </svg>
     </button>
   </nav>
+  <a class="year-link" data-testid="year-link" [routerLink]="['/year', year()]"
+    >Year {{ year() }}</a
+  >
   <a class="muted" routerLink="/today">Today overview</a>
   <a class="gear" routerLink="/settings" aria-label="Settings" title="Settings" data-testid="gear"
     >&#9881;</a
