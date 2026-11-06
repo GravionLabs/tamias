@@ -5,6 +5,38 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.0] — 2026-11-05
+
+### Bug Fixes
+- Calendar day card opens the day view on any click, smaller gap in the day view (#153)
+- Tray card rows alike, stays while the pointer is inside, no frame on Open tamias (#156) (#157)
+- **app**: Colour the month projection by its own ratio (#158)
+
+
+### Features
+- **app**: Month projection in the tray card and the calendar (#158) (#159)
+- **app**: Month projection in the tray card and the calendar (#158)
+
+
+## [0.5.0] — 2026-11-05
+
+### Bug Fixes
+- **app**: Tray card stays hidden after a click, show-calendar event, docs (#149)
+- Windows: setup prompt missing in the calendar view after start (#148) (#152)
+- **app**: Show the service status error in the calendar instead of an empty view
+- **app**: Never leave the calendar silently empty without data (#148)
+
+
+### Documentation
+- Update CHANGELOG.md for v0.5.0 [skip ci]
+
+
+### Features
+- **app**: Tray hover shows a compact usage card (#149) (#150)
+- **app**: Hovering the tray icon shows a compact usage card (#149)
+- **app**: Today row and restyled open button on the tray card (#149)
+
+
 ## [0.4.0] — 2026-11-05
 
 ### Bug Fixes
@@ -13,6 +45,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 - **site**: Drop roadmap and ADR links, add icon, calendar screenshots and CLI page (#142) (#146)
+- Update CHANGELOG.md for v0.4.0 [skip ci]
 
 
 ### Features
