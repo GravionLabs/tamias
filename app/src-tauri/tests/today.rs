@@ -282,7 +282,7 @@ fn claude_switched_off_is_unavailable_despite_data() {
     let report = read(&database, &config);
 
     assert_eq!(report.providers[0].status, Status::Unavailable);
-    assert!(report.providers[0].windows.is_empty());
+    assert_eq!(report.providers[0].windows, []);
 }
 
 #[test]

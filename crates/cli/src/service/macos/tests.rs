@@ -295,7 +295,7 @@ fn uninstall_removes_the_registration_and_the_plist_but_keeps_the_data() {
     f.agent.install(Path::new("/x/tamias")).unwrap();
     f.agent.uninstall().unwrap();
 
-    assert!(f.files().is_empty());
+    assert_eq!(f.files(), [] as [std::string::String; 0]);
     assert!(f.registered().is_empty());
     assert_eq!(
         fs::read_to_string(data.join("logs/collect.log")).unwrap(),
@@ -311,7 +311,7 @@ fn uninstall_removes_the_registration_and_the_plist_but_keeps_the_data() {
 fn uninstall_when_not_installed_is_ok_and_calls_no_bootout() {
     let f = Fixture::new();
     f.agent.uninstall().unwrap();
-    assert!(f.launchctl_calls().is_empty());
+    assert_eq!(f.launchctl_calls(), [] as [std::string::String; 0]);
 }
 
 #[test]

@@ -84,7 +84,7 @@ fn a_day_without_data_has_no_points() {
     );
     let report = read(&path, "2026-11-20").unwrap();
     let claude = &report.providers[0];
-    assert!(claude.points.is_empty());
+    assert_eq!(claude.points, []);
     assert_eq!(
         (claude.usage, claude.budget, claude.colour),
         (None, None, None)

@@ -176,7 +176,7 @@ fn no_column_holds_credentials() {
             .unwrap()
             .collect::<Result<_, _>>()
             .unwrap();
-        assert!(!columns.is_empty());
+        assert_ne!(columns.len(), 0);
         for column in columns {
             let lower = column.to_lowercase();
             for word in [
@@ -286,7 +286,7 @@ fn empty_insert_stores_nothing() {
     let (_dir, path) = temp_db();
     let mut store = Store::open(&path).unwrap();
     assert_eq!(store.insert_snapshots(&[]).unwrap(), 0);
-    assert!(all_claude_seven_day(&store).is_empty());
+    assert_eq!(all_claude_seven_day(&store).len(), 0);
 }
 
 #[test]
@@ -326,7 +326,7 @@ fn range_is_half_open_ordered_and_filtered_by_provider_and_window() {
             ts("2100-01-01T00:00:00Z"),
         )
         .unwrap();
-    assert!(none.is_empty());
+    assert_eq!(none.len(), 0);
 }
 
 #[test]
@@ -337,13 +337,14 @@ fn empty_or_inverted_range_returns_nothing() {
         .insert_snapshots(&[snapshot("2026-11-03T10:00:00Z", 1.0)])
         .unwrap();
     let at = ts("2026-11-03T10:00:00Z");
-    assert!(
+    assert_eq!(
         store
             .snapshots(Provider::Claude, Window::SevenDay, at, at)
             .unwrap()
-            .is_empty()
+            .len(),
+        0
     );
-    assert!(
+    assert_eq!(
         store
             .snapshots(
                 Provider::Claude,
@@ -352,7 +353,8 @@ fn empty_or_inverted_range_returns_nothing() {
                 at
             )
             .unwrap()
-            .is_empty()
+            .len(),
+        0
     );
 }
 
@@ -367,7 +369,7 @@ fn invalid_snapshot_fails_the_whole_batch() {
         ])
         .unwrap_err();
     assert!(matches!(err, Error::Sqlite(_)), "{err}");
-    assert!(all_claude_seven_day(&store).is_empty());
+    assert_eq!(all_claude_seven_day(&store).len(), 0);
 }
 
 #[test]
@@ -379,7 +381,7 @@ fn nan_usage_is_rejected() {
             .insert_snapshots(&[snapshot("2026-11-03T10:00:00Z", f64::NAN)])
             .is_err()
     );
-    assert!(all_claude_seven_day(&store).is_empty());
+    assert_eq!(all_claude_seven_day(&store).len(), 0);
 }
 
 #[test]
@@ -511,7 +513,7 @@ fn failed_run_leaves_neither_snapshots_nor_ok_time() {
         )
         .unwrap_err();
     assert!(matches!(err, Error::Sqlite(_)), "{err}");
-    assert!(all_claude_seven_day(&store).is_empty());
+    assert_eq!(all_claude_seven_day(&store).len(), 0);
     assert_eq!(
         store.status(Provider::Claude).unwrap().unwrap().last_ok_at,
         Some(before)
@@ -535,7 +537,7 @@ fn failed_run_on_a_busy_database_leaves_neither() {
     assert!(err.is_busy(), "{err}");
     blocker.execute_batch("ROLLBACK").unwrap();
 
-    assert!(all_claude_seven_day(&store).is_empty());
+    assert_eq!(all_claude_seven_day(&store).len(), 0);
     assert_eq!(store.status(Provider::Claude).unwrap(), None);
 }
 
@@ -582,7 +584,7 @@ fn read_only_cannot_write() {
         .insert_snapshots(&[snapshot("2026-11-03T10:00:00Z", 12.0)])
         .unwrap_err();
     assert!(matches!(err, Error::Sqlite(_)), "{err}");
-    assert!(all_claude_seven_day(&reader).is_empty());
+    assert_eq!(all_claude_seven_day(&reader).len(), 0);
 }
 
 #[test]
