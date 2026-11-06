@@ -178,10 +178,25 @@ describe("Day", () => {
         "Day vs budget 60%",
       );
       expect(claude.querySelector("[data-testid=legend-five-hour]")?.textContent).toBe(
-        "5-hour window 30%",
+        "5-hour window 0%",
       );
       expect(claude.querySelector("[data-testid=five-hour]")).toBeNull();
       expect(claude.querySelector("[data-testid=summary]")?.textContent).toContain("6% of 10%");
+    });
+
+    it("shows the last drawn point of the 5-hour curve, not the current level, on a past day", async () => {
+      const past: ProviderDay = {
+        ...CLAUDE,
+        five_hour: { used: 90, limit: 100, colour: "red" },
+        five_hour_points: [
+          { at: at(0), used: 10, limit: 100 },
+          { at: at(6), used: 40, limit: 200 },
+        ],
+      };
+      const { el } = await mount((d) => day(d, past, COPILOT_UNAVAILABLE));
+      expect(panel(el, "claude").querySelector("[data-testid=legend-five-hour]")?.textContent).toBe(
+        "5-hour window 20%",
+      );
     });
 
     it("gives the curves different theme colours", async () => {
