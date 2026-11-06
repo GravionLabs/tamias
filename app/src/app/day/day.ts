@@ -155,7 +155,7 @@ function legend(p: ProviderDay, withWindow: boolean): LegendEntry[] {
         : "",
   };
   if (!withWindow) return [day];
-  const level = p.five_hour;
+  const level = p.five_hour_points?.at(-1);
   return [
     day,
     {
