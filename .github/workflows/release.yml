@@ -73,5 +73,7 @@ jobs:
     permissions:
       contents: write # gh release upload of the archives
     uses: ./.github/workflows/release-binaries.yml
+    # TAURI_SIGNING_PRIVATE_KEY signs the app bundles for the updater (#163)
+    secrets: inherit
     with:
       tag: v${{ needs.release.outputs.version }}

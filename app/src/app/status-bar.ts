@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from "@angular/core";
+import { AutoUpdate } from "./core/auto-update";
 import { Ipc } from "./core/ipc";
 import { ZOOM_MAX, ZOOM_MIN, Zoom } from "./core/zoom";
 
@@ -7,7 +8,51 @@ import { ZOOM_MAX, ZOOM_MIN, Zoom } from "./core/zoom";
   selector: "app-status-bar",
   template: `
     <footer class="bar" data-testid="status-bar">
-      <span class="version" data-testid="version">{{ version() }}</span>
+      <span class="left">
+        <span class="version" data-testid="version">{{ version() }}</span>
+        <span class="update">
+          @switch (update.state().kind) {
+            @case ("checking") {
+              <span data-testid="update-status">Checking for updates...</span>
+            }
+            @case ("current") {
+              <span data-testid="update-status">Up to date</span>
+            }
+            @case ("installing") {
+              <span data-testid="update-status">Installing...</span>
+            }
+            @case ("error") {
+              <span class="error" role="alert" data-testid="update-error">{{
+                errorMessage()
+              }}</span>
+            }
+          }
+          @if (available(); as version) {
+            <button type="button" data-testid="update-install" (click)="update.install()">
+              Update to v{{ version }}
+            </button>
+          } @else {
+            <button
+              type="button"
+              data-testid="update-check"
+              [disabled]="busy()"
+              (click)="update.check()"
+            >
+              Check for updates
+            </button>
+          }
+          <label class="auto">
+            <input
+              type="checkbox"
+              role="switch"
+              data-testid="update-auto"
+              [checked]="update.auto()"
+              (change)="update.setAuto($any($event.target).checked)"
+            />
+            Auto-update
+          </label>
+        </span>
+      </span>
       <span class="zoom" role="group" aria-label="Zoom">
         <button
           type="button"
@@ -54,6 +99,21 @@ import { ZOOM_MAX, ZOOM_MIN, Zoom } from "./core/zoom";
       border-top: 1px solid var(--h-content-border-color);
       background: var(--h-content-background);
     }
+    .left,
+    .update {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .error {
+      color: var(--h-danger-color, #c0392b);
+    }
+    .auto {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
     .zoom {
       display: inline-flex;
       align-items: center;
@@ -85,6 +145,18 @@ import { ZOOM_MAX, ZOOM_MIN, Zoom } from "./core/zoom";
 export class StatusBar {
   private readonly ipc = inject(Ipc);
   protected readonly zoom = inject(Zoom);
+  protected readonly update = inject(AutoUpdate);
+  protected readonly available = computed(() => {
+    const state = this.update.state();
+    return state.kind === "available" ? state.version : null;
+  });
+  protected readonly busy = computed(() =>
+    ["checking", "installing"].includes(this.update.state().kind),
+  );
+  protected readonly errorMessage = computed(() => {
+    const state = this.update.state();
+    return state.kind === "error" ? state.message : "";
+  });
   protected readonly min = ZOOM_MIN;
   protected readonly max = ZOOM_MAX;
   /** Empty outside Tauri, where the version is unknown. */
@@ -92,6 +164,7 @@ export class StatusBar {
 
   constructor() {
     void this.zoom.restore();
+    void this.update.start();
     void this.readVersion();
   }
 

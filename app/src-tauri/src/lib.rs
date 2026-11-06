@@ -265,7 +265,13 @@ fn autostart_enable(app: tauri::AppHandle) -> Result<(), CommandError> {
 ///
 /// When the window cannot be created.
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Updates (#163): checked and installed from the status bar; desktop only.
+    #[cfg(desktop)]
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
+    builder
         // The entry starts the app with `--hidden`; the OS is the source of truth for whether it
         // exists, there is no own setting.
         .plugin(tauri_plugin_autostart::init(

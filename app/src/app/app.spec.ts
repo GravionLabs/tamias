@@ -4,6 +4,7 @@ import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-
 import { Router } from "@angular/router";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { App, SHOW_CALENDAR } from "./app";
+import { Updater } from "./core/updater";
 import { Ipc, type Unlisten } from "./core/ipc";
 
 beforeAll(() => {
@@ -34,6 +35,7 @@ async function shell(url: string, hash = "#/") {
   TestBed.configureTestingModule({
     providers: [
       { provide: Ipc, useValue: ipc },
+      { provide: Updater, useValue: { check: async () => null } },
       { provide: Router, useValue: { url, navigateByUrl: navigate } },
     ],
   });
