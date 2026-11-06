@@ -318,3 +318,21 @@ describe("Tray month projection", () => {
     expect(projectionBarWidth(w, new Date(2026, 10, 1))).toBe(100);
   });
 });
+
+describe("Tray popup height", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("reports the height of the loaded card without a resize notification", async () => {
+    // A hidden popup webview draws no frames, so its ResizeObserver stays silent (jsdom has none):
+    // the height has to be reported after the report has rendered, not only on a resize.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const height = 40 + 100 * this.querySelectorAll(".window").length;
+      return { height } as DOMRect;
+    });
+    const { ipc } = await mount(() => report(CLAUDE, COPILOT));
+    const heights = ipc.args.map((a) => (a as { height: number }).height);
+    expect(heights.at(-1)).toBe(340);
+  });
+});

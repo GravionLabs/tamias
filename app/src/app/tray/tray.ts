@@ -5,6 +5,7 @@ import {
   ElementRef,
   HostListener,
   afterNextRender,
+  afterRenderEffect,
   effect,
   inject,
   signal,
@@ -68,17 +69,24 @@ export class Tray {
       untracked(() => void this.load());
     });
 
-    // Sizes the popup window to the card after every change of its content.
-    afterNextRender(() => {
-      const element = this.host.nativeElement;
-      const fit = () => {
-        const height = Math.ceil(element.getBoundingClientRect().height);
-        if (height > 0 && height !== this.fitted) {
-          this.fitted = height;
-          this.ipc.fitTrayPopup(height).catch((e: unknown) => console.error("cannot fit", e));
-        }
-      };
+    // Sizes the popup window to the card. The ResizeObserver alone is not enough: a hidden popup
+    // webview draws no frames, so it stays silent while the report loads and the window keeps the
+    // height of the placeholder, clipping the rows below. The height is therefore also read after
+    // every render of the card.
+    const element = this.host.nativeElement;
+    const fit = () => {
+      const height = Math.ceil(element.getBoundingClientRect().height);
+      if (height > 0 && height !== this.fitted) {
+        this.fitted = height;
+        this.ipc.fitTrayPopup(height).catch((e: unknown) => console.error("cannot fit", e));
+      }
+    };
+    afterRenderEffect(() => {
+      this.report();
+      this.error();
       fit();
+    });
+    afterNextRender(() => {
       if (typeof ResizeObserver !== "undefined") {
         const observer = new ResizeObserver(fit);
         observer.observe(element);
