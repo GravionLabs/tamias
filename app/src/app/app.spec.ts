@@ -27,7 +27,8 @@ class EventIpc extends Ipc {
 
 const flush = () => new Promise((resolve) => setTimeout(resolve));
 
-async function shell(url: string) {
+async function shell(url: string, hash = "#/") {
+  window.location.hash = hash;
   const ipc = new EventIpc();
   const navigate = vi.fn().mockResolvedValue(true);
   TestBed.configureTestingModule({
@@ -49,9 +50,19 @@ describe("App", () => {
   });
 
   it("keeps the tray card on its own route", async () => {
-    const { ipc, navigate } = await shell("/tray");
+    const { ipc, navigate } = await shell("/tray", "#/tray");
     ipc.handlers.get(SHOW_CALENDAR)?.();
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("shows the status bar in the main window", async () => {
+    const { fixture } = await shell("/settings", "#/settings");
+    expect(fixture.nativeElement.querySelector('[data-testid="status-bar"]')).not.toBeNull();
+  });
+
+  it("shows no status bar in the tray popup", async () => {
+    const { fixture } = await shell("/tray", "#/tray");
+    expect(fixture.nativeElement.querySelector('[data-testid="status-bar"]')).toBeNull();
   });
 
   it("stops listening when destroyed", async () => {

@@ -14,10 +14,10 @@
       {
         "label": "main",
         "title": "tamias",
-        "width": 820,
-        "height": 600,
-        "minWidth": 480,
-        "minHeight": 360,
+        "width": 960,
+        "height": 880,
+        "minWidth": 640,
+        "minHeight": 840,
         "visible": false
       },
       {

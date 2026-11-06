@@ -39,6 +39,16 @@ export abstract class Ipc {
     return this.invoke<DayReport>("day", { date });
   }
 
+  /** The installed version of the app (`getVersion()` of the Tauri app API, capability `app:allow-version`). */
+  appVersion(): Promise<string> {
+    return this.invoke<string>("plugin:app|version");
+  }
+
+  /** Zooms the web content of the main window (`1` is 100 %; webview zoom, capability `core:webview:allow-set-webview-zoom`). */
+  async setZoom(factor: number): Promise<void> {
+    await this.invoke<void>("plugin:webview|set_webview_zoom", { label: "main", value: factor });
+  }
+
   /** Whether the OS has the autostart entry (the autostart plugin's `isEnabled`). */
   autostartEnabled(): Promise<boolean> {
     return this.invoke<boolean>("plugin:autostart|is_enabled");
