@@ -5,6 +5,8 @@
   "windows": ["main", "tray"],
   "permissions": [
     "core:default",
+    "core:app:allow-version",
+    "core:webview:allow-set-webview-zoom",
     "autostart:allow-disable",
     "autostart:allow-is-enabled"
   ]

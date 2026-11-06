@@ -70,6 +70,10 @@ The calendar refreshes when the collector writes new snapshots, so the app needs
 
 Click a day to open its day view, or "Year" for the year view. The "Today overview" link shows today's report of every provider.
 
+## Status bar and zoom
+
+The window opens at 960 x 880 and cannot get smaller than 640 x 840, so a whole month (header, projection chips, six week rows) is visible at 100 % without scrolling. The bar at the bottom of the window shows the installed version (for example `v0.6.0`) and the zoom: `−`, the percentage and `+`. The percentage is the zoom of the window, in steps of 10 % between 50 % and 200 %; click it to go back to 100 %. The zoom is remembered across restarts. At a high zoom the content scrolls above the bar. The tray card has no status bar.
+
 ## Day view
 
 ![The day view: usage over the day against the budget line, for Claude and Copilot](/screenshots/day-light.png){.screenshot .light-only}
