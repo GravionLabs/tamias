@@ -191,7 +191,9 @@ for (const scheme of ["light", "dark"]) {
     ["day", `#/day/${DAY}`],
   ]) {
     await page.goto(base + hash);
-    await page.waitForSelector(name === "calendar" ? "[data-colour]" : "[data-testid=panel] app-window-list");
+    await page.waitForSelector(
+      name === "calendar" ? "[data-colour]" : "[data-testid=panel] app-window-list",
+    );
     await page.waitForTimeout(500);
     await page.screenshot({ path: join(out, `${name}-${scheme}.png`) });
   }
