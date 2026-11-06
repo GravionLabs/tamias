@@ -401,7 +401,7 @@ echo "noise" >&2"#
             .trim()
             .parse()
             .unwrap();
-        let alive = std::process::Command::new("kill")
+        let alive = tamias_core::process::command("kill")
             .args(["-0", &pid.to_string()])
             .stderr(std::process::Stdio::null())
             .status()

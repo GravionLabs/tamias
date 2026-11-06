@@ -5,7 +5,7 @@
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{ExitStatus, Stdio};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -88,7 +88,7 @@ fn run_with_timeout(
         ))
     };
     let deadline = Instant::now() + timeout;
-    let mut child = Command::new(program)
+    let mut child = crate::process::command(program)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

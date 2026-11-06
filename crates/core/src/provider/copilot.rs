@@ -12,7 +12,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 use jiff::Timestamp;
@@ -337,7 +337,7 @@ impl TokenSource for GhTokenSource {
 }
 
 fn run_gh(gh: &Path, timeout: Duration) -> Result<GhToken> {
-    let mut child = Command::new(gh)
+    let mut child = crate::process::command(gh)
         .args(["auth", "token"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

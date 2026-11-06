@@ -3,8 +3,6 @@
 //!
 //! `cargo run -p tamias-core --example read_report`
 
-use std::process::Command;
-
 use tamias_core::report::Report;
 use tamias_core::snapshot::{Provider, Window};
 
@@ -23,7 +21,9 @@ fn claude_ratio(report: &Report) -> Option<f64> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // exit code 3 (a stale provider) still prints the document, so the status is not checked
-    let output = Command::new("tamias").args(["today", "--json"]).output()?;
+    let output = tamias_core::process::command("tamias")
+        .args(["today", "--json"])
+        .output()?;
     let report = Report::parse(&String::from_utf8(output.stdout)?)?;
     match claude_ratio(&report) {
         Some(ratio) => println!("Claude used {:.0} % of today's budget", ratio * 100.0),

@@ -6,6 +6,7 @@ pub mod budget;
 pub mod config;
 pub mod credentials;
 pub mod paths;
+pub mod process;
 pub mod provider;
 pub mod report;
 pub mod snapshot;
