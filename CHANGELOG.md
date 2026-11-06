@@ -5,6 +5,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.1] — 2026-11-06
+
+### Bug Fixes
+- **app**: Show the tray card overview in the day view instead of the chart (#185) (#190)
+- **app**: Report the tray card height after every render, not only on a resize (#186) (#191)
+- **collector**: Hide the console window of child processes on Windows (#187) (#192)
+
+
+### Documentation
+- Update CHANGELOG.md for v0.7.0 [skip ci] (#194)
+
+
 ## [0.7.0] — 2026-11-06
 
 ### Bug Fixes
@@ -16,6 +28,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ### Documentation
 - App page and roadmap for the history charts (#170) (#177)
 - Note how the window sizes were measured, label the zoom reset button (#162)
+- Update CHANGELOG.md for v0.7.0 [skip ci]
 
 
 ### Features
