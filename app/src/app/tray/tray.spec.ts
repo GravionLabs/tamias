@@ -6,14 +6,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Ipc, type Unlisten } from "../core/ipc";
 import { STORE_CHANGED } from "../core/store-events";
 import type { ProviderReport, Report, WindowReport } from "../core/report";
-import {
-  Tray,
-  barWidth,
-  providerNote,
-  todayBarWidth,
-  shownProviders,
-  projectionBarWidth,
-} from "./tray";
+import { barWidth, todayBarWidth, projectionBarWidth, WindowList } from "../core/window-list";
+import { Tray, providerNote, shownProviders } from "./tray";
 
 beforeAll(() => {
   getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
@@ -111,6 +105,13 @@ async function mount(answer: () => unknown) {
       templateUrl: undefined,
       styleUrl: undefined,
       template: readFileSync("src/app/tray/tray.html", "utf8"),
+    },
+  });
+  TestBed.overrideComponent(WindowList, {
+    set: {
+      templateUrl: undefined,
+      styleUrl: undefined,
+      template: readFileSync("src/app/core/window-list.html", "utf8"),
     },
   });
   const fixture = TestBed.createComponent(Tray);
@@ -315,5 +316,23 @@ describe("Tray month projection", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const w = { ...CLAUDE.windows[0], budget: 1, month_usage: 30 };
     expect(projectionBarWidth(w, new Date(2026, 10, 1))).toBe(100);
+  });
+});
+
+describe("Tray popup height", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("reports the height of the loaded card without a resize notification", async () => {
+    // A hidden popup webview draws no frames, so its ResizeObserver stays silent (jsdom has none):
+    // the height has to be reported after the report has rendered, not only on a resize.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const height = 40 + 100 * this.querySelectorAll(".window").length;
+      return { height } as DOMRect;
+    });
+    const { ipc } = await mount(() => report(CLAUDE, COPILOT));
+    const heights = ipc.args.map((a) => (a as { height: number }).height);
+    expect(heights.at(-1)).toBe(340);
   });
 });

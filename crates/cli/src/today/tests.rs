@@ -437,7 +437,10 @@ mod copilot {
             .unwrap();
         let today = setup.read();
         assert_eq!(copilot_status(&today), Status::Unavailable);
-        assert!(today.report.providers[1].windows.is_empty());
+        assert_eq!(
+            today.report.providers[1].windows,
+            [] as [tamias_core::report::Window; 0]
+        );
     }
 
     #[test]

@@ -62,7 +62,7 @@ fn month_returns_both_providers_with_copilot_unavailable() {
     assert!((today.usage - 4.0).abs() < 1e-9);
     assert_eq!(copilot.provider, Provider::Copilot);
     assert_eq!(copilot.status, Status::Unavailable);
-    assert!(copilot.days.is_empty());
+    assert_eq!(copilot.days, []);
 }
 
 #[test]

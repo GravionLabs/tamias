@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DayEntry, ProviderMonth } from "../core/report";
-import { buildMonthChart, cumulativeUsage } from "./month-chart";
+import { buildMonthChart, cumulativeUsage, niceMax } from "./month-chart";
 
 function entry(day: number, usage: number, budget = 10): DayEntry {
   const date = `2026-11-${String(day).padStart(2, "0")}`;
@@ -84,5 +84,17 @@ describe("buildMonthChart", () => {
     expect(
       buildMonthChart(2026, 11, 30, provider([entry(1, 2)], { status: "unavailable" }), true, 3),
     ).toBeNull();
+  });
+});
+
+describe("niceMax", () => {
+  it("rounds up to 1, 2, 2.5, 5 or 10 times a power of ten", () => {
+    expect(niceMax(0)).toBe(1);
+    expect(niceMax(-3)).toBe(1);
+    expect(niceMax(8.04)).toBe(10);
+    expect(niceMax(10)).toBe(10);
+    expect(niceMax(11.1)).toBe(20);
+    expect(niceMax(21)).toBe(25);
+    expect(niceMax(3)).toBe(5);
   });
 });

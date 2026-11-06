@@ -20,7 +20,7 @@ use std::io::{self, Read};
 #[cfg(unix)]
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::{Child, Command, ExitStatus, Stdio};
+use std::process::{Child, ExitStatus, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
@@ -212,13 +212,12 @@ impl Sidecar {
     fn spawn(&self, args: &[&str]) -> Result<Child, Error> {
         let mut attempt = 1;
         loop {
-            let mut command = Command::new(&self.path);
+            let mut command = tamias_core::process::command(&self.path);
             command
                 .args(args)
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped());
-            hide_console(&mut command);
             match command.spawn() {
                 Ok(child) => return Ok(child),
                 Err(e)
@@ -417,17 +416,6 @@ fn collect(rx: &Receiver<Vec<u8>>, deadline: Instant) -> String {
         .map(|buf| String::from_utf8_lossy(&buf).into_owned())
         .unwrap_or_default()
 }
-
-/// Windows: no console window flashes up for the sidecar of a windowed app.
-#[cfg(windows)]
-fn hide_console(command: &mut Command) {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    command.creation_flags(CREATE_NO_WINDOW);
-}
-
-#[cfg(not(windows))]
-fn hide_console(_command: &mut Command) {}
 
 /// Keeps install and uninstall from running concurrently; managed by the app.
 #[derive(Debug, Clone, Default)]

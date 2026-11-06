@@ -17,7 +17,6 @@ pub mod windows;
 use std::fmt::{self, Write as _};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use clap::Subcommand;
 use jiff::Timestamp;
@@ -187,7 +186,7 @@ pub struct SystemRunner;
 
 impl Runner for SystemRunner {
     fn run(&self, program: &str, args: &[&str]) -> io::Result<Output> {
-        let output = Command::new(program).args(args).output()?;
+        let output = tamias_core::process::command(program).args(args).output()?;
         Ok(Output {
             success: output.status.success(),
             status: output.status.to_string(),

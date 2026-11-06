@@ -1,0 +1,5 @@
+# Child processes go through tamias_core::process::command, which hides the console window on
+# Windows (a GUI program such as tamiasw.exe would otherwise flash one for every console child).
+disallowed-methods = [
+    { path = "std::process::Command::new", reason = "use tamias_core::process::command so no console window flashes up on Windows" },
+]
