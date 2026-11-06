@@ -168,6 +168,48 @@
       </div>
     }
   </div>
+  @for (m of monthCharts(); track m.provider) {
+    <section class="month-chart" data-testid="month-chart" [attr.data-provider]="m.provider">
+      <h2>{{ m.name }}</h2>
+      <svg
+        class="chart"
+        [attr.viewBox]="'0 0 ' + chartWidth + ' ' + chartHeight"
+        role="img"
+        [attr.aria-label]="m.name + ' cumulative usage over the month against the budget'"
+      >
+        @for (t of m.chart.yTicks; track $index) {
+          <line
+            class="chart-grid"
+            [attr.x1]="m.chart.left"
+            [attr.x2]="m.chart.right"
+            [attr.y1]="t.at"
+            [attr.y2]="t.at"
+          />
+          <text class="tick" text-anchor="end" [attr.x]="m.chart.left - 6" [attr.y]="t.at + 4">
+            {{ t.label }}
+          </text>
+        }
+        @for (t of m.chart.xTicks; track $index) {
+          <text class="tick" text-anchor="middle" [attr.x]="t.at" [attr.y]="m.chart.bottom + 18">
+            {{ t.label }}
+          </text>
+        }
+        <path class="budget" data-testid="budget-line" [attr.d]="m.chart.budgetPath" />
+        <path
+          [class]="'usage colour-' + m.chart.colour"
+          data-testid="usage-line"
+          [attr.d]="m.chart.usagePath"
+        />
+        @if (m.chart.projectionPath; as d) {
+          <path
+            [class]="'usage projection colour-' + m.chart.colour"
+            data-testid="projection-line"
+            [attr.d]="d"
+          />
+        }
+      </svg>
+    </section>
+  }
 } @else if (!error()) {
   <p class="loading" role="status">
     <hx-progress-spinner ariaLabel="Reading the month" /> Reading the month…
