@@ -23,6 +23,7 @@ import { ZOOM_MAX, ZOOM_MIN, Zoom } from "./core/zoom";
           type="button"
           class="percent"
           data-testid="zoom-reset"
+          aria-label="Reset zoom to 100 %"
           title="Reset to 100 %"
           (click)="zoom.reset()"
         >
