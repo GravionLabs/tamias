@@ -11,7 +11,11 @@ Milestones are named `M<n>`; a closed one is renamed `M<n> (x.y.z)` after its re
 | `0.1.0` Usable CLI (legacy) | v0.1.0 | Closed |
 | `0.1.1` Fixes and documentation (legacy) | v0.1.1 | Closed |
 | M1 (0.2.0) Desktop app | v0.1.2 and v0.2.0 | Closed |
-| M2 Copilot and verified sources | next release | Open |
+| M2 (0.3.0) Copilot and verified sources | v0.3.0 and v0.3.1 | Closed |
+| M3 (0.4.0) Fixes and week start | v0.4.0 | Closed |
+| M4 (0.6.0) Tray card and projection | v0.5.0 and v0.6.0 | Closed |
+| M5 Status bar and open sources | not released yet | Open |
+| M6 Usage history charts | not released yet | Open |
 
 v0.1.2 has no milestone of its own: its fixes (#68 to #73, see the CHANGELOG) are closed issues of M1 and were released as a patch tag before the desktop app shipped in v0.2.0.
 
@@ -40,15 +44,31 @@ Goal: a Tauri app with a month calendar coloured by daily budget, an intraday vi
 | [#9](https://github.com/GravionLabs/tamias/issues/9) Desktop app | Angular and helix-ui; calendar, day view, tray, optional autostart, collection set up from the app; the [app page](./app.md) |
 | [#88](https://github.com/GravionLabs/tamias/issues/88) Releases (follow-up) | Unsigned Tauri bundles in the release workflow |
 
-## M2 – Copilot and verified sources
+## M2 (0.3.0) – Copilot and verified sources
 
-Goal: Copilot is polled and shown next to Claude, the Claude Code status line is a fallback source, and the usage sources are verified on all three platforms. Open; it ships in the next release.
+Goal: Copilot is polled and shown next to Claude, the Claude Code status line is a fallback source, and the usage sources are verified on all three platforms. Closed; shipped as tag v0.3.0, followed by the patch tag v0.3.1.
 
 | Feature | Content |
 |---|---|
 | [#5](https://github.com/GravionLabs/tamias/issues/5) Copilot usage and daily budget | Copilot provider after the spike [#17](https://github.com/GravionLabs/tamias/issues/17) |
 | [#7](https://github.com/GravionLabs/tamias/issues/7) Claude Code status line | `tamias ingest-statusline`: fallback source and compact line |
 | [#2](https://github.com/GravionLabs/tamias/issues/2) Verified usage sources (spike) | Claude on Linux and Windows and the status line ([#20](https://github.com/GravionLabs/tamias/issues/20)) |
+
+## M3 (0.4.0) – Fixes and week start
+
+Goal: a release build with working styles, a configurable week start (Monday by default), larger day charts and a site with screenshots. Closed; shipped as tag v0.4.0.
+
+## M4 (0.6.0) – Tray card and projection
+
+Goal: a compact usage card on tray hover and a month projection in the card and the calendar, with the fixes found on the way. Closed; shipped as the tags v0.5.0 and v0.6.0.
+
+## M5 – Status bar and open sources
+
+Goal: a window that fits the calendar with a status bar (version, zoom, auto-update from GitHub Releases), and the Features of M2 that are still open (Copilot [#5](https://github.com/GravionLabs/tamias/issues/5), status line [#7](https://github.com/GravionLabs/tamias/issues/7), verified sources [#2](https://github.com/GravionLabs/tamias/issues/2)). Open; no tag yet.
+
+## M6 – Usage history charts
+
+Goal: the [#164](https://github.com/GravionLabs/tamias/issues/164) Feature: one day chart with the daily budget and the 5-hour curve, a month chart with the projection and a year view with a bar per month; see the [app page](./app.md#day-view). Open; no tag yet.
 
 ## Consumers in other repositories
 

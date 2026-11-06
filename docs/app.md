@@ -1,6 +1,6 @@
 # Desktop app
 
-The desktop app shows the same numbers as `tamias today`: a month calendar with each day coloured by the daily budget, a day view with the usage over the day, and a tray icon with the traffic light. It only reads. Collection stays the scheduled `tamias collect` of the CLI, which the app can set up for you ([Installation](./installation.md#scheduled-collection)).
+The desktop app shows the same numbers as `tamias today`: a month calendar with each day coloured by the daily budget, a day view with the usage over the day, a year view with a bar per month, and a tray icon with the traffic light. It only reads. Collection stays the scheduled `tamias collect` of the CLI, which the app can set up for you ([Installation](./installation.md#scheduled-collection)).
 
 ## Download
 
@@ -68,7 +68,7 @@ The calendar refreshes when the collector writes new snapshots, so the app needs
 
 ![The month calendar with Claude and Copilot usage chips per day](/screenshots/calendar-dark.png){.screenshot .dark-only}
 
-Click a day to open its day view. The "Today overview" link shows today's report of every provider.
+Click a day to open its day view, or "Year" for the year view. The "Today overview" link shows today's report of every provider.
 
 ## Day view
 
@@ -76,7 +76,17 @@ Click a day to open its day view. The "Today overview" link shows today's report
 
 ![The day view: usage over the day against the budget line, for Claude and Copilot](/screenshots/day-dark.png){.screenshot .dark-only}
 
-The day view shows, per provider, the usage over the local day as a curve against the day's budget line. Next to the chart the usage of the day is written out as "usage of budget"; a day without a budget says "No budget for this day.". The view reloads on every change of the store, like the calendar.
+The day view shows, per provider, the usage over the local day as a step line (midnight to midnight, 23 or 25 hours on a daylight saving change) against the day's budget. Next to the chart the usage of the day is written out as "usage of budget"; a day without a budget says "No budget for this day.". The view reloads on every change of the store, like the calendar.
+
+Claude has two curves, both in percent: "Day vs budget" is the usage of the day against the day's budget, with the budget line at 100 %, and "5-hour window" is the usage of the 5-hour window against its limit (the `five_hour_points` of the `day` report). The legend names each curve with its latest value. A provider without five-hour points, like Copilot, shows one curve in the unit of its budget, coloured by the day colour, with the budget as a line. For today the curves run on to the current time.
+
+## Month chart
+
+Below the calendar grid, each provider with a budget has a month chart: the cumulative usage of the month as a line against the cumulative budget, a straight line from 0 to the monthly budget at the end of the month. A day without data adds nothing and leaves a gap in the line. For the current month a dashed line continues from the last usage point to the projected month end (the month projection described under [Calendar](#calendar)). The usage line and the projection take the colour of the projection; a past month shows no projection.
+
+## Year view
+
+"Year" in the calendar header opens the year view at `/year/<year>`. It has one panel per provider with a bar for each month, January to December. A bar's height is the month's usage against its monthly budget; the budget mark sits at 100 % and a bar is full at 150 %. The bar's colour follows the same limits as the calendar (green below 80 %, yellow up to and including 100 %, red above), months without data are empty, and the percentage and the month name are written under the bar. A click on a bar opens that month in the calendar. Previous year, "This year" and Next year move between years; "Calendar" returns to the month. The view is read through the `year` command of the app.
 
 ## Tray
 
