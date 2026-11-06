@@ -5,12 +5,42 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.0] — 2026-11-06
+
+### Bug Fixes
+- **app**: Five-hour points compile in the day report (#165)
+- **app**: Restore blank cell background, no month chart for a future month (#167)
+- Day chart legend takes the 5-hour value from the last drawn point (#178) (#179)
+
+
+### Documentation
+- App page and roadmap for the history charts (#170) (#177)
+- Note how the window sizes were measured, label the zoom reset button (#162)
+
+
+### Features
+- **core**: Five-hour window curve in the day report (#165) (#171)
+- **core**: Five-hour window curve in the day report (#165)
+- **core**: Year report and IPC command (#168) (#173)
+- **app**: One day chart with the daily budget and the five-hour curve (#166) (#174)
+- **app**: Month chart in the calendar (#167) (#175)
+- **app**: Month chart in the calendar (#167)
+- **app**: Year view with a bar per month (#169) (#176)
+- **app**: Window fits the calendar, status bar with version and zoom (#162) (#182)
+- **app**: Window fits the calendar, status bar with version and zoom (#162)
+- **app**: Auto-update from GitHub Releases in the status bar (#163) (#183)
+
+
 ## [0.6.0] — 2026-11-05
 
 ### Bug Fixes
 - Calendar day card opens the day view on any click, smaller gap in the day view (#153)
 - Tray card rows alike, stays while the pointer is inside, no frame on Open tamias (#156) (#157)
 - **app**: Colour the month projection by its own ratio (#158)
+
+
+### Documentation
+- Update CHANGELOG.md for v0.6.0 [skip ci]
 
 
 ### Features
