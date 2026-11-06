@@ -15,7 +15,7 @@ Every release on the [GitHub releases page](https://github.com/GravionLabs/tamia
 
 Check the checksum as described in [Installation](./installation.md#download). Each bundle contains the `tamias` CLI of the same version (on Windows also `tamiasw.exe`), so the app does not need a separate CLI install.
 
-The bundles are not signed or notarised (v1 ships unsigned). Each system warns on the first start:
+The bundles are not signed or notarised by the operating system (v1 ships unsigned); they are signed for the updater only (see [Updates](#updates)). Each system warns on the first start:
 
 - **macOS**: open the `.dmg` and drag the app into `/Applications` first, then start it from there. An unsigned app started from Downloads or straight from the mounted disk image runs from a temporary path (macOS App Translocation). Collection set up from such a start would be registered with that temporary path, so move the app first. To remove the quarantine flag of the installed app once:
 
@@ -118,6 +118,14 @@ If the tray icon cannot be created (for example on Linux without an AppIndicator
 ## Unavailable providers
 
 The app shows the same document as `tamias today --json`. A provider that is `unavailable` has no windows, no calendar chips and a grey tray (when all are unavailable). For Copilot that is: `copilot = false` in `config.toml` (old data is ignored), `auto` without a `gh` executable (not set up), and a seat without a countable monthly quota (`no premium quota` for a free seat, `unlimited`), as recorded by the last `tamias collect`. An error recorded after that makes it `stale` instead. With `gh` installed but logged out, Copilot is `stale` (never collected), not unavailable. See [Copilot](./installation.md#copilot).
+
+## Updates
+
+The status bar has "Check for updates", "Update to vX.Y.Z" and an "Auto-update" switch. The app asks `https://github.com/GravionLabs/tamias/releases/latest/download/latest.json` (written by the release workflow) for a newer version. With the switch on (the default, remembered across restarts) it checks once at start; it never installs without you: when a newer release exists the button reads "Update to vX.Y.Z", and clicking it downloads the bundle, checks its minisign signature against the public key in `tauri.conf.json`, installs it and restarts the app. Turn the switch off to check only with "Check for updates".
+
+A failure (offline, GitHub unreachable, a signature that does not match) shows a message in the status bar ("Update check failed: ..." or "Update failed: ...") and changes nothing: the app keeps running and you can check again. The update signature protects the download; it is not the operating system's code signature.
+
+Because the app is not signed or notarised, an updated macOS app is quarantined again: after every update run `xattr -cr /Applications/tamias.app` once (and start it again if macOS refuses). The maintainers sign the bundles with the secret `TAURI_SIGNING_PRIVATE_KEY` of the repository (empty password); the matching public key is in `tauri.conf.json`.
 
 ## Start at login
 
