@@ -267,6 +267,52 @@ pub fn intraday(
     points
 }
 
+/// One point of the window curve of [`window_curve`].
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct FillPoint {
+    /// Observation of the snapshot.
+    pub at: Timestamp,
+    /// Fill of the window at `at`, in the window's unit.
+    pub used: f64,
+    /// Limit of the window at `at`.
+    pub limit: f64,
+}
+
+/// The fill of an informational window (Claude `five_hour`) over the local calendar day `date`
+/// in `tz`: one point per snapshot of the day, oldest first, with the observed `used` and
+/// `limit`. A reset shows as a drop to the new window's value. Snapshots after `now` are left
+/// out; a day without a snapshot, or out of range, gives no points.
+#[must_use]
+pub fn window_curve(
+    snapshots: &[Snapshot],
+    provider: Provider,
+    window: Window,
+    date: Date,
+    tz: &TimeZone,
+    now: Timestamp,
+) -> Vec<FillPoint> {
+    let (Ok(start), Ok(end)) = (
+        date.to_zoned(tz.clone()).map(|z| z.timestamp()),
+        date.tomorrow()
+            .and_then(|d| d.to_zoned(tz.clone()))
+            .map(|z| z.timestamp()),
+    ) else {
+        return Vec::new();
+    };
+    let mut points: Vec<FillPoint> = snapshots
+        .iter()
+        .filter(|s| s.provider == provider && s.window == window)
+        .filter(|s| start <= s.observed_at && s.observed_at < end && s.observed_at <= now)
+        .map(|s| FillPoint {
+            at: s.observed_at,
+            used: s.used,
+            limit: s.limit,
+        })
+        .collect();
+    points.sort_by_key(|p| p.at);
+    points
+}
+
 /// Current fill and colour of an informational window (Claude `five_hour`): `used / limit`
 /// against the thresholds, no budget. `None` without snapshots.
 #[must_use]

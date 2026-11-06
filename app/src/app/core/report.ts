@@ -117,6 +117,15 @@ export interface ProviderDay {
   colour?: Colour;
   /** Current level, Claude only. */
   five_hour?: FiveHourLevel;
+  /** Fill of the five-hour window over the day, oldest first; Claude only. */
+  five_hour_points?: FiveHourPoint[];
+}
+
+/** One snapshot of the five-hour window; a reset shows as a drop. */
+export interface FiveHourPoint {
+  at: Timestamp;
+  used: number;
+  limit: number;
 }
 
 /** The answer of the `day` command (`DayReport` in `app/src-tauri/src/day.rs`). */
