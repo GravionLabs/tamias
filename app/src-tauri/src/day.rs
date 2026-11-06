@@ -171,7 +171,7 @@ pub fn read(
             let snapshots = snapshots(store, state.provider, window, date, now, tz)?;
             entry.points = budget::intraday(&snapshots, state.provider, window, date, tz);
             if report::windows(state.provider).contains(&Window::FiveHour) {
-                let five = snapshots(store, state.provider, Window::FiveHour, date, now, tz)?;
+                let five = self::snapshots(store, state.provider, Window::FiveHour, date, now, tz)?;
                 entry.five_hour_points = Some(budget::window_curve(
                     &five,
                     state.provider,
