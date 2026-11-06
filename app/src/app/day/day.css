@@ -138,6 +138,22 @@ path.colour-neutral {
   margin-left: 8px;
 }
 
+path.curve-day {
+  stroke: var(--h-blue-500);
+}
+
+path.curve-five-hour {
+  stroke: var(--h-orange-500);
+}
+
+.curve-day-swatch {
+  border-top-color: var(--h-blue-500);
+}
+
+.curve-five-hour-swatch {
+  border-top-color: var(--h-orange-500);
+}
+
 .budget-swatch {
   border-top: 2px dashed var(--h-text-color);
 }
