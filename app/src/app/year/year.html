@@ -1,0 +1,92 @@
+<header class="head">
+  <h1 data-testid="title">{{ year() }}</h1>
+  <nav class="nav" aria-label="Year">
+    <button
+      hx-button
+      variant="text"
+      size="small"
+      iconOnly
+      data-testid="prev"
+      aria-label="Previous year"
+      title="Previous year"
+      (click)="previous()"
+    >
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="2" />
+      </svg>
+    </button>
+    <button
+      hx-button
+      variant="text"
+      size="small"
+      data-testid="current"
+      [disabled]="isCurrentYear()"
+      (click)="goCurrent()"
+    >
+      This year
+    </button>
+    <button
+      hx-button
+      variant="text"
+      size="small"
+      iconOnly
+      data-testid="next"
+      aria-label="Next year"
+      title="Next year"
+      (click)="next()"
+    >
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" />
+      </svg>
+    </button>
+  </nav>
+  <a class="muted" routerLink="/" data-testid="calendar-link">Calendar</a>
+</header>
+
+@if (error(); as message) {
+  <hx-message severity="error" data-testid="error">Cannot read the year: {{ message }}</hx-message>
+}
+@if (report()) {
+  @for (p of panels(); track p.provider) {
+    <section class="panel" data-testid="panel" [attr.data-provider]="p.provider">
+      <h2>
+        {{ p.name }}
+        @if (p.stale; as hint) {
+          <span class="stale" data-testid="stale">{{ hint }}</span>
+        }
+      </h2>
+      <ol class="bars">
+        @for (b of p.bars; track b.month) {
+          <li>
+            <a
+              class="bar"
+              data-testid="bar"
+              [class.empty]="!b.hasData"
+              [attr.data-month]="b.value"
+              [attr.data-colour]="b.colour"
+              [attr.title]="b.title"
+              [attr.aria-label]="b.aria"
+              routerLink="/"
+              [queryParams]="{ month: b.value }"
+            >
+              <span class="track">
+                <span class="budget" [style.bottom.%]="budgetAt"></span>
+                @if (b.hasData) {
+                  <span [class]="'fill colour-' + b.colour" [style.height.%]="b.height"></span>
+                }
+              </span>
+              <span class="percent">{{ b.percent || "–" }}</span>
+              <span class="label">{{ b.label }}</span>
+            </a>
+          </li>
+        }
+      </ol>
+    </section>
+  } @empty {
+    <p class="hint" data-testid="no-data">No provider with data for {{ year() }}.</p>
+  }
+} @else if (!error()) {
+  <p class="loading" role="status">
+    <hx-progress-spinner ariaLabel="Reading the year" /> Reading the year…
+  </p>
+}
