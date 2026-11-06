@@ -4,7 +4,9 @@ use jiff::civil::{Date, date};
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 
-use super::{Colour, Point, Status, Thresholds, day, intraday, level, today};
+use super::{
+    Colour, FillPoint, Point, Status, Thresholds, day, intraday, level, today, window_curve,
+};
 use crate::snapshot::{Provider, Snapshot, Source, Unit, Window};
 
 fn ts(s: &str) -> Timestamp {
@@ -627,4 +629,89 @@ fn intraday_across_the_year_boundary_belongs_to_the_local_day() {
     assert_eq!(points[0].at, ts("2026-12-31T23:00:00Z"));
     assert_eq!(usages(&points), [0.0, 2.0, 5.0]);
     assert_curve_of_day(&snaps, date(2027, 1, 1), "2027-01-01T10:00:00Z");
+}
+
+fn five(used: f64, resets_at: &str, observed_at: &str) -> Snapshot {
+    snap(Window::FiveHour, used, resets_at, observed_at, Source::Poll)
+}
+
+fn fill(snaps: &[Snapshot], d: Date, now: &str) -> Vec<FillPoint> {
+    window_curve(
+        snaps,
+        Provider::Claude,
+        Window::FiveHour,
+        d,
+        &berlin(),
+        ts(now),
+    )
+}
+
+fn fills(points: &[FillPoint]) -> Vec<f64> {
+    points.iter().map(|p| p.used).collect()
+}
+
+#[test]
+fn window_curve_has_one_point_per_snapshot_and_a_reset_drops() {
+    let snaps = [
+        five(80.0, "2026-11-04T06:00:00Z", "2026-11-04T05:00:00Z"),
+        five(90.0, "2026-11-04T06:00:00Z", "2026-11-04T05:50:00Z"),
+        five(5.0, "2026-11-04T11:00:00Z", "2026-11-04T06:10:00Z"),
+        five(12.0, "2026-11-04T11:00:00Z", "2026-11-04T07:00:00Z"),
+    ];
+    let points = fill(&snaps, date(2026, 11, 4), "2026-11-04T09:00:00Z");
+    assert_eq!(fills(&points), [80.0, 90.0, 5.0, 12.0]);
+    assert_eq!(points[0].at, ts("2026-11-04T05:00:00Z"));
+    close(points[2].limit, 100.0);
+}
+
+#[test]
+fn window_curve_leaves_out_the_future_other_days_and_other_series() {
+    let snaps = [
+        five(70.0, "2026-11-04T06:00:00Z", "2026-11-03T22:30:00Z"), // Nov 3, 23:30 local
+        five(10.0, "2026-11-04T11:00:00Z", "2026-11-04T07:00:00Z"),
+        five(20.0, "2026-11-04T11:00:00Z", "2026-11-04T08:00:00Z"), // after now
+        week(30.0, WEEK, "2026-11-04T07:00:00Z"),
+        five(50.0, "2026-11-05T11:00:00Z", "2026-11-04T23:30:00Z"), // Nov 5, 00:30 local
+    ];
+    let points = fill(&snaps, date(2026, 11, 4), "2026-11-04T07:30:00Z");
+    assert_eq!(fills(&points), [10.0]);
+}
+
+#[test]
+fn window_curve_without_five_hour_snapshots_is_empty() {
+    assert!(fill(&[], date(2026, 11, 4), "2026-11-04T09:00:00Z").is_empty());
+    let snaps = [week(30.0, WEEK, "2026-11-04T07:00:00Z")];
+    assert!(fill(&snaps, date(2026, 11, 4), "2026-11-04T09:00:00Z").is_empty());
+}
+
+#[test]
+fn window_curve_sorts_oldest_first() {
+    let snaps = [
+        five(20.0, "2026-11-04T11:00:00Z", "2026-11-04T08:00:00Z"),
+        five(10.0, "2026-11-04T11:00:00Z", "2026-11-04T07:00:00Z"),
+    ];
+    let points = fill(&snaps, date(2026, 11, 4), "2026-11-04T09:00:00Z");
+    assert_eq!(fills(&points), [10.0, 20.0]);
+}
+
+#[test]
+fn window_curve_follows_the_local_day_across_dst() {
+    let resets = "2027-03-28T20:00:00Z";
+    let snaps = [
+        five(1.0, resets, "2027-03-27T22:30:00Z"), // 23:30 CET, Mar 27
+        five(2.0, resets, "2027-03-27T23:00:00Z"), // 00:00 CET, Mar 28
+        five(3.0, resets, "2027-03-28T21:59:00Z"), // 23:59 CEST, Mar 28
+        five(4.0, resets, "2027-03-28T22:00:00Z"), // 00:00 CEST, Mar 29
+    ];
+    let points = fill(&snaps, date(2027, 3, 28), "2027-03-29T12:00:00Z");
+    assert_eq!(fills(&points), [2.0, 3.0]);
+
+    let snaps = [
+        five(1.0, resets, "2026-10-24T21:59:00Z"), // 23:59 CEST, Oct 24
+        five(2.0, resets, "2026-10-24T22:00:00Z"), // 00:00 CEST, Oct 25
+        five(3.0, resets, "2026-10-25T22:59:00Z"), // 23:59 CET, Oct 25
+        five(4.0, resets, "2026-10-25T23:00:00Z"), // 00:00 CET, Oct 26
+    ];
+    let points = fill(&snaps, date(2026, 10, 25), "2026-10-26T12:00:00Z");
+    assert_eq!(fills(&points), [2.0, 3.0]);
 }

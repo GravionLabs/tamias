@@ -5,6 +5,7 @@
 //! - Snapshots after `now` do not count, as in [`crate::month`]; a day without data (or in the
 //!   future) has no points, no usage and no budget.
 //! - Past days are judged as if fresh; a stale provider greys only today.
+//! - `five_hour_points` is the fill of the five-hour window over the day (Claude only).
 //! - `five_hour` is the current level of Claude's five-hour window at `now`, extra information
 //!   whatever day is asked for.
 
@@ -14,7 +15,7 @@ use jiff::civil::Date;
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 use serde::Serialize;
-use tamias_core::budget::{self, Colour, Point};
+use tamias_core::budget::{self, Colour, FillPoint, Point};
 use tamias_core::config::{self, Config};
 use tamias_core::paths;
 use tamias_core::report::{self, Status};
@@ -85,6 +86,10 @@ pub struct ProviderDay {
     /// Current level of Claude's five-hour window; absent for Copilot and without data.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub five_hour: Option<FiveHour>,
+    /// Fill of Claude's five-hour window over the day, one point per snapshot, oldest first;
+    /// absent for Copilot and without data.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub five_hour_points: Option<Vec<FillPoint>>,
 }
 
 /// The day of every provider, in [`today::PROVIDERS`] order.
@@ -151,6 +156,7 @@ pub fn read(
             usage: None,
             budget: None,
             colour: None,
+            five_hour_points: None,
             five_hour: state
                 .windows
                 .iter()
@@ -164,6 +170,17 @@ pub fn read(
         if let (Some(store), Status::Ok | Status::Stale) = (&store, state.status) {
             let snapshots = snapshots(store, state.provider, window, date, now, tz)?;
             entry.points = budget::intraday(&snapshots, state.provider, window, date, tz);
+            if report::windows(state.provider).contains(&Window::FiveHour) {
+                let five = snapshots(store, state.provider, Window::FiveHour, date, now, tz)?;
+                entry.five_hour_points = Some(budget::window_curve(
+                    &five,
+                    state.provider,
+                    Window::FiveHour,
+                    date,
+                    tz,
+                    now,
+                ));
+            }
             // Only today can be stale; a past day is not a property of the provider's health.
             let status = budget::Status {
                 now,

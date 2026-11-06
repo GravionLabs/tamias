@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/GravionLabs/tamias/blob/main/docs/schema/day-v1.schema.json",
+  "title": "tamias app day report, schema version 1",
+  "description": "The `day` IPC report of the app: the curves of one local day per provider. Within version 1 fields are only added as optional; a rename or removal bumps the version.",
+  "type": "object",
+  "required": ["date", "generated_at", "providers"],
+  "properties": {
+    "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "generated_at": { "$ref": "#/$defs/timestamp" },
+    "providers": { "type": "array", "items": { "$ref": "#/$defs/provider" } }
+  },
+  "$defs": {
+    "timestamp": {
+      "description": "RFC 3339 instant in UTC.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+    },
+    "colour": { "enum": ["green", "yellow", "red", "grey"] },
+    "provider": {
+      "type": "object",
+      "required": ["provider", "status", "unit", "points"],
+      "properties": {
+        "provider": { "enum": ["claude", "copilot"] },
+        "status": { "enum": ["ok", "stale", "unavailable"] },
+        "stale_since": { "$ref": "#/$defs/timestamp" },
+        "unit": { "enum": ["percent", "requests"] },
+        "points": {
+          "description": "Running usage of the day, from 0 at local midnight; empty without data.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["at", "usage"],
+            "properties": { "at": { "$ref": "#/$defs/timestamp" }, "usage": { "type": "number" } }
+          }
+        },
+        "usage": { "type": "number" },
+        "budget": { "type": "number" },
+        "colour": { "$ref": "#/$defs/colour" },
+        "five_hour": {
+          "description": "Current level of Claude's five-hour window.",
+          "type": "object",
+          "required": ["used", "limit", "colour"],
+          "properties": {
+            "used": { "type": "number" },
+            "limit": { "type": "number" },
+            "colour": { "$ref": "#/$defs/colour" }
+          }
+        },
+        "five_hour_points": {
+          "description": "Fill of Claude's five-hour window over the day, one point per snapshot, oldest first; a reset is a drop. Absent for Copilot and without data.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["at", "used", "limit"],
+            "properties": {
+              "at": { "$ref": "#/$defs/timestamp" },
+              "used": { "type": "number" },
+              "limit": { "type": "number" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
