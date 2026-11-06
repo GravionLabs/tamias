@@ -620,6 +620,6 @@ describe("Calendar month chart", () => {
     expect(past.el.querySelector("[data-testid=projection-line]")).toBeNull();
     TestBed.resetTestingModule();
     const future = await mount((y, m) => month(y, m, CLAUDE), { month: "2026-12" });
-    expect(charts(future.el)).toHaveLength(1);
+    expect(charts(future.el)).toHaveLength(0);
   });
 });

@@ -199,6 +199,9 @@ export class Calendar {
     if (!report || report.year !== year || report.month !== month) return [];
     const days = daysInMonth(year, month);
     const current = this.isCurrentMonth();
+    if (!current && isoDate(year, month, 1) > isoDate(now.getFullYear(), now.getMonth() + 1, 1)) {
+      return [];
+    }
     const panels: MonthChartPanel[] = [];
     for (const p of report.providers) {
       const chart = buildMonthChart(year, month, days, p, current, now.getDate());
