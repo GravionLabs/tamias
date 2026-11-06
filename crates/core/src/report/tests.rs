@@ -166,7 +166,7 @@ fn informational_window_has_no_budget_fields() {
 fn unavailable_provider_has_no_windows() {
     let p = unavailable(snapshot::Provider::Claude);
     assert_eq!(p.status, Status::Unavailable);
-    assert!(p.windows.is_empty());
+    assert_eq!(p.windows.len(), 0);
     assert_eq!(
         serde_json::to_string(&p).unwrap(),
         r#"{"provider":"claude","status":"unavailable","windows":[]}"#
@@ -185,7 +185,7 @@ fn never_collected_is_stale_without_since_and_windows() {
     let p = build(snapshot::Provider::Claude, &[], Some(&status));
     assert_eq!(p.status, Status::Stale);
     assert_eq!(p.stale_since, None);
-    assert!(p.windows.is_empty());
+    assert_eq!(p.windows.len(), 0);
     let none = build(snapshot::Provider::Claude, &[], None);
     assert_eq!(none.status, Status::Stale);
 }
@@ -288,7 +288,7 @@ fn read_of_an_empty_store_is_stale_without_windows() {
     )
     .unwrap();
     assert_eq!(p.status, Status::Stale);
-    assert!(p.windows.is_empty());
+    assert_eq!(p.windows.len(), 0);
 }
 
 #[test]
@@ -440,7 +440,7 @@ fn month_leaves_out_days_without_snapshots() {
         days.iter()
             .all(|e| e.date.to_string().as_str() != "2026-11-01")
     );
-    assert!(!days.is_empty());
+    assert_ne!(days.len(), 0);
 }
 
 #[test]
@@ -454,15 +454,17 @@ fn month_of_an_empty_store_or_invalid_month_is_empty() {
     let (_dir, store) = month_store(&[]);
     let c = snapshot::Provider::Claude;
     let t = Thresholds::default();
-    assert!(
+    assert_eq!(
         month(&store, c, 2026, 11, &TimeZone::UTC, &t, ts(NOW))
             .unwrap()
-            .is_empty()
+            .len(),
+        0
     );
-    assert!(
+    assert_eq!(
         month(&store, c, 2026, 13, &TimeZone::UTC, &t, ts(NOW))
             .unwrap()
-            .is_empty()
+            .len(),
+        0
     );
 }
 
@@ -471,10 +473,11 @@ fn month_in_the_future_is_empty() {
     let (_dir, store) = month_store(&claude());
     let c = snapshot::Provider::Claude;
     let t = Thresholds::default();
-    assert!(
+    assert_eq!(
         month(&store, c, 2026, 12, &TimeZone::UTC, &t, ts(NOW))
             .unwrap()
-            .is_empty()
+            .len(),
+        0
     );
 }
 

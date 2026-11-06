@@ -291,7 +291,7 @@ fn uninstall_disables_removes_both_units_but_keeps_the_data() {
     f.timer.install(Path::new("/x/tamias")).unwrap();
     f.timer.uninstall().unwrap();
 
-    assert!(f.files().is_empty());
+    assert_eq!(f.files(), [] as [std::string::String; 0]);
     assert!(!f.enabled());
     assert_eq!(
         fs::read_to_string(data.join("logs").join("collect.log")).unwrap(),
@@ -359,7 +359,7 @@ fn without_a_systemd_user_instance_every_action_names_the_cause() {
         assert!(text.contains("no systemd user instance"), "{text}");
         assert!(text.contains("Failed to connect to bus"), "{text}");
     }
-    assert!(f.files().is_empty());
+    assert_eq!(f.files(), [] as [std::string::String; 0]);
 }
 
 #[test]

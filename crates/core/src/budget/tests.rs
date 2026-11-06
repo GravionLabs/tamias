@@ -564,9 +564,9 @@ fn intraday_equal_instants_make_one_point_and_later_days_do_not_count() {
 
 #[test]
 fn intraday_without_a_snapshot_of_the_day_is_empty() {
-    assert!(curve(&[], date(2026, 11, 4)).is_empty());
+    assert_eq!(curve(&[], date(2026, 11, 4)).len(), 0);
     let snaps = [week(10.0, WEEK, "2026-11-03T20:00:00Z")];
-    assert!(curve(&snaps, date(2026, 11, 4)).is_empty());
+    assert_eq!(curve(&snaps, date(2026, 11, 4)).len(), 0);
 }
 
 #[test]
@@ -679,9 +679,15 @@ fn window_curve_leaves_out_the_future_other_days_and_other_series() {
 
 #[test]
 fn window_curve_without_five_hour_snapshots_is_empty() {
-    assert!(fill(&[], date(2026, 11, 4), "2026-11-04T09:00:00Z").is_empty());
+    assert_eq!(
+        fill(&[], date(2026, 11, 4), "2026-11-04T09:00:00Z").len(),
+        0
+    );
     let snaps = [week(30.0, WEEK, "2026-11-04T07:00:00Z")];
-    assert!(fill(&snaps, date(2026, 11, 4), "2026-11-04T09:00:00Z").is_empty());
+    assert_eq!(
+        fill(&snaps, date(2026, 11, 4), "2026-11-04T09:00:00Z").len(),
+        0
+    );
 }
 
 #[test]

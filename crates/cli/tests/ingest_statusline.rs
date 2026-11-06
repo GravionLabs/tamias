@@ -138,7 +138,10 @@ fn garbage_and_empty_stdin_print_a_line_and_exit_zero() {
         assert_eq!(code, 0, "{input:?}");
         assert!(out.ends_with('\n'), "{input:?}: {out:?}");
     }
-    assert!(env.statusline_snapshots(Window::FiveHour).is_empty());
+    assert_eq!(
+        env.statusline_snapshots(Window::FiveHour),
+        [] as [tamias_core::snapshot::Snapshot; 0]
+    );
 }
 
 #[test]
@@ -146,7 +149,10 @@ fn no_rate_limits_stores_nothing() {
     let env = Env::new(CLAUDE_ON);
     let (_, code) = env.ingest(r#"{"rate_limits_available":false,"rate_limits":null}"#, &[]);
     assert_eq!(code, 0);
-    assert!(env.statusline_snapshots(Window::SevenDay).is_empty());
+    assert_eq!(
+        env.statusline_snapshots(Window::SevenDay),
+        [] as [tamias_core::snapshot::Snapshot; 0]
+    );
 }
 
 #[test]
@@ -154,7 +160,10 @@ fn disabled_claude_stores_nothing() {
     let env = Env::new("[providers]\nclaude = false\ncopilot = false\n");
     let (out, code) = env.ingest(&body(12.0, 34.0), &["--color", "never"]);
     assert_eq!((out.as_str(), code), ("\n", 0));
-    assert!(env.statusline_snapshots(Window::SevenDay).is_empty());
+    assert_eq!(
+        env.statusline_snapshots(Window::SevenDay),
+        [] as [tamias_core::snapshot::Snapshot; 0]
+    );
     assert!(env.store().status(Provider::Claude).unwrap().is_none());
 }
 

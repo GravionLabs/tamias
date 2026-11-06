@@ -524,7 +524,7 @@ fn statusline_without_limits_is_empty() {
 #[test]
 fn statusline_unavailable_flag_wins_over_limits() {
     let body = br#"{"rate_limits_available":false,"rate_limits":{"five_hour":{"used_percentage":5,"resets_at":1}}}"#;
-    assert!(parse_statusline(body, now()).unwrap().is_empty());
+    assert_eq!(parse_statusline(body, now()).unwrap().len(), 0);
 }
 
 #[test]

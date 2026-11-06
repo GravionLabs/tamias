@@ -226,7 +226,7 @@ mod tests {
             unavailable(snapshot::Provider::Copilot),
         ]);
         assert_eq!(line(&report), "");
-        assert!(segments(&report).is_empty());
+        assert_eq!(segments(&report).len(), 0);
         assert_eq!(line(&Report::new(now(), Vec::new())), "");
     }
 
