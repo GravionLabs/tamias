@@ -212,13 +212,6 @@ export function staleText(since: Timestamp | undefined, now: Date = new Date()):
   return since ? `stale since ${localTime(since, now)}` : "stale, never collected";
 }
 
-/** `value` with thousands separators (`2,380`), fractions as in `amount`. */
-function grouped(value: number): string {
-  const [whole, fraction] = (Number.isInteger(value) ? String(value) : value.toFixed(1)).split(".");
-  const digits = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return fraction === undefined ? digits : `${digits}.${fraction}`;
-}
-
 /** The share of the limit used, in percent, as a whole number: `0` for a limit of 0. */
 export function usedPercent(w: WindowReport): number {
   if (w.limit <= 0) return 0;
@@ -231,11 +224,15 @@ export function todayPercent(w: WindowReport): number | null {
   return Math.round(w.ratio * 100);
 }
 
-/** The absolute numbers of `w`: `54% of 100% used`, or `489 of 2,380 requests`. */
-export function usedOfText(w: WindowReport): string {
-  return w.unit === "percent"
-    ? `${amount(w.used, w.unit)} of ${amount(w.limit, w.unit)} used`
-    : `${grouped(w.used)} of ${grouped(w.limit)} requests`;
+/** Today's usage against today's budget for the tray and day view, `4% of 10% today`; `null` without a budget. */
+export function todayShortText(w: WindowReport): string | null {
+  if (w.today_usage === undefined || w.budget === undefined) return null;
+  return `${amount(w.today_usage, w.unit)} of ${amount(w.budget, w.unit)} today`;
+}
+
+/** The projected month against the monthly quota, `≈ 240 of 300 by month end`, in the unit of `w`. */
+export function projectionShortText(p: Projection, unit: Unit): string {
+  return `≈ ${amount(Math.round(p.projected), unit)} of ${amount(p.budget, unit)} by month end`;
 }
 
 /** `HH:MM` when `at` is on the local day of `now`, else `YYYY-MM-DD HH:MM`; both in local time. */

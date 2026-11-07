@@ -206,7 +206,7 @@ describe("Day", () => {
     expect(sevenDay.querySelector<HTMLElement>(".bar")?.style.width).toBe("54%");
     expect(text(sevenDay.querySelector("[data-testid=today]"))).toBe("40%");
     expect(sevenDay.querySelector("[data-testid=projection]")).not.toBeNull();
-    expect(text(sevenDay.querySelector("[data-testid=used]"))).toBe("54% of 100% used");
+    expect(text(sevenDay.querySelector("[data-testid=used]"))).toBe("54% used");
     expect(text(sevenDay.querySelector("[data-testid=resets]"))).toMatch(/^resets /);
     expect(claude.querySelector("[data-window=five_hour]")).not.toBeNull();
     const copilot = panel(el, "copilot");

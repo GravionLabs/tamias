@@ -9,8 +9,9 @@ import {
   providerLabel,
   staleText,
   todayPercent,
+  projectionShortText,
+  todayShortText,
   todayText,
-  usedOfText,
   usedPercent,
   usedText,
   windowLabel,
@@ -100,7 +101,7 @@ describe("usedText", () => {
   });
 });
 
-describe("usedPercent and usedOfText", () => {
+describe("usedPercent", () => {
   it("rounds the share of the limit", () => {
     expect(usedPercent({ ...SEVEN_DAY, unit: "requests", used: 489, limit: 2380 })).toBe(21);
     expect(usedPercent(SEVEN_DAY)).toBe(54);
@@ -109,15 +110,35 @@ describe("usedPercent and usedOfText", () => {
   it("is 0 for a limit of 0", () => {
     expect(usedPercent({ ...SEVEN_DAY, limit: 0 })).toBe(0);
   });
+});
 
-  it("shows requests with thousands separators and percent against 100%", () => {
-    expect(usedOfText({ ...SEVEN_DAY, unit: "requests", used: 489, limit: 2380 })).toBe(
-      "489 of 2,380 requests",
-    );
-    expect(usedOfText({ ...SEVEN_DAY, unit: "requests", used: 1234567, limit: 2000000 })).toBe(
-      "1,234,567 of 2,000,000 requests",
-    );
-    expect(usedOfText(SEVEN_DAY)).toBe("54% of 100% used");
+describe("todayShortText", () => {
+  it("shows today's usage against today's budget, in the unit of the window", () => {
+    expect(todayShortText(SEVEN_DAY)).toBe("4% of 10% today");
+    expect(
+      todayShortText({ ...SEVEN_DAY, unit: "requests", today_usage: 12, budget: 40, ratio: 0.3 }),
+    ).toBe("12 of 40 today");
+  });
+
+  it("is null without a budget", () => {
+    expect(todayShortText({ ...SEVEN_DAY, budget: undefined, today_usage: undefined })).toBeNull();
+  });
+});
+
+describe("projectionShortText", () => {
+  it("shows the projected month against the monthly quota, rounded", () => {
+    expect(
+      projectionShortText(
+        { projected: 239.6, budget: 300, percent: 80, colour: "green" },
+        "requests",
+      ),
+    ).toBe("≈ 240 of 300 by month end");
+    expect(
+      projectionShortText(
+        { projected: 342.857, budget: 300, percent: 114, colour: "red" },
+        "percent",
+      ),
+    ).toBe("≈ 343% of 300% by month end");
   });
 });
 

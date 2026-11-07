@@ -2,9 +2,11 @@ import { ChangeDetectionStrategy, Component, Input } from "@angular/core";
 import {
   localTime,
   projectionColour,
+  projectionShortText,
   todayPercent,
-  usedOfText,
+  todayShortText,
   usedPercent,
+  usedText,
   windowLabel,
   windowProjection,
   type WindowReport,
@@ -26,9 +28,9 @@ export function projectionBarWidth(w: WindowReport, now: Date = new Date()): num
 }
 
 /**
- * The windows of one provider as the tray card shows them: label and percentage, the bar, the
- * Today and Month (projected) rows where present, `x of y used` and `resets …`. Shared by the
- * tray card and the day view.
+ * The windows of one provider as the tray card shows them: label and percentage, the bar, and
+ * under each percentage a short line (`7% used · resets 08:50`, `4% of 10% today`,
+ * `≈ 240 of 300 by month end`). Shared by the tray card and the day view.
  */
 @Component({
   selector: "app-window-list",
@@ -41,7 +43,9 @@ export class WindowList {
   @Input({ required: true }) windows: WindowReport[] = [];
 
   protected readonly windowLabel = windowLabel;
-  protected readonly usedOfText = usedOfText;
+  protected readonly usedText = usedText;
+  protected readonly todayShort = todayShortText;
+  protected readonly projectionShort = projectionShortText;
   protected readonly percent = usedPercent;
   protected readonly width = barWidth;
   protected readonly today = todayPercent;

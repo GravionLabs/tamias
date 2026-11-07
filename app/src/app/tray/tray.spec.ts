@@ -134,12 +134,12 @@ describe("Tray", () => {
     expect(text(sevenDay.querySelector("[data-testid=percent]"))).toBe("54%");
     expect(sevenDay.querySelector(".bar")?.classList).toContain("colour-yellow");
     expect(sevenDay.querySelector<HTMLElement>(".bar")?.style.width).toBe("54%");
-    expect(text(sevenDay.querySelector("[data-testid=used]"))).toBe("54% of 100% used");
+    expect(text(sevenDay.querySelector("[data-testid=used]"))).toBe("54% used");
     expect(text(sevenDay.querySelector("[data-testid=resets]"))).toMatch(/^resets /);
     const monthly = el.querySelector("[data-window=monthly]")!;
     expect(text(monthly.querySelector("[data-testid=percent]"))).toBe("21%");
     expect(monthly.querySelector(".bar")?.classList).toContain("colour-red");
-    expect(text(monthly.querySelector("[data-testid=used]"))).toBe("489 of 2,380 requests");
+    expect(text(monthly.querySelector("[data-testid=used]"))).toBe("489 of 2380 used");
     expect(el.querySelectorAll(".window").length).toBe(3);
   });
 
