@@ -7,13 +7,17 @@
 #   release PR are closed -> release-binaries.yml builds the tagged commit for five targets and attaches the archives
 #   and SHA256SUMS to that release (#33).
 #
-# workflow_dispatch on release/next with prerelease: true (#205): the release candidate for the manual test at the end of
-#   a milestone, `gh workflow run release.yml --ref release/next -f prerelease=true`. ci.yml -> determine-version gives
-#   <next stable>-rc.<n> (GitVersion.yml: label rc on release/next, rc tags are no version source) -> gh-release tags
-#   v<version> on release/next and creates a GitHub pre-release (no changelog, no issue closing, no commit to main or
-#   release/next, default token) -> release-binaries.yml builds that tag and uploads archives, app bundles (NSIS instead
-#   of .msi on Windows) and latest.json to the pre-release. releases/latest/download/latest.json never serves a
-#   pre-release, so installed apps do not update to it. Any other dispatch builds nothing.
+# workflow_dispatch (no inputs): the channel comes from the branch, derived by determine-version of GravionLabs/ci
+#   (GravionLabs/ci#184): main stable, release/* rc, every other branch beta. `gh workflow run release.yml --ref <branch>`.
+#   - release/* (#205, #206): the release candidate for the manual test at the end of a milestone. ci.yml ->
+#     determine-version gives <next stable>-rc.<n> (GitVersion.yml: rc tags are no version source) -> gh-release tags
+#     v<version> on the branch and creates a GitHub pre-release (no changelog, no issue closing, no commit to main or
+#     release/next, default token) -> release-binaries.yml builds that tag and uploads archives, app bundles (NSIS
+#     instead of .msi on Windows) and latest.json to the pre-release. releases/latest/download/latest.json never serves
+#     a pre-release, so installed apps do not update to it.
+#   - any other branch: <next stable>-beta.<n>, built by release-binaries.yml as workflow artifacts (retention 7 days)
+#     with that version in the binaries; no tag, no release, no commit.
+#   - main: the release is made by the push; a dispatch on main builds nothing.
 #
 # .github/scripts/set-version.sh sets [workspace.package] version and the tamias-core version in
 # [workspace.dependencies] and updates Cargo.lock, so a build of the tag reports the released version (tamias --version).
@@ -26,11 +30,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      prerelease:
-        description: Release candidate from release/next for the manual test (tag v<version>-rc.<n>, GitHub pre-release)
-        type: boolean
-        default: false
 
 permissions: {}
 
@@ -82,12 +81,12 @@ jobs:
           close-issues: "true"
           token: ${{ secrets.GH_PAT }}
 
-  # Release candidate of release/next: tag and GitHub pre-release only. No version or changelog commit and no issue
+  # Release candidate of a release/* branch: tag and GitHub pre-release only. No version or changelog commit and no issue
   # closing; release-binaries.yml writes the version into its own checkout. The default token pushes the tag.
   prerelease:
     name: Pre-release
     needs: test
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease && github.ref == 'refs/heads/release/next' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/release/') }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.semver }}
@@ -107,7 +106,9 @@ jobs:
       - name: Check the pre-release version
         env:
           VERSION: ${{ steps.version.outputs.semver }}
+          CHANNEL: ${{ steps.version.outputs.channel }}
         run: |
+          [ "$CHANNEL" = rc ] || { echo "::error::unexpected channel on a release branch: $CHANNEL"; exit 1; }
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]] || { echo "::error::unexpected pre-release version: $VERSION"; exit 1; }
 
       # The version has a pre-release part, so gh-release creates a pre-release. Without update-changelog nothing is
@@ -121,15 +122,48 @@ jobs:
           update-changelog: "false"
           close-issues: "false"
 
+  # Beta build of any other branch: only the version; release-binaries.yml builds it as workflow artifacts. No tag,
+  # release or commit.
+  beta:
+    name: Beta
+    needs: test
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref_type == 'branch' && github.ref_name != 'main' && !startsWith(github.ref, 'refs/heads/release/') }}
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.semver }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # required by GitVersion
+          persist-credentials: false
+
+      - name: Determine version
+        id: version
+        uses: GravionLabs/ci/versioning/determine-version@v1
+        with:
+          gitversion-config-file: GitVersion.yml
+
+      - name: Check the beta version
+        env:
+          VERSION: ${{ steps.version.outputs.semver }}
+          CHANNEL: ${{ steps.version.outputs.channel }}
+        run: |
+          [ "$CHANNEL" = beta ] || { echo "::error::unexpected channel: $CHANNEL"; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]] || { echo "::error::unexpected beta version: $VERSION"; exit 1; }
+
   binaries:
     name: Binaries
-    needs: [release, prerelease]
-    # release and prerelease are skipped on other dispatches; binaries run only when one of them succeeded.
-    if: ${{ !cancelled() && (needs.release.result == 'success' || needs.prerelease.result == 'success') }}
+    needs: [release, prerelease, beta]
+    # release, prerelease and beta are skipped on other triggers; binaries run only when one of them succeeded.
+    if: ${{ !cancelled() && (needs.release.result == 'success' || needs.prerelease.result == 'success' || needs.beta.result == 'success') }}
     permissions:
       contents: write # gh release upload of the archives
     uses: ./.github/workflows/release-binaries.yml
     # TAURI_SIGNING_PRIVATE_KEY signs the app bundles for the updater (#163)
     secrets: inherit
     with:
-      tag: v${{ needs.release.outputs.version || needs.prerelease.outputs.version }}
+      # a beta has no tag: the binaries are built from the dispatched ref with the version written into the checkout
+      tag: ${{ needs.release.outputs.version && format('v{0}', needs.release.outputs.version) || needs.prerelease.outputs.version && format('v{0}', needs.prerelease.outputs.version) || '' }}
+      version: ${{ needs.beta.outputs.version }}
