@@ -14,6 +14,10 @@
     >
       <div class="bar" [class]="'bar colour-' + w.colour" [style.width.%]="width(w)"></div>
     </div>
+    <div class="detail">
+      <span data-testid="used">{{ usedText(w) }}</span> ·
+      <span data-testid="resets">{{ resets(w.resets_at) }}</span>
+    </div>
     @if (today(w) !== null) {
       <div class="row today-row">
         <span class="label">Today</span>
@@ -34,6 +38,9 @@
           [style.width.%]="todayWidth(w)"
         ></div>
       </div>
+      @if (todayShort(w); as line) {
+        <div class="detail" data-testid="today-detail">{{ line }}</div>
+      }
     }
     @if (projection(w); as month) {
       <div class="row today-row">
@@ -56,10 +63,7 @@
           [style.width.%]="projectionWidth(w)"
         ></div>
       </div>
+      <div class="detail" data-testid="projection-detail">{{ projectionShort(month, w.unit) }}</div>
     }
-    <div class="detail">
-      <span data-testid="used">{{ usedOfText(w) }}</span>
-      <span data-testid="resets">{{ resets(w.resets_at) }}</span>
-    </div>
   </div>
 }
