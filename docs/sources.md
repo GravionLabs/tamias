@@ -160,13 +160,13 @@ Probe: `spikes/copilot-usage.ps1` (#17). Fixtures: `crates/core/tests/fixtures/c
 
 | | macOS | Linux | Windows |
 |---|---|---|---|
-| OS / gh | Darwin 27.0.0 arm64 (macOS), gh 2.103.3, pwsh 7.5.4, 2026-11-03 | **pending** | **pending** |
-| Personal seat | run, see below | **pending** | **pending** |
-| Enterprise-managed seat | **pending** (no such seat available on the test machine) | **pending** | **pending** |
-| Fine-grained PAT | **pending** (none available) | **pending** | **pending** |
+| OS / gh | Darwin 27.0.0 arm64 (macOS), gh 2.103.3, pwsh 7.5.4, 2026-11-03 | not tested: no Linux machine reachable from the macOS-only environment of #95 | not tested: no Windows machine reachable from the macOS-only environment of #95 |
+| Personal seat | run, see below; re-checked 2026-11-06 (#95): same free seat (`individual`, `free_limited_copilot`, `entitlement 0`, `has_quota` false), so no paid fixture could be recorded | not tested: needs Linux and a paid personal seat | not tested: needs Windows and a paid personal seat |
+| Enterprise-managed seat | not tested: the signed-in gh account has no enterprise or organization Copilot seat (`enterprise_list` and `organization_login_list` empty) | not tested: no Linux machine and no managed seat | not tested: no Windows machine and no managed seat |
+| Fine-grained PAT | not tested: none exists for the account and creating one needs the web UI | not tested: no Linux machine | not tested: no Windows machine |
 | Command | `pwsh -NoProfile -File spikes/copilot-usage.ps1` (also `-InvalidToken`, `-Day 3`, `-Token <pat>`) | same | same |
 
-Pending rows go into a follow-up PBI; nothing in them was run or assumed.
+Rows marked "not tested" were neither run nor assumed; each needs the seat or platform named in it. No `user-paid-real.json` or `user-managed.json` fixture exists because no such response could be recorded (#95).
 
 ### `GET https://api.github.com/copilot_internal/user`
 
@@ -200,7 +200,7 @@ Pending rows go into a follow-up PBI; nothing in them was run or assumed.
 - **Failure modes:** invalid token: HTTP 401 `{"message":"Bad credentials",...}` (`user-unauthorized.json`).
   Other cases (account without Copilot, 403 for managed seats, 404) not observed.
 - **Verdict (macOS, personal free seat):** **Use as primary**; works with the gh token, undocumented, so
-  parse tolerantly. Quota semantics for paid/managed seats **pending**. Implemented: tamias polls it
+  parse tolerantly. Quota semantics for paid/managed seats not tested (no such seat available, #95). Implemented: tamias polls it
   with the `gh` token; a seat with `has_quota` false or `unlimited` true is stored as `unavailable`.
 
 ### `GET /users/{username}/settings/billing/premium_request/usage?year=&month=[&day=]`
@@ -215,5 +215,5 @@ Pending rows go into a follow-up PBI; nothing in them was run or assumed.
 - **Fields used:** none; no successful response was seen.
 - **Verdict:** **not usable on the owner's seat as tested; dropped for v1.** The billing fallback is unconfirmed: it
   returned nothing for a free personal seat with a classic PAT and a gh token, and nothing was run
-  for a paid personally billed or enterprise-managed seat (pending). Do not build on it for v1;
+  for a paid personally billed or enterprise-managed seat (no such seat available, #95). Do not build on it for v1;
   `copilot_internal/user` is the only source, and `stale` carries the risk (ADR 0001).

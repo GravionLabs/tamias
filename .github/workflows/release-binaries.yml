@@ -23,6 +23,13 @@
 # macOS bundles `app,dmg`. The upload job writes latest.json (the endpoint of tauri.conf.json) from them with
 # .github/scripts/make-latest-json.sh and attaches it to the release. SHA256SUMS lists the bundles and the
 # .app.tar.gz, not the .sig files.
+# Beta (#206): release.yml on a branch other than main and release/* passes the version x.y.z-beta.n and no tag; the
+# jobs build the dispatched ref with that version (as for an rc, NSIS on Windows) and keep the archives as artifacts;
+# the upload job is skipped.
+# Release candidate (#205): release.yml on a release/* branch passes the tag v<x.y.z>-rc.<n> of release/next. The tag
+# carries the Cargo version of the last release, so each job writes the rc version into its own checkout with
+# set-version.sh (not committed). WiX (.msi) needs a numeric version: on Windows an rc bundles NSIS (-setup.exe, uploaded
+# as tamias-app-<version>-<target>.exe) instead; a stable release keeps the .msi.
 # No build cache: release binaries are built from a clean state.
 name: Release binaries
 
@@ -33,6 +40,11 @@ on:
         description: Release tag (v<version>) to build and upload to
         required: true
         type: string
+      version:
+        description: Beta version (x.y.z-beta.n) to write into the checkout of the dispatched ref; no tag, nothing is uploaded
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:
 
 permissions: {}
@@ -44,6 +56,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   TAG: ${{ inputs.tag }}
+  BETA_VERSION: ${{ inputs.version }}
 
 jobs:
   build:
@@ -85,6 +98,12 @@ jobs:
         run: |
           rustup toolchain install --no-self-update
           rustup target add "$TARGET"
+
+      # A release candidate: the tag has the version of the last release, so write the rc version into this checkout.
+      - name: Set the release candidate version
+        if: contains(inputs.tag, '-') || inputs.version != ''
+        working-directory: ${{ github.workspace }}
+        run: bash .github/scripts/set-version.sh "${BETA_VERSION:-${TAG#v}}"
 
       - name: Determine version
         id: version
@@ -148,7 +167,7 @@ jobs:
         include:
           - { target: aarch64-apple-darwin, os: macos-latest, bundles: "app,dmg" }
           - { target: x86_64-apple-darwin, os: macos-latest, bundles: "app,dmg" }
-          - { target: x86_64-pc-windows-msvc, os: windows-latest, bundles: msi }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, bundles: "${{ (contains(inputs.tag, '-') || inputs.version != '') && 'nsis' || 'msi' }}" }
           # 22.04 so the AppImage links the older glibc and starts on current Ubuntu releases too
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04, bundles: "appimage,deb" }
     runs-on: ${{ matrix.os }}
@@ -180,6 +199,12 @@ jobs:
         run: |
           rustup toolchain install --no-self-update
           rustup target add "$TARGET"
+
+      # A release candidate: the tag has the version of the last release, so write the rc version into this checkout.
+      - name: Set the release candidate version
+        if: contains(inputs.tag, '-') || inputs.version != ''
+        working-directory: ${{ github.workspace }}
+        run: bash .github/scripts/set-version.sh "${BETA_VERSION:-${TAG#v}}"
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
@@ -235,13 +260,13 @@ jobs:
           mkdir -p ../dist
           shopt -s nullglob
           found=0
-          for f in ../target/"$TARGET"/release/bundle/{dmg/*.dmg,msi/*.msi,appimage/*.AppImage,deb/*.deb}; do
+          for f in ../target/"$TARGET"/release/bundle/{dmg/*.dmg,msi/*.msi,nsis/*-setup.exe,appimage/*.AppImage,deb/*.deb}; do
             ext="${f##*.}"
             cp "$f" "../dist/tamias-app-$VERSION-$TARGET.$ext"
             found=$((found + 1))
           done
-          # the updater artifacts: .sig of the .msi and .AppImage, the .app.tar.gz and its .sig on macOS
-          for f in ../target/"$TARGET"/release/bundle/{msi/*.msi.sig,appimage/*.AppImage.sig,macos/*.app.tar.gz,macos/*.app.tar.gz.sig}; do
+          # the updater artifacts: .sig of the .msi (rc: .exe) and .AppImage, the .app.tar.gz and its .sig on macOS
+          for f in ../target/"$TARGET"/release/bundle/{msi/*.msi.sig,nsis/*-setup.exe.sig,appimage/*.AppImage.sig,macos/*.app.tar.gz,macos/*.app.tar.gz.sig}; do
             name="${f##*/}"
             case "$name" in
               *.app.tar.gz*) rest="${name#*.app.tar.gz}"; out="tamias-app-$VERSION-$TARGET.app.tar.gz$rest" ;;
@@ -286,7 +311,7 @@ jobs:
         working-directory: dist
         run: |
           shopt -s nullglob
-          archives=(tamias-*.tar.gz tamias-*.zip tamias-app-*.dmg tamias-app-*.msi tamias-app-*.AppImage tamias-app-*.deb)
+          archives=(tamias-*.tar.gz tamias-*.zip tamias-app-*.dmg tamias-app-*.msi tamias-app-*.exe tamias-app-*.AppImage tamias-app-*.deb)
           # 5 CLI archives (the two .app.tar.gz match tamias-*.tar.gz too), 5 bundles, 2 macOS updater archives
           [ "${#archives[@]}" -eq 12 ] || { echo "::error::expected 5 archives, 5 bundles and 2 updater archives, got ${#archives[@]}: ${archives[*]}"; exit 1; }
           sha256sum "${archives[@]}" > SHA256SUMS

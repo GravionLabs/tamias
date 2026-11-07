@@ -27,6 +27,16 @@ The bundles are not signed or notarised by the operating system (v1 ships unsign
 - **Windows**: SmartScreen may warn about an unrecognized app. Choose "More info", then "Run anyway".
 - **Linux**: no warning. Make the AppImage executable (`chmod +x`) before you start it.
 
+## Release candidate
+
+The maintainers cut a release candidate of `release/next` for the manual test at the end of every milestone:
+
+```sh
+gh workflow run release.yml --ref release/next
+```
+
+The workflow tags `v<next stable>-rc.<n>` (for example `v0.8.0-rc.3`) on `release/next` and creates a GitHub pre-release with the CLI archives, the app bundles, `SHA256SUMS` and `latest.json`. It commits nothing to `main` or `release/next`. The channel comes from the branch (`determine-version` of GravionLabs/ci): `release/*` gives `-rc.<n>`, `main` the stable release, and dispatching the workflow on any other branch builds `v<next stable>-beta.<n>` as workflow artifacts (7 days) without tag or release. WiX (`.msi`) needs a numeric version, so the Windows bundle of a candidate is the NSIS installer `tamias-app-<version>-x86_64-pc-windows-msvc.exe`; a stable release keeps the `.msi`. The update endpoint `releases/latest/download/latest.json` never serves a pre-release, so installed apps do not update to a candidate, and the stable version after candidates is the same as without them.
+
 ## First start and collection setup
 
 On the first start without data and without a collector, the calendar asks "Collection is not set up — set up now?". "Set up" runs `tamias service install` of the bundled CLI, which registers the collector with your operating system's scheduler:
