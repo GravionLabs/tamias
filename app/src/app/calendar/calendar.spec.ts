@@ -6,8 +6,9 @@ import { BrowserTestingModule, platformBrowserTesting } from "@angular/platform-
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Ipc, type ServiceStatus, type Unlisten } from "../core/ipc";
 import { STORE_CHANGED } from "../core/store-events";
-import type { MonthReport, ProviderMonth } from "../core/report";
+import type { MonthReport, ProviderMonth, Report } from "../core/report";
 import { STATUS_RETRY_DELAY, STATUS_TIMEOUT } from "../core/collection";
+import { WindowList } from "../core/window-list";
 import { Calendar, FIRST_DAY, NOW } from "./calendar";
 import type { FirstDay } from "./grid";
 
@@ -34,6 +35,8 @@ class StubIpc extends Ipc {
   install: () => void = () => {
     this.service = INSTALLED;
   };
+  /** What `today` answers; a throwing function makes the report unreadable. */
+  todayAnswer: () => unknown = () => TODAY;
   private readonly handlers = new Map<string, Set<() => void>>();
 
   constructor(public answer: (year: number, month: number) => unknown) {
@@ -48,6 +51,7 @@ class StubIpc extends Ipc {
       if (command === "service_status") return (this.serviceQueue.shift() ?? this.service) as T;
       return "installed" as T;
     }
+    if (command === "today") return this.todayAnswer() as T;
     if (command !== "month") throw new Error(`unexpected command ${command}`);
     const { year, month } = args as { year: number; month: number };
     this.requests.push([year, month]);
@@ -76,6 +80,43 @@ const CLAUDE: ProviderMonth = {
   ],
 };
 
+/** Today's report: Claude with a budgeted 7-day and a 5-hour window, Copilot unavailable. */
+const TODAY: Report = {
+  schema_version: 1,
+  generated_at: "2026-11-03T10:05:00Z",
+  providers: [
+    {
+      provider: "claude",
+      status: "ok",
+      windows: [
+        {
+          window: "seven_day",
+          binding: true,
+          unit: "percent",
+          used: 54,
+          limit: 100,
+          resets_at: "2026-11-10T00:00:00Z",
+          colour: "yellow",
+          today_usage: 4,
+          budget: 10,
+          ratio: 0.4,
+          month_usage: 12,
+        },
+        {
+          window: "five_hour",
+          binding: false,
+          unit: "percent",
+          used: 30,
+          limit: 100,
+          resets_at: "2026-11-03T15:00:00Z",
+          colour: "green",
+        },
+      ],
+    },
+    { provider: "copilot", status: "unavailable", windows: [] },
+  ],
+};
+
 const COPILOT_UNAVAILABLE: ProviderMonth = {
   provider: "copilot",
   status: "unavailable",
@@ -96,7 +137,7 @@ async function mount(
     now?: Date;
     month?: string;
     service?: ServiceStatus;
-    prepare?: Partial<Pick<StubIpc, "serviceQueue" | "hang">>;
+    prepare?: Partial<Pick<StubIpc, "serviceQueue" | "hang" | "todayAnswer">>;
   } = {},
 ) {
   const ipc = new StubIpc(answer);
@@ -127,6 +168,13 @@ async function mount(
       templateUrl: undefined,
       styleUrl: undefined,
       template: readFileSync("src/app/calendar/calendar.html", "utf8"),
+    },
+  });
+  TestBed.overrideComponent(WindowList, {
+    set: {
+      templateUrl: undefined,
+      styleUrl: undefined,
+      template: readFileSync("src/app/core/window-list.html", "utf8"),
     },
   });
   const fixture = TestBed.createComponent(Calendar);
@@ -596,31 +644,52 @@ describe("Calendar month projection", () => {
   });
 });
 
-describe("Calendar month chart", () => {
-  const charts = (el: HTMLElement) => [...el.querySelectorAll("[data-testid=month-chart]")];
+describe("Calendar window bars", () => {
+  const panels = (el: HTMLElement) => [...el.querySelectorAll("[data-testid=month-windows]")];
+  const totals = (el: HTMLElement) => [...el.querySelectorAll("[data-testid=month-total]")];
 
-  it("shows a chart per provider with data, with usage, budget and projection lines", async () => {
+  it("shows the tray card windows per provider in the current month, and no chart", async () => {
     const { el } = await mount((y, m) => month(y, m, CLAUDE, COPILOT_UNAVAILABLE));
-    const found = charts(el);
+    const found = panels(el);
     expect(found.map((c) => c.getAttribute("data-provider"))).toEqual(["claude"]);
-    expect(found[0]!.querySelector("[data-testid=budget-line]")).not.toBeNull();
-    expect(found[0]!.querySelector("[data-testid=usage-line]")!.getAttribute("class")).toContain(
-      "colour-yellow",
-    );
-    expect(found[0]!.querySelector("[data-testid=projection-line]")).not.toBeNull();
+    expect(found[0]!.querySelectorAll("app-window-list")).toHaveLength(1);
+    expect(found[0]!.querySelector("[data-testid=today]")).not.toBeNull();
+    expect(totals(el)).toHaveLength(0);
+    expect(el.querySelector("svg.chart, [data-testid=month-chart]")).toBeNull();
   });
 
-  it("shows no projection line for a past month and no chart for a future one", async () => {
+  it("shows no window bars when today's report cannot be read", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE), {
+      prepare: {
+        todayAnswer: () => {
+          throw new Error("boom");
+        },
+      },
+    });
+    expect(panels(el)).toHaveLength(0);
+    expect(cells(el)).toHaveLength(30);
+  });
+
+  it("shows the month total against the budget per provider in a past month, without window bars", async () => {
     const october: ProviderMonth = {
       ...CLAUDE,
-      days: [{ date: "2026-10-31", usage: 62, budget: 10, ratio: 6.2, colour: "red" }],
+      days: [{ date: "2026-10-31", usage: 155, budget: 10, ratio: 15.5, colour: "red" }],
     };
-    const past = await mount((y, m) => month(y, m, october), { month: "2026-10" });
-    expect(charts(past.el)).toHaveLength(1);
-    expect(past.el.querySelector("[data-testid=projection-line]")).toBeNull();
-    TestBed.resetTestingModule();
-    const future = await mount((y, m) => month(y, m, CLAUDE), { month: "2026-12" });
-    expect(charts(future.el)).toHaveLength(0);
+    const { el } = await mount((y, m) => month(y, m, october), { month: "2026-10" });
+    expect(panels(el)).toHaveLength(0);
+    const found = totals(el);
+    expect(found.map((c) => c.getAttribute("data-provider"))).toEqual(["claude"]);
+    expect(found[0]!.querySelector("[data-testid=month-total-text]")!.textContent).toContain(
+      "50 %",
+    );
+    const bar = found[0]!.querySelector<HTMLElement>("[data-testid=month-total-bar]")!;
+    expect(bar.style.width).toBe("50%");
+  });
+
+  it("shows nothing below the grid for a future month", async () => {
+    const { el } = await mount((y, m) => month(y, m, CLAUDE), { month: "2026-12" });
+    expect(panels(el)).toHaveLength(0);
+    expect(totals(el)).toHaveLength(0);
   });
 
   it("links the header to the year view of the shown month", async () => {

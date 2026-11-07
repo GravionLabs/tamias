@@ -84,9 +84,9 @@ The sizes were measured, not guessed: the calendar content is 783 px high at zoo
 
 The day view shows, per provider, the usage of the local day written out as "usage of budget" (a day without a budget says "No budget for this day.", a day without data says why) and below it the windows exactly as the tray card shows them: per window the label and the percentage, the progress bar, the "Today" and "Month (projected)" rows where the window has a budget, `x of y used` and `resets …`. The windows are the current ones of `tamias today`, whatever day is open; if that report cannot be read, the day is shown without them. A stale provider says since when. The view reloads on every change of the store, like the calendar.
 
-## Month chart
+## Window bars in the calendar
 
-Below the calendar grid, each provider with a budget has a month chart: the cumulative usage of the month as a line against the cumulative budget, a straight line from 0 to the monthly budget at the end of the month. A day without data adds nothing and leaves a gap in the line. For the current month a dashed line continues from the last usage point to the projected month end (the month projection described under [Calendar](#calendar)). The usage line and the projection take the colour of the projection; a past month shows no projection.
+Below the calendar grid the calendar shows, per provider, the same window bars as the tray card (5-hour window, 7-day window, Copilot monthly quota, with the "Today" and "Month (projected)" rows where the window has a budget). In the current month they are the current state of `tamias today`; if that report cannot be read, the calendar shows no bars. A past month shows no 5-hour or 7-day values, only per provider the month total against the monthly budget (the daily budget times the days in the month) as a bar in the projection colour. A future month shows nothing below the grid.
 
 ## Year view
 

@@ -238,58 +238,23 @@ h1 {
   margin: 0 0 16px;
 }
 
-.month-chart h2 {
-  margin: 20px 0 4px;
+.month-windows h2 {
+  margin: 20px 0 8px;
   font-size: 1rem;
 }
 
-.month-chart .chart {
-  display: block;
-  width: 100%;
-  height: auto;
+.total-text {
+  margin: 0 0 6px;
 }
 
-.chart-grid {
-  stroke: var(--h-surface-300);
-  stroke-width: 1;
+.track {
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--h-surface-200);
 }
 
-.tick {
-  fill: var(--h-text-muted-color);
-  font-size: 11px;
-}
-
-.budget {
-  fill: none;
-  stroke: var(--h-text-color);
-  stroke-width: 1.5;
-  stroke-dasharray: 6 4;
-}
-
-.usage {
-  fill: none;
-  stroke-width: 2.5;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.projection {
-  stroke-dasharray: 2 5;
-  stroke-linecap: round;
-}
-
-path.colour-green {
-  stroke: var(--h-green-500);
-}
-
-path.colour-yellow {
-  stroke: var(--h-yellow-500);
-}
-
-path.colour-red {
-  stroke: var(--h-red-500);
-}
-
-path.colour-grey {
-  stroke: var(--h-surface-400);
+.bar {
+  height: 100%;
+  border-radius: 3px;
 }

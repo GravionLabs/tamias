@@ -23,10 +23,12 @@ import {
   type MonthReport,
   type ProviderMonth,
   type ProviderName,
+  type Report,
+  type WindowReport,
 } from "../core/report";
 import { daysInMonth, isoDate, leadingBlanks, shiftMonth, type FirstDay } from "./grid";
 import { WeekStart } from "../core/week-start";
-import { HEIGHT, WIDTH, buildMonthChart, type MonthChart } from "./month-chart";
+import { WindowList } from "../core/window-list";
 
 /** First day of the week; defaults to `week_start` of `config.toml`, tests provide a fixed one. */
 export const FIRST_DAY = new InjectionToken<FirstDay>("FIRST_DAY", {
@@ -61,20 +63,25 @@ interface Cell {
   stale: string | null;
 }
 
-/** The month chart of one provider below the grid. */
-interface MonthChartPanel {
+/** The window bars of one provider below the grid, as the tray card shows them. */
+interface WindowPanel {
   provider: ProviderName;
   name: string;
-  chart: MonthChart;
+  windows: WindowReport[];
 }
 
 /** A provider's month line below the header: the projection of the current month, the final usage of a past one. */
 interface MonthLine {
   provider: ProviderName;
+  name: string;
   /** "Claude: projected 62 %" / "Claude: month total 48 %". */
   label: string;
   colour: Colour;
   title: string;
+  /** The month total as a share of the monthly budget, for the bar of a past month. */
+  percent: number;
+  /** "48 of 100 %" / "310 of 600 requests". */
+  detail: string;
 }
 
 const LETTERS: Record<ProviderName, string> = { claude: "C", copilot: "CP" };
@@ -85,7 +92,7 @@ const LETTERS: Record<ProviderName, string> = { claude: "C", copilot: "CP" };
  */
 @Component({
   selector: "app-calendar",
-  imports: [HxButton, HxMessage, HxProgressSpinner, RouterLink],
+  imports: [HxButton, HxMessage, HxProgressSpinner, RouterLink, WindowList],
   templateUrl: "./calendar.html",
   styleUrl: "./calendar.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -107,6 +114,8 @@ export class Calendar {
   protected readonly month = signal(this.start.month);
   protected readonly report = signal<MonthReport | null>(null);
   protected readonly error = signal<string | null>(null);
+  /** Today's report, whose windows the current month shows; `null` until read or when it cannot be read. */
+  private readonly overview = signal<Report | null>(null);
 
   protected readonly title = computed(() =>
     new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(
@@ -175,40 +184,32 @@ export class Calendar {
       const result = monthProjection(usage, last.budget, current ? now.getDate() : days, days);
       if (!result) continue;
       const name = providerLabel(p.provider);
+      const projected = amount(Math.round(result.projected * 10) / 10, p.unit);
       lines.push({
         provider: p.provider,
+        name,
         label: `${name}: ${current ? "projected" : "month total"} ${result.percent} %`,
         colour: projectionColour(result, last.colour),
-        title:
-          `${name}: ${amount(Math.round(result.projected * 10) / 10, p.unit)} of ` +
-          `${amount(result.budget, p.unit)} monthly budget`,
+        title: `${name}: ${projected} of ${amount(result.budget, p.unit)} monthly budget`,
+        percent: result.percent,
+        detail: `${projected} of ${amount(result.budget, p.unit)}`,
       });
     }
     return lines;
   });
 
-  protected readonly chartWidth = WIDTH;
-  protected readonly chartHeight = HEIGHT;
-
-  /** Per provider with data and a budget the month chart: cumulative usage against budget and the projection. */
-  protected readonly monthCharts = computed<MonthChartPanel[]>(() => {
-    const year = this.year();
-    const month = this.month();
-    const report = this.report();
-    const now = this.now();
-    if (!report || report.year !== year || report.month !== month) return [];
-    const days = daysInMonth(year, month);
-    const current = this.isCurrentMonth();
-    if (!current && isoDate(year, month, 1) > isoDate(now.getFullYear(), now.getMonth() + 1, 1)) {
-      return [];
-    }
-    const panels: MonthChartPanel[] = [];
-    for (const p of report.providers) {
-      const chart = buildMonthChart(year, month, days, p, current, now.getDate());
-      if (chart) panels.push({ provider: p.provider, name: providerLabel(p.provider), chart });
-    }
-    return panels;
+  /** The current month: per provider with windows the window bars of the tray card; nothing for other months. */
+  protected readonly windowPanels = computed<WindowPanel[]>(() => {
+    if (!this.isCurrentMonth()) return [];
+    return (this.overview()?.providers ?? [])
+      .filter((p) => p.status !== "unavailable" && p.windows.length > 0)
+      .map((p) => ({ provider: p.provider, name: providerLabel(p.provider), windows: p.windows }));
   });
+
+  /** A past month: per provider the month total against the monthly budget. */
+  protected readonly monthTotals = computed<MonthLine[]>(() =>
+    this.isCurrentMonth() ? [] : this.monthLines(),
+  );
 
   /**
    * "Collection is not set up — set up now?": no data and no collector, until "Not now". It stays
@@ -306,9 +307,14 @@ export class Calendar {
     // Only the latest load is shown: an earlier one that answers late is dropped.
     const load = ++this.loads;
     try {
-      const report = await this.ipc.month(year, month);
+      const [report, overview] = await Promise.all([
+        this.ipc.month(year, month),
+        // The windows are extra: a failing overview leaves the calendar without them.
+        this.ipc.today().catch(() => null),
+      ]);
       if (load !== this.loads) return;
       this.report.set(report);
+      this.overview.set(overview);
       this.error.set(null);
       // Only without data: the status runs the CLI, which a filled calendar does not need.
       if (hasNoData(report) && this.collection.status() === null) void this.collection.check();
