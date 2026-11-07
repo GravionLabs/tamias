@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Writes the released version into the Cargo workspace so a build of the release tag reports it (`tamias --version`).
 # Usage: VERSION=1.2.3 .github/scripts/set-version.sh   (or: .github/scripts/set-version.sh 1.2.3)
+# VERSION is x.y.z or the release candidate x.y.z-rc.n (#205); release-binaries.yml writes the latter into its own
+# checkout of the pre-release tag without committing it.
 # Sets `[workspace.package] version` and the `tamias-core` version in `[workspace.dependencies]` of the root
 # Cargo.toml, installs the toolchain of rust-toolchain.toml, then updates the workspace members in Cargo.lock
 # (`cargo update --workspace`, offline first; its error is printed before the online retry).
@@ -8,7 +10,7 @@
 set -euo pipefail
 
 VERSION="${1:-${VERSION:-}}"
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "unexpected version: '$VERSION' (expected x.y.z)" >&2; exit 1; }
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]] || { echo "unexpected version: '$VERSION' (expected x.y.z or x.y.z-rc.n)" >&2; exit 1; }
 
 manifest=Cargo.toml
 [ -f "$manifest" ] || { echo "$manifest not found; run from the repository root" >&2; exit 1; }
